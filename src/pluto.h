@@ -31,6 +31,10 @@
 
 #include "osl/extensions/dependence.h"
 
+// -- Jie Added --
+#define JIE_DEBUG
+// ---------------
+
 #ifdef GLPK
 #include <glpk.h>
 #endif

@@ -1,5 +1,3 @@
-// Jie
-
 /*
  * PLUTO: An automatic parallelizer and locality optimizer
  *
@@ -45,6 +43,7 @@
 #include "post_transform.h"
 #include "program.h"
 #include "version.h"
+#include "psa_dep.h"
 
 #include "clan/clan.h"
 #include "candl/candl.h"
@@ -586,6 +585,24 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
   }
   IF_MORE_DEBUG(pluto_prog_print(stdout, prog));
 
+  /* Jie Added - Start */
+  /* Dependence Checker for Systolic Array */
+  fprintf(stdout, "[PSA] Check uniformity of the design.\n");
+  bool is_uniform = systolic_array_dep_checker(prog);
+  if (!is_uniform) {
+    fprintf(stdout, "[PSA] Non-uniform dependence detected.\n");
+    return 1;
+  }
+#ifdef JIE_DEBUG
+  fprintf(stdout, "[Debug] Uniformity: %d\n", is_uniform);
+#endif
+
+  fprintf(stdout, "[PSA] Filter out redundant dependences.\n");
+  /* Filter out RAR dependences on scalar variables */
+  rar_scalar_filter(prog);
+
+  /* Jie Added - End */
+
   int dim_sum = 0;
   for (i = 0; i < prog->nstmts; i++) {
     dim_sum += prog->stmts[i]->dim;
@@ -598,6 +615,25 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
     fprintf(stdout, "[pluto] Maximum domain dimensionality: %d\n", prog->nvar);
     fprintf(stdout, "[pluto] Number of parameters: %d\n", prog->npar);
   }
+
+//#ifdef JIE_DEBUG
+//  fprintf(stdout, "print out the dependences\n");
+//  for (i = 0; i < prog->ndeps; i++) {
+//    Dep* dep = prog->deps[i];
+//    fprintf(stdout, "[Debug] Dependence ID: %d\n", i);
+//    fprintf(stdout, "[Debug] src ID: %d\n", dep->src);
+//    fprintf(stdout, "[Debug] dest ID: %d\n", dep->dest);
+//    PlutoConstraints* dpolytope = dep->dpolytope;
+//    pluto_constraints_pretty_print(stdout, dpolytope);
+//    fprintf(stdout, "[Debug] type: %d\n", dep->type);
+//    if (IS_RAR(dep->type)) {
+//      // print out access functions of RAR deps
+//      PlutoAccess *acc = dep->src_acc;
+//      fprintf(stdout, "[Debug] name: %s\n", acc->name);
+//      pluto_matrix_print(stdout, acc->mat);
+//    }
+// }
+//#endif
 
   if (options->iss) {
     pluto_iss_dep(prog);
@@ -620,6 +656,21 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
     /* Print out transformations */
     pluto_transformations_pretty_print(prog);
   }
+
+  /* Jie Added - Start */
+  fprintf(stdout, "[PSA] Explore different systolic array candidates.\n");
+  PlutoProg** progs;
+  int nprogs;
+  progs = sa_candidates_generation(prog, &nprogs);
+  fprintf(stdout, "[PSA] Number of array candidates: %d\n", nprogs);
+#ifdef JIE_DEBUG  
+  if (progs[0] == NULL) {
+    fprintf(stdout, "[Debug] progs pointer NULL!\n");
+  }
+#endif  
+  //prog = progs[0];
+
+  /* Jie Added - End */
 
   if (options->tile) {
     pluto_tile(prog);

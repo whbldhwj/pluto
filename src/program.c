@@ -3256,8 +3256,8 @@ Dep *pluto_dep_dup(Dep *d) {
                               : NULL;
 
   dep->depsat_poly =
-      d->depsat_poly ? pluto_constraints_dup(d->depsat_poly) : NULL;
-  dep->satvec = NULL; // TODO
+      d->depsat_poly ? pluto_constraints_dup(d->depsat_poly) : NULL;  
+  dep->satvec = NULL; // TODO  
   dep->type = d->type;
   dep->satisfied = d->satisfied;
   dep->satisfaction_level = d->satisfaction_level;
@@ -4923,6 +4923,25 @@ Stmt *pluto_stmt_dup(const Stmt *stmt) {
   int i;
 
   Stmt *nstmt = pluto_stmt_alloc(stmt->dim, stmt->domain, stmt->trans);
+
+  /* Jie Added - Start */
+  nstmt->id = stmt->id;
+  nstmt->tile = stmt->tile;
+  if (stmt->evicted_hyp) {
+    nstmt->evicted_hyp = pluto_matrix_dup(stmt->evicted_hyp);
+  }
+  nstmt->evicted_hyp_pos = stmt->evicted_hyp_pos;  
+  for (i = 0; i < stmt->trans->nrows; i++) {
+    nstmt->hyp_types[i] = stmt->hyp_types[i];
+  }
+  nstmt->num_tiled_loops = stmt->num_tiled_loops;
+  nstmt->scc_id = stmt->scc_id;
+  nstmt->cc_id = stmt->cc_id;
+  nstmt->first_tile_dim = stmt->first_tile_dim;
+  nstmt->last_tile_dim = stmt->last_tile_dim;
+  nstmt->type = stmt->type;
+  nstmt->ploop_id = stmt->ploop_id;  
+  /* Jie Added - End */
 
   nstmt->dim_orig = stmt->dim_orig;
   nstmt->type = stmt->type;
