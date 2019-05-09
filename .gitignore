@@ -7,8 +7,8 @@
 *.pyc
 test_plutolib
 # vscode
-.vscode/*
-src/.vscode/*
+.vscode*
+src/.vscode*
 
 test/*.cloog
 test/*.pluto.c
