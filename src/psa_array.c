@@ -79,7 +79,7 @@ Dep *pluto_dep_prog_dup(Dep *d, int num_hyperplanes) {
 
   dep->depsat_poly =
       d->depsat_poly ? pluto_constraints_dup(d->depsat_poly) : NULL;  
-  //dep->satvec = NULL; // TODO  
+  dep->satvec = NULL; // TODO  
   if (d->satvec) {
     dep->satvec = (int *)malloc(num_hyperplanes * sizeof(int));
     for (i = 0; i < num_hyperplanes; i++) {
@@ -89,11 +89,25 @@ Dep *pluto_dep_prog_dup(Dep *d, int num_hyperplanes) {
   dep->type = d->type;
   dep->satisfied = d->satisfied;
   dep->satisfaction_level = d->satisfaction_level;
-  //dep->dirvec = NULL; // TODO
+  dep->dirvec = NULL; // TODO
   if (d->dirvec) {
     dep->dirvec = (DepDir *)malloc(num_hyperplanes * sizeof(DepDir));
     for (i = 0; i < num_hyperplanes; i++) {
       dep->dirvec[i] = d->dirvec[i];
+    }
+  }
+  //dep->disvec
+#ifdef JIE_DEBUG
+  fprintf(stdout, "[Debug] dep->id: %d\n", dep->id);
+#endif
+  dep->disvec = NULL;
+  if (d->disvec) {
+#ifdef JIE_DEBUG
+    fprintf(stdout, "[Debug] duplicate disvec.\n");
+#endif
+    dep->disvec = (DepDis *)malloc(num_hyperplanes * sizeof(DepDis));
+    for (i = 0; i < num_hyperplanes; i++) {
+      dep->disvec[i] = d->disvec[i];
     }
   }
   dep->cst = d->cst ? pluto_constraints_dup(d->cst) : NULL;
@@ -187,7 +201,7 @@ PlutoOptions *pluto_options_dup(const PlutoOptions *options) {
  * Return a clone of a graph
  */
 Graph *graph_dup(const Graph *graph) {
-  int i, j;
+  int i;
 
 // #ifdef JIE_DEBUG
 //   fprintf(stdout, "[Debug] Stop 1.1.\n");
@@ -222,7 +236,8 @@ Graph *graph_dup(const Graph *graph) {
 //   fprintf(stdout, "[Debug] SCC number: %d\n", graph->num_sccs);
 // #endif
 
-  free(ngraph->sccs);
+  if (ngraph->sccs)
+    free(ngraph->sccs);
   ngraph->sccs = (Scc *)malloc(ngraph->num_sccs * sizeof(Scc));
   for (i = 0; i < ngraph->num_sccs; i++) {
     ngraph->sccs[i].size = graph->sccs[i].size;
@@ -276,7 +291,7 @@ Graph *graph_dup(const Graph *graph) {
  */
 PlutoProg *pluto_prog_dup(const PlutoProg *prog) {
   int i;
-  PlutoProg *new_prog = pluto_prog_alloc();
+  PlutoProg *new_prog = (PlutoProg *)pluto_prog_alloc();
 
 // #ifdef JIE_DEBUG
 //   fprintf(stdout, "[Debug] num_hyperplanes: %d\n", prog->num_hyperplanes);
@@ -291,12 +306,18 @@ PlutoProg *pluto_prog_dup(const PlutoProg *prog) {
 
   /* Array of dependences */
   new_prog->ndeps = prog->ndeps;
+#ifdef JIE_DEBUG
+  fprintf(stdout, "[Debug] deps dup.\n");
+#endif
   new_prog->deps = (Dep **)malloc(prog->ndeps * sizeof(Dep *));
   for (i = 0; i < prog->ndeps; i++) {
 	  new_prog->deps[i] = pluto_dep_prog_dup(prog->deps[i], prog->num_hyperplanes);
   }
 
   /* Array of dependences */
+#ifdef JIE_DEBUG
+  fprintf(stdout, "[Debug] transdeps dup.\n");
+#endif
   new_prog->ntransdeps = prog->ntransdeps;
   new_prog->transdeps = (Dep **)malloc(prog->ntransdeps * sizeof(Dep *));
   for (i = 0; i < prog->ntransdeps; i++) {
@@ -441,21 +462,428 @@ PlutoProg *pluto_prog_dup(const PlutoProg *prog) {
   return new_prog;
 }
 
+/* 
+ * Distance vector component at level 'level'
+ */
+DepDis get_dep_distance(const Dep *dep, const PlutoProg *prog, int level) {
+  PlutoConstraints *cst;
+  int j, src, dest;
+
+  int npar = prog->npar;
+  Stmt **stmts = prog->stmts;
+
+  src = dep->src;
+  dest = dep->dest;
+
+  Stmt *src_stmt = stmts[dep->src];
+  Stmt *dest_stmt = stmts[dep->dest];
+
+  int src_dim = src_stmt->dim;
+  int dest_dim = dest_stmt->dim;
+
+  assert(level < stmts[src]->trans->nrows);
+  assert(level < stmts[dest]->trans->nrows);
+
+  cst = pluto_constraints_alloc(2 * (2 + dep->dpolytope->nrows),
+                                (src_dim + dest_dim) + npar + 1);
+
+  /* Check for zero
+   *
+   * To test \phi(dest) - \phi(src) = 0, we try
+   * 
+   * \phi(dest) - \phi(src) >= 1 and
+   * \phi(dest) - \phi(src) <= -1
+   */
+  cst->is_eq[0] = 0;
+  for (j = 0; j < src_dim; j++) {
+    cst->val[0][j] = -stmts[src]->trans->val[level][j];
+  }
+  for (j = src_dim; j < src_dim + dest_dim; j++) {
+    cst->val[0][j] = stmts[dest]->trans->val[level][j - src_dim];
+  }
+  for (j = src_dim + dest_dim; j < src_dim + dest_dim + npar; j++) {
+    cst->val[0][j] = -stmts[src]->trans->val[level][j - dest_dim] +
+                    stmts[dest]->trans->val[level][j - src_dim];
+  }
+  cst->val[0][src_dim + dest_dim + npar] =
+      -stmts[src]->trans->val[level][src_dim + npar] +
+      stmts[dest]->trans->val[level][dest_dim + npar] - 1;
+  cst->nrows = 1;
+  
+  pluto_constraints_add(cst, dep->dpolytope);
+
+  bool is_empty = pluto_constraints_is_empty(cst);
+
+  if (is_empty) {
+    /* \phi(dest) - \phi(src) <= -1 */
+    for (j = 0; j < src_dim; j++) {
+      cst->val[0][j] = stmts[src]->trans->val[level][j];
+    }
+    for (j = src_dim; j < src_dim + dest_dim; j++) {
+      cst->val[0][j] = -stmts[dest]->trans->val[level][j - src_dim];
+    }
+    for (j = src_dim + dest_dim; j < src_dim + dest_dim + npar; j++) {
+      cst->val[0][j] = stmts[src]->trans->val[level][j - dest_dim] - 
+                       stmts[dest]->trans->val[level][j - src_dim];                       
+    }
+    cst->val[0][src_dim + dest_dim + npar] = 
+        stmts[src]->trans->val[level][src_dim + npar] - 
+        stmts[dest]->trans->val[level][dest_dim + npar] - 1;
+    cst->nrows = 1;
+
+    pluto_constraints_add(cst, dep->dpolytope);
+
+    is_empty = pluto_constraints_is_empty(cst);
+
+    /* If no solution exists, all points satisfy \phi(dest) - \phi(src) = 0 */
+    if (is_empty) {
+      pluto_constraints_free(cst);
+      return DEP_DIS_ZERO;
+    }    
+  }
+
+  /* Check for plus one
+   *
+   * To test \phi(dest) - \phi(src) = 1, we try
+   * 
+   * \phi(dest) - \phi(src) >= 2 and
+   * \phi(dest) - \phi(src) <= 0
+   */  
+  cst->is_eq[0] = 0;
+  for (j = 0; j < src_dim; j++) {
+    cst->val[0][j] = -stmts[src]->trans->val[level][j];
+  }
+  for (j = src_dim; j < src_dim + dest_dim; j++) {
+    cst->val[0][j] = stmts[dest]->trans->val[level][j - src_dim];
+  }
+  for (j = src_dim + dest_dim; j < src_dim + dest_dim + npar; j++) {
+    cst->val[0][j] = -stmts[src]->trans->val[level][j - dest_dim] +
+                    stmts[dest]->trans->val[level][j - src_dim];
+  }
+  cst->val[0][src_dim + dest_dim + npar] =
+      -stmts[src]->trans->val[level][src_dim + npar] +
+      stmts[dest]->trans->val[level][dest_dim + npar] - 2;
+  cst->nrows = 1;
+  
+  pluto_constraints_add(cst, dep->dpolytope);
+
+  is_empty = pluto_constraints_is_empty(cst);
+
+  if (is_empty) {
+    /* \phi(dest) - \phi(src) <= 0 */
+    for (j = 0; j < src_dim; j++) {
+      cst->val[0][j] = stmts[src]->trans->val[level][j];
+    }
+    for (j = src_dim; j < src_dim + dest_dim; j++) {
+      cst->val[0][j] = -stmts[dest]->trans->val[level][j - src_dim];
+    }
+    for (j = src_dim + dest_dim; j < src_dim + dest_dim + npar; j++) {
+      cst->val[0][j] = stmts[src]->trans->val[level][j - dest_dim] - 
+                       stmts[dest]->trans->val[level][j - src_dim];                       
+    }
+    cst->val[0][src_dim + dest_dim + npar] = 
+        stmts[src]->trans->val[level][src_dim + npar] - 
+        stmts[dest]->trans->val[level][dest_dim + npar];
+    cst->nrows = 1;
+
+    pluto_constraints_add(cst, dep->dpolytope);
+
+    is_empty = pluto_constraints_is_empty(cst);
+
+    /* If no solution exists, all points satisfy \phi(dest) - \phi(src) = 1 */
+    if (is_empty) {
+      pluto_constraints_free(cst);
+      return DEP_DIS_PLUS_ONE;
+    }    
+  }
+
+  /* Check for minus one
+   *
+   * To test \phi(dest) - \phi(src) = -1, we try
+   * 
+   * \phi(dest) - \phi(src) >= 0 and
+   * \phi(dest) - \phi(src) <= -2
+   */  
+  cst->is_eq[0] = 0;
+  for (j = 0; j < src_dim; j++) {
+    cst->val[0][j] = -stmts[src]->trans->val[level][j];
+  }
+  for (j = src_dim; j < src_dim + dest_dim; j++) {
+    cst->val[0][j] = stmts[dest]->trans->val[level][j - src_dim];
+  }
+  for (j = src_dim + dest_dim; j < src_dim + dest_dim + npar; j++) {
+    cst->val[0][j] = -stmts[src]->trans->val[level][j - dest_dim] +
+                    stmts[dest]->trans->val[level][j - src_dim];
+  }
+  cst->val[0][src_dim + dest_dim + npar] =
+      -stmts[src]->trans->val[level][src_dim + npar] +
+      stmts[dest]->trans->val[level][dest_dim + npar];
+  cst->nrows = 1;
+  
+  pluto_constraints_add(cst, dep->dpolytope);
+
+  is_empty = pluto_constraints_is_empty(cst);
+
+  if (is_empty) {
+    /* \phi(dest) - \phi(src) <= -2 */
+    for (j = 0; j < src_dim; j++) {
+      cst->val[0][j] = stmts[src]->trans->val[level][j];
+    }
+    for (j = src_dim; j < src_dim + dest_dim; j++) {
+      cst->val[0][j] = -stmts[dest]->trans->val[level][j - src_dim];
+    }
+    for (j = src_dim + dest_dim; j < src_dim + dest_dim + npar; j++) {
+      cst->val[0][j] = stmts[src]->trans->val[level][j - dest_dim] - 
+                       stmts[dest]->trans->val[level][j - src_dim];                       
+    }
+    cst->val[0][src_dim + dest_dim + npar] = 
+        stmts[src]->trans->val[level][src_dim + npar] - 
+        stmts[dest]->trans->val[level][dest_dim + npar] - 2;
+    cst->nrows = 1;
+
+    pluto_constraints_add(cst, dep->dpolytope);
+
+    is_empty = pluto_constraints_is_empty(cst);
+
+    /* If no solution exists, all points satisfy \phi(dest) - \phi(src) = -1 */
+    if (is_empty) {
+      pluto_constraints_free(cst);
+      return DEP_DIS_MINUS_ONE;
+    }        
+  }  
+
+  /* Neither ZERO, nor PLUS ONE, nor MINUS ONE, has to be STAR */
+  return DEP_STAR;    
+}
+
+/* 
+ * Compute the dependence distance for each mapped hyperplane.
+ */
+void psa_compute_dep_distances(PlutoProg *prog) {
+  int level;
+
+  Dep **deps = prog->deps;
+  Dep **transdeps = prog->transdeps;
+
+  /* Clear invalid pointer value in transdeps */
+  for (int i = 0; i < prog->ntransdeps; i++) {
+    //if (transdeps[i]->disvec != NULL) {
+    //  free(transdeps[i]->disvec);
+    //}
+    transdeps[i]->disvec = NULL;
+  }
+
+  for (int i = 0; i < prog->ndeps; i++) {    
+    if (deps[i]->disvec != NULL) {
+      free(deps[i]->disvec);
+    }
+    deps[i]->disvec = (DepDis *)malloc(prog->num_hyperplanes * sizeof(DepDis));
+    for (level = 0; level < prog->num_hyperplanes; level++) {
+      deps[i]->disvec[level] = get_dep_distance(deps[i], prog, level);
+    }
+#ifdef JIE_DEBUG
+    Dep *dep = deps[i];
+    fprintf(stdout, "[Debug] id: %d\n", dep->id);
+    fprintf(stdout, "[Debug] type: %d\n", dep->type);
+    fprintf(stdout, "[Debug] name: %s\n", dep->src_acc->name);
+    PlutoConstraints *dpolytope = dep->dpolytope;
+    pluto_constraints_pretty_print(stdout, dpolytope);
+    for (level = 0; level < prog->num_hyperplanes; level++) {
+      fprintf(stdout, "[Debug] dep dis %d: %c\n", level, deps[i]->disvec[level]);
+    }
+#endif
+  }
+}
+
+PlutoProg **sa_candidates_generation_band(Band *band, int array_dim, 
+              PlutoProg *prog, int *nprogs) {
+  PlutoProg **progs = NULL;
+  unsigned i, j, nloops;
+
+  Ploop **loops;
+
+  int firstD = band->loop->depth;
+  int lastD = band->loop->depth + band->width - 1;
+
+  /* Select loops that carried dependence with distance less equal to 1 */
+  int *is_space_loop = (int *)malloc(band->width * sizeof(int));
+  for (i = firstD; i < firstD + band->width; i++) {    
+    for (j = 0; j < prog->ndeps; j++) {
+      Dep *dep = prog->deps[j];
+      assert(dep->disvec != NULL);
+      if (!(dep->disvec[i] == DEP_DIS_ZERO || dep->disvec[i] == DEP_DIS_PLUS_ONE)) {
+        break;
+      }
+    }
+    is_space_loop[i - firstD] = (j == prog->ndeps);
+  }
+
+  /* Perform loop permutation to generate all candidate variants */
+  if (array_dim == 1) {
+    for (i = firstD; i < firstD + band->width; i++) {
+      if (is_space_loop[i - firstD]) {
+        PlutoProg *new_prog = pluto_prog_dup(prog);
+        /* As new prog is generated, we will need to generate new bands correspondingly */
+        Band **new_bands;
+        unsigned new_nbands;
+        new_bands = pluto_get_outermost_permutable_bands(new_prog, &new_nbands);
+
+        Ploop *loop = new_bands[0]->loop;
+        /* Make the loop i the outermost loop */
+        for (j = 0; j < loop->nstmts; j++) {
+          Stmt *stmt = loop->stmts[j];
+#ifdef JIE_DEBUG
+          fprintf(stdout, "[Debug] stmts nrows: %d\n", stmt->trans->nrows);
+          fprintf(stdout, "[Debug] stmts ncols: %d\n", stmt->trans->ncols);
+#endif          
+          unsigned d;
+          for (d = i; d > firstD; d--) {
+            pluto_stmt_loop_interchange(stmt, d, d - 1, new_prog);
+          }
+        }
+
+        pluto_compute_dep_directions(new_prog);
+        pluto_compute_dep_satisfaction(new_prog);
+        /* Add the new invariant to the list */
+        if (progs) {
+          progs = (PlutoProg **)realloc(progs, (*nprogs + 1) * sizeof(PlutoProg));
+          progs[*nprogs] = new_prog;
+          *nprogs = *nprogs + 1;
+        } else {
+          progs = (PlutoProg **)malloc((*nprogs + 1) * sizeof(PlutoProg));
+          progs[*nprogs] = new_prog;
+          *nprogs = *nprogs + 1;
+        }
+      }
+    }    
+  } else if (array_dim == 2) {
+    for (i = firstD; i < firstD + band->width; i++) {
+      if (is_space_loop[i]) {
+        for (j = i + 1; j < firstD + band->width; j++) {
+          if (is_space_loop[j]) {
+            PlutoProg *new_prog = pluto_prog_dup(prog);
+            /* As new prog is generated, we will need to generate new bands correspondingly */
+            Band **new_bands;
+            unsigned new_nbands;
+            new_bands = pluto_get_outermost_permutable_bands(new_prog, &new_nbands);
+
+            Ploop *loop = new_bands[0]->loop;
+            /* Make the loop i, j the outermost loops */
+            unsigned s;
+            for (s = 0; s < loop->nstmts; s++) {
+              Stmt *stmt = loop->stmts[s];
+              unsigned d;
+              for (d = j; d > firstD; d--) {
+                pluto_stmt_loop_interchange(stmt, d, d - 1, new_prog);
+              }
+              for (d = i + 1; d > firstD; d--) {
+                pluto_stmt_loop_interchange(stmt, d, d - 1, new_prog);
+              }
+            }
+
+            pluto_compute_dep_directions(new_prog);
+            pluto_compute_dep_satisfaction(new_prog);
+            /* Add the new invariant to the list */
+            if (progs) {
+              progs = (PlutoProg **)realloc(progs, (*nprogs + 1) * sizeof(PlutoProg));
+              progs[*nprogs] = new_prog;
+              *nprogs = *nprogs + 1;
+            } else {
+              progs = (PlutoProg **)malloc((*nprogs + 1) * sizeof(PlutoProg));
+              progs[*nprogs] = new_prog;
+              *nprogs = *nprogs + 1;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  free(is_space_loop);
+  return progs;
+}
+
 /*
  * Enumerate different combinations of the loops in the outermost permutable loop
  * band to generate different systolic array candidates. 
+ * Select permutable loops in the outermost permutable loop bands with all dependence
+ * components (<= 1) and generate all combinations for different array layouts. 
+ * (2D and 1D systolic array)
+ * Separate arrays that need interior I/O elimination and those don't.
  */
 PlutoProg **sa_candidates_generation(PlutoProg *prog, int *nprogs_p) {
-	int i;
-  int nprogs = 1;
-  *nprogs_p = nprogs;
+	PlutoProg **progs = NULL;
+  int nprogs = 0;
 
-  PlutoProg **progs;
-	progs = (PlutoProg *)malloc(nprogs * sizeof(PlutoProg*));
+  int i;
+  unsigned nbands;
+  Band **bands;
+  /* Compute projected dependence components */
+  psa_compute_dep_distances(prog);
+
+  /* Grasp the outermost permutable loop bands */
+  bands = pluto_get_outermost_permutable_bands(prog, &nbands);
+
+  /* Enumerate different combinations of loops in the permutable bands to generate
+   * different systolic array candidates 
+   */  
+  assert (nbands <= 1);
+  if (nbands == 0 || nbands > 1) {
+    progs = NULL;
+    *nprogs_p = 0;
+    return progs;
+  }
+
+  /* 1D systolic array */
+  if (bands[0]->width >= 1) {    
+    PlutoProg **new_progs = NULL;
+    int new_nprogs = 0;
+    new_progs = sa_candidates_generation_band(bands[0], 1, prog, &new_nprogs);
+    if (!progs) {
+#ifdef JIE_DEBUG
+      fprintf(stdout, "[Debug] in 1D branch.\n");
+      fprintf(stdout, "[Debug] number of 1D systolic array: %d\n", new_nprogs);
+#endif      
+      nprogs += new_nprogs;
+      progs = new_progs;
+    } else {
+      progs = (PlutoProg **)realloc(progs, (nprogs + new_nprogs) * sizeof(PlutoProg **));
+      for (i = nprogs; i < nprogs + new_nprogs; i++) {
+        progs[i] = new_progs[i - nprogs];
+      }      
+      nprogs += new_nprogs;
+    }
+  }
+  /* 2D systolic array */
+  if (bands[0]->width >= 2) {
+    PlutoProg **new_progs = NULL;
+    int new_nprogs = 0;
+    new_progs = sa_candidates_generation_band(bands[0], 2, prog, &new_nprogs);
+#ifdef JIE_DEBUG
+    fprintf(stdout, "[Debug] in 2D branch.\n");
+    fprintf(stdout, "[Debug] number of 2D systolic array: %d\n", new_nprogs);
+#endif    
+    if (!progs) {
+      nprogs += new_nprogs;
+      progs = new_progs;
+    } else {
+      progs = (PlutoProg **)realloc(progs, (nprogs + new_nprogs) * sizeof(PlutoProg **));
+      for (i = nprogs; i < nprogs + new_nprogs; i++) {
+        progs[i] = new_progs[i - nprogs];
+      }
+      nprogs += new_nprogs;
+    }
+  }
+
+  *nprogs_p = nprogs;
+  
+  // int nprogs = 1;
+  // *nprogs_p = nprogs;  
+	// progs = (PlutoProg *)malloc(nprogs * sizeof(PlutoProg*));
 	
-	for (i = 0; i < nprogs; i++) {
-		progs[i] = pluto_prog_dup(prog);
-	}
+	// for (i = 0; i < nprogs; i++) {
+	// 	progs[i] = pluto_prog_dup(prog);
+	// }
 
 	return progs;
 }

@@ -16,6 +16,8 @@
 #include "pet.h"
 #include "osl/scop.h"
 
+void psa_compute_dep_distances(PlutoProg *prog);
+DepDis get_dep_distance(const Dep *dep, const PlutoProg *prog, int level);
 //HyperplaneProperties *hyperplane_properties_dup(const HyperplaneProperties *hProps);
 Dep *pluto_dep_prog_dup(Dep *d, int num_hyperplanes);
 PlutoOptions *pluto_options_dup(const PlutoOptions *options);

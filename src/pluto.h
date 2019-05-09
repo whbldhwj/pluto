@@ -94,6 +94,15 @@ typedef enum dirvec_type {
   DEP_STAR = '*'
 } DepDir;
 
+/* Jie Added - Start */
+typedef enum disvec_type {
+  DEP_DIS_MINUS_ONE = '-',
+  DEP_DIS_ZERO = '0',
+  DEP_DIS_PLUS_ONE = '+',
+  DEP_DIS_STAR = '*'
+} DepDis;
+/* Jie Added - End */
+
 /* H_TILE_SPACE_LOOP may not always be distinguished from H_LOOP */
 typedef enum hyptype {
   H_UNKNOWN = 0,
@@ -298,6 +307,11 @@ struct dependence {
 
   /* Dependence direction in transformed space */
   DepDir *dirvec;
+
+  /* Jie Added - Start */
+  /* Dependence distance in transformed space */
+  DepDis *disvec;
+  /* Jie Added - End */
 };
 typedef struct dependence Dep;
 

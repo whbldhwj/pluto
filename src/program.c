@@ -1532,9 +1532,14 @@ void pluto_dep_free(Dep *dep) {
   if (dep->dirvec) {
     free(dep->dirvec);
   }
-  if (dep->dirvec) {
+  if (dep->satvec) {
     free(dep->satvec);
   }
+  /* Jie Added - Start */
+  if (dep->disvec) {
+    free(dep->disvec);
+  }
+  /* Jie Added - End */
   pluto_constraints_free(dep->cst);
   pluto_constraints_free(dep->bounding_cst);
   free(dep);

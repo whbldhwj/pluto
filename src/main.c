@@ -668,7 +668,7 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
     fprintf(stdout, "[Debug] progs pointer NULL!\n");
   }
 #endif  
-  //prog = progs[0];
+  prog = progs[0];
 
   /* Jie Added - End */
 
