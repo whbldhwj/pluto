@@ -76,6 +76,10 @@
 
 #define DEFAULT_L1_TILE_SIZE 32
 
+/* Jie Added - Start */
+#define DEFAULT_TASK_INTERLEAVE_TILE_FACTOR 8
+/* Jie Added - End */
+
 #define PI_TABLE_SIZE 256
 
 #define CST_WIDTH (npar + 1 + nstmts *(nvar + 1) + 1)
@@ -111,12 +115,30 @@ typedef enum hyptype {
   H_SCALAR
 } PlutoHypType;
 
+/* Jie Added - Start */
+typedef enum psahyptype {
+  PSA_H_UNKNOWN = 0,
+  PSA_H_SPACE_LOOP,
+  PSA_H_TIME_LOOP,
+  PSA_H_ARRAY_PART_LOOP,
+  PSA_H_SCALAR
+} PSAHypType;
+/* Jie Added - End */
+
 /* Candl dependences are not marked uniform/non-uniform */
 #define IS_UNIFORM(type) (0)
 #define IS_RAR(type) (type == OSL_DEPENDENCE_RAR)
 #define IS_RAW(type) (type == OSL_DEPENDENCE_RAW)
 #define IS_WAR(type) (type == OSL_DEPENDENCE_WAR)
 #define IS_WAW(type) (type == OSL_DEPENDENCE_WAW)
+
+/* Jie Added - Start */
+#define IS_PSA_ARRAY_PART_LOOP(type)  (type == PSA_H_ARRAY_PART_LOOP)
+#define IS_PSA_SPACE_LOOP(type)       (type == PSA_H_SPACE_LOOP)
+#define IS_PSA_TIME_LOOP(type)        (type == PSA_H_TIME_LOOP)
+#define IS_PSA_SCALAR(type)           (type == PSA_H_SCALAR)
+#define IS_PSA_UNKNOWN(type)          (type == PSA_H_UNKNOWN)
+/* Jie Added - End */
 
 typedef enum looptype {
   UNKNOWN = 0,
@@ -125,6 +147,13 @@ typedef enum looptype {
   SEQ,
   PIPE_PARALLEL_INNER_PARALLEL
 } PlutoLoopType;
+
+typedef enum psalooptype {
+  PSA_UNKNOWN = 0,
+  PSA_PARALLEL,
+  PSA_PIPE_PARALLEL,
+  PSA_SEQ
+} PSALoopType;
 
 /* ORIG is an original compute statement provided by a polyhedral extractor */
 typedef enum stmttype {
@@ -197,6 +226,9 @@ struct statement {
 
   /* H_LOOP, H_SCALAR, .. */
   PlutoHypType *hyp_types;
+
+  /* PSA_H_TIME_LOOP, PSA_H_SPACE_LOOP, .. */
+  PSAHypType *psa_hyp_types;
 
   /* Num of scattering dimensions tiled */
   int num_tiled_loops;
@@ -329,9 +361,15 @@ struct hyperplane_properties {
   /* Hyperplane property: see looptype enum definition */
   PlutoLoopType dep_prop;
 
+  /* Hyperplane property in PSA: see psalooptype enum defintion */
+  PSALoopType psa_dep_prop;  
+
   /* Hyperplane type: scalar, loop, or tile-space loop (H_SCALAR,
    * H_LOOP, H_TILE... */
   PlutoHypType type;
+
+  /* Hyperplane type: scalar, time loop, space loop, or array_partition_loop */
+  PSAHypType psa_type;
 
   /* The band number this hyperplane belongs to. Note that everything is a
    * hierarchy of permutable loop nests (it's not a tree, but a straight
@@ -433,6 +471,12 @@ struct plutoProg {
   double fcg_const_time, fcg_colour_time, fcg_dims_scale_time, fcg_update_time,
       fcg_cst_alloc_time;
   long int num_lp_calls;
+
+  /* Systolic array dimension */
+  int array_dim;
+
+  /* Systolic array array partition loops num */
+  int array_part_dim;
 };
 typedef struct plutoProg PlutoProg;
 
@@ -504,6 +548,11 @@ extern PlutoOptions *options;
 
 void dep_alloc_members(Dep *);
 void dep_free(Dep *);
+
+/* Jie Added - Start */
+void psa_detect_hyperplane_types_stmtwise(PlutoProg *prog, int array_dim, int array_part_dim);
+void psa_detect_hyperplane_types(PlutoProg *prog, int array_dim, int array_part_dim);
+/* Jie Added - End */
 
 void pluto_compute_dep_satisfaction(PlutoProg *prog);
 int pluto_compute_dep_satisfaction_precise(PlutoProg *prog);
@@ -720,5 +769,12 @@ Graph *build_fusion_conflict_graph(PlutoProg *prog, int *colour, int num_nodes,
                                    int current_colour);
 void find_permutable_dimensions_scc_based(int *colour, PlutoProg *prog);
 void introduce_skew(PlutoProg *prog);
+
+/* Jie Added - Start */
+Ploop **psa_get_outermost_loops(const PlutoProg *prog, 
+                                Stmt **stmts, int nstmts,
+                                int depth, int *ndploops);
+//void psa_redetect_hyperplane_types(PlutoProg *prog, int array_dim);                                
+/* Jie Added - End */                                
 #endif
 #endif

@@ -14,6 +14,7 @@
 #include "math_support.h"
 #include "constraints.h"
 #include "psa_dep.h"
+#include "program.h"
 
 #include "osl/macros.h"
 #include "osl/scop.h"
@@ -49,14 +50,14 @@
  */
 bool systolic_array_dep_checker(PlutoProg *prog) {
   /* Declaration */
-  int i, nstmts, nvar, npar, ndeps;
+  int i, npar, ndeps;
   Dep **deps;
   bool is_uniform = true;
 
-  nstmts = prog->nstmts;
+  // nstmts = prog->nstmts;
   ndeps = prog->ndeps;
   deps = prog->deps;
-  nvar = prog->nvar;
+  // nvar = prog->nvar;
   npar = prog->npar;
 
   /* Check uniformity of each dependence */
@@ -134,14 +135,14 @@ bool systolic_array_dep_checker(PlutoProg *prog) {
  */
 void rar_scalar_filter(PlutoProg *prog) {
   /* Declaration */
-  int i, j, nvar, npar, ndeps, ndata;
+  int i, j, ndeps;
   Dep **deps;
-  char **data_names;
+  // char **data_names;
   
   ndeps = prog->ndeps;
-  ndata = prog->num_data;
+  // ndata = prog->num_data;
   deps = prog->deps;
-  data_names = prog->data_names;
+  // data_names = prog->data_names;
 
   bool *is_scalar_dep = (bool *)malloc(ndeps * sizeof(bool));
 

@@ -1193,7 +1193,7 @@ static Stmt **osl_to_pluto_stmts(const osl_scop_p scop) {
     /* Pad with all zero rows */
     int curr_sched_rows = stmts[i]->trans->nrows;
     for (j = curr_sched_rows; j < max_sched_rows; j++) {
-      pluto_stmt_add_hyperplane(stmts[i], H_SCALAR, j);
+      pluto_stmt_add_hyperplane(stmts[i], H_SCALAR, PSA_H_SCALAR, j);
     }
 
     pluto_constraints_free(domain);
@@ -2642,7 +2642,7 @@ PlutoProg *scop_to_pluto_prog(osl_scop_p scop, PlutoOptions *options) {
   /* Add hyperplanes */
   if (prog->nstmts >= 1) {
     for (i = 0; i < max_sched_rows; i++) {
-      pluto_prog_add_hyperplane(prog, prog->num_hyperplanes, H_UNKNOWN);
+      pluto_prog_add_hyperplane(prog, prog->num_hyperplanes, H_UNKNOWN, PSA_H_UNKNOWN);
       prog->hProps[prog->num_hyperplanes - 1].type =
           (i % 2) ? H_LOOP : H_SCALAR;
     }
@@ -2719,6 +2719,11 @@ PlutoProg *pluto_prog_alloc() {
   prog->globcst = NULL;
 
   prog->num_parameterized_loops = -1;
+
+  /* Jie Added - Start */
+  prog->array_dim = 0;
+  prog->array_part_dim = 0;
+  /* Jie Added - End */
 
   return prog;
 }
@@ -2930,7 +2935,7 @@ void pluto_options_free(PlutoOptions *options) {
  * time_pos: position of time iterator; iter: domain iterator; supply -1
  * if you don't want a scattering function row added for it */
 void pluto_stmt_add_dim(Stmt *stmt, int pos, int time_pos, const char *iter,
-                        PlutoHypType hyp_type, PlutoProg *prog) {
+                        PlutoHypType hyp_type, PSAHypType psa_hyp_type, PlutoProg *prog) {
   int i, npar;
 
   npar = stmt->domain->ncols - stmt->dim - 1;
@@ -2962,6 +2967,15 @@ void pluto_stmt_add_dim(Stmt *stmt, int pos, int time_pos, const char *iter,
       stmt->hyp_types[i + 1] = stmt->hyp_types[i];
     }
     stmt->hyp_types[time_pos] = hyp_type;
+
+    /* Jie Added - Start */
+    stmt->psa_hyp_types = 
+        realloc(stmt->psa_hyp_types, sizeof(int) * stmt->trans->nrows);
+    for (i = stmt->trans->nrows - 2; i >= time_pos; i--) {
+      stmt->psa_hyp_types[i + 1] = stmt->psa_hyp_types[i];
+    }
+    stmt->psa_hyp_types[time_pos] = psa_hyp_type;
+    /* Jie Added - End */
   }
 
   /* Update is_orig_loop */
@@ -3073,7 +3087,7 @@ void pluto_stmt_remove_dim(Stmt *stmt, int pos, PlutoProg *prog) {
   }
 }
 
-void pluto_stmt_add_hyperplane(Stmt *stmt, PlutoHypType type, int pos) {
+void pluto_stmt_add_hyperplane(Stmt *stmt, PlutoHypType type, PSAHypType psa_type, int pos) {
   int i;
 
   assert(pos <= stmt->trans->nrows);
@@ -3086,6 +3100,14 @@ void pluto_stmt_add_hyperplane(Stmt *stmt, PlutoHypType type, int pos) {
   }
   stmt->hyp_types[pos] = type;
 
+  /* Jie Added - Start */
+  stmt->psa_hyp_types = realloc(stmt->psa_hyp_types, sizeof(int) * stmt->trans->nrows);
+  for (i = stmt->trans->nrows - 2; i >= pos; i--) {
+    stmt->psa_hyp_types[i + 1] = stmt->psa_hyp_types[i];
+  }
+  stmt->psa_hyp_types[pos] = psa_type;
+  /* Jie Added - End */
+
   if (stmt->first_tile_dim >= pos)
     stmt->first_tile_dim++;
   if (stmt->last_tile_dim >= pos)
@@ -3093,7 +3115,8 @@ void pluto_stmt_add_hyperplane(Stmt *stmt, PlutoHypType type, int pos) {
 }
 
 void pluto_prog_add_hyperplane(PlutoProg *prog, int pos,
-                               PlutoHypType hyp_type) {
+                               PlutoHypType hyp_type,
+                               PSAHypType psa_hyp_type) {
   int i;
 
   prog->num_hyperplanes++;
@@ -3109,6 +3132,7 @@ void pluto_prog_add_hyperplane(PlutoProg *prog, int pos,
   prog->hProps[pos].band_num = -1;
   prog->hProps[pos].dep_prop = UNKNOWN;
   prog->hProps[pos].type = hyp_type;
+  prog->hProps[pos].psa_type = psa_hyp_type;
 }
 
 /*
@@ -3165,14 +3189,14 @@ void pluto_pad_stmt_transformations(PlutoProg *prog) {
 
       /* Add all zero rows */
       for (j = curr_rows; j < max_nrows; j++) {
-        pluto_stmt_add_hyperplane(stmts[i], H_SCALAR, stmts[i]->trans->nrows);
+        pluto_stmt_add_hyperplane(stmts[i], H_SCALAR, PSA_H_SCALAR, stmts[i]->trans->nrows);
       }
     }
 
     int old_hyp_num = prog->num_hyperplanes;
     for (i = old_hyp_num; i < max_nrows; i++) {
       /* This is not really H_SCALAR, but this is the best we can do */
-      pluto_prog_add_hyperplane(prog, prog->num_hyperplanes, H_SCALAR);
+      pluto_prog_add_hyperplane(prog, prog->num_hyperplanes, H_SCALAR, PSA_H_SCALAR);
     }
   }
 }
@@ -3303,6 +3327,13 @@ Stmt *pluto_stmt_alloc(int dim, const PlutoConstraints *domain,
   for (i = 0; i < stmt->trans->nrows; i++) {
     stmt->hyp_types[i] = H_LOOP;
   }
+
+  /* Jie Added - Start */
+  stmt->psa_hyp_types = malloc(stmt->trans->nrows * sizeof(int));
+  for (i = 0; i < stmt->trans->nrows; i++) {
+    stmt->psa_hyp_types[i] = PSA_H_UNKNOWN;
+  }
+  /* Jie Added - End */
 
   stmt->text = NULL;
   stmt->tile = 1;
@@ -3997,13 +4028,13 @@ void pluto_separate_stmts(PlutoProg *prog, Stmt **stmts, int num, int level,
   nstmts = prog->nstmts;
 
   for (i = 0; i < nstmts; i++) {
-    pluto_stmt_add_hyperplane(prog->stmts[i], H_SCALAR, level);
+    pluto_stmt_add_hyperplane(prog->stmts[i], H_SCALAR, PSA_H_SCALAR, level);
   }
   for (k = 0; k < num; k++) {
     stmts[k]->trans->val[level][stmts[k]->trans->ncols - 1] = offset + 1 + k;
   }
 
-  pluto_prog_add_hyperplane(prog, level, H_SCALAR);
+  pluto_prog_add_hyperplane(prog, level, H_SCALAR, PSA_H_SCALAR);
   prog->hProps[level].dep_prop = SEQ;
 }
 
@@ -4016,12 +4047,12 @@ void pluto_separate_stmt(PlutoProg *prog, const Stmt *stmt, int level) {
 
   // pluto_matrix_print(stdout, stmt->trans);
   for (i = 0; i < nstmts; i++) {
-    pluto_stmt_add_hyperplane(prog->stmts[i], H_SCALAR, level);
+    pluto_stmt_add_hyperplane(prog->stmts[i], H_SCALAR, PSA_H_SCALAR, level);
   }
   // pluto_matrix_print(stdout, stmt->trans);
   stmt->trans->val[level][stmt->trans->ncols - 1] = 1;
 
-  pluto_prog_add_hyperplane(prog, level, H_SCALAR);
+  pluto_prog_add_hyperplane(prog, level, H_SCALAR, PSA_H_SCALAR);
   prog->hProps[level].dep_prop = SEQ;
 }
 
@@ -4532,7 +4563,7 @@ static Stmt **pet_to_pluto_stmts(struct pet_scop *pscop,
     /* Pad with all zero rows */
     int curr_sched_rows = stmts[s]->trans->nrows;
     for (j = curr_sched_rows; j < max_sched_rows; j++) {
-      pluto_stmt_add_hyperplane(stmts[s], H_SCALAR, j);
+      pluto_stmt_add_hyperplane(stmts[s], H_SCALAR, PSA_H_SCALAR, j);
     }
   }
 
@@ -4862,7 +4893,7 @@ PlutoProg *pet_to_pluto_prog(struct pet_scop *pscop, isl_ctx *ctx,
   /* Add hyperplanes */
   if (prog->nstmts >= 1) {
     for (i = 0; i < max_sched_rows; i++) {
-      pluto_prog_add_hyperplane(prog, prog->num_hyperplanes, H_UNKNOWN);
+      pluto_prog_add_hyperplane(prog, prog->num_hyperplanes, H_UNKNOWN, PSA_H_UNKNOWN);
       prog->hProps[prog->num_hyperplanes - 1].type =
           (i % 2) ? H_LOOP : H_SCALAR;
     }
@@ -4939,6 +4970,10 @@ Stmt *pluto_stmt_dup(const Stmt *stmt) {
   for (i = 0; i < stmt->trans->nrows; i++) {
     nstmt->hyp_types[i] = stmt->hyp_types[i];
   }
+  for (i = 0; i < stmt->trans->nrows; i++) {
+    nstmt->psa_hyp_types[i] = stmt->psa_hyp_types[i];
+  }
+
   nstmt->num_tiled_loops = stmt->num_tiled_loops;
   nstmt->scc_id = stmt->scc_id;
   nstmt->cc_id = stmt->cc_id;

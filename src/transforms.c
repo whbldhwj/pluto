@@ -33,7 +33,7 @@ void pluto_sink_statement(Stmt *stmt, int depth, int val, PlutoProg *prog) {
   char iter[13];
   snprintf(iter, sizeof(iter), "d%d", stmt->dim);
 
-  pluto_stmt_add_dim(stmt, depth, -1, iter, H_SCALAR, prog);
+  pluto_stmt_add_dim(stmt, depth, -1, iter, H_SCALAR, PSA_H_SCALAR, prog);
 
   pluto_constraints_set_var(stmt->domain, depth, val);
   stmt->is_orig_loop[depth] = false;
@@ -43,7 +43,7 @@ void pluto_sink_statement(Stmt *stmt, int depth, int val, PlutoProg *prog) {
  * 'supernode' as the name of the supernode in the domain */
 void pluto_stripmine(Stmt *stmt, int dim, int factor, char *supernode,
                      PlutoProg *prog) {
-  pluto_stmt_add_dim(stmt, 0, dim, supernode, H_TILE_SPACE_LOOP, prog);
+  pluto_stmt_add_dim(stmt, 0, dim, supernode, H_TILE_SPACE_LOOP, PSA_H_ARRAY_PART_LOOP, prog);
 
   PlutoConstraints *domain = stmt->domain;
 
@@ -72,8 +72,22 @@ void pluto_stmt_loop_interchange(Stmt *stmt, int level1, int level2,
   for (j = 0; j < stmt->trans->ncols; j++) {
     tmp = stmt->trans->val[level1][j];
     stmt->trans->val[level1][j] = stmt->trans->val[level2][j];
-    stmt->trans->val[level2][j] = tmp;
+    stmt->trans->val[level2][j] = tmp;    
   }
+
+  /* Jie Added - Start */
+  PlutoHypType tmp_htype;
+  PSAHypType tmp_psahtype;
+  /* Permute the hyperplane types */
+  tmp_htype = stmt->hyp_types[level1];
+  stmt->hyp_types[level1] = stmt->hyp_types[level2];
+  stmt->hyp_types[level2] = tmp_htype;
+
+  /* Permute the PSA hyperplane types */
+  tmp_psahtype = stmt->hyp_types[level1];
+  stmt->hyp_types[level1] = stmt->hyp_types[level2];
+  stmt->hyp_types[level2] = tmp_psahtype;
+  /* Jie Added - End */
 }
 
 void pluto_interchange(PlutoProg *prog, int level1, int level2) {
@@ -110,6 +124,14 @@ void pluto_sink_transformation(Stmt *stmt, int pos, PlutoProg *prog) {
     stmt->hyp_types[i + 1] = stmt->hyp_types[i];
   }
   stmt->hyp_types[pos] = H_SCALAR;
+
+  /* Jie Added - Start */
+  stmt->psa_hyp_types = realloc(stmt->psa_hyp_types, sizeof(int) * stmt->trans->nrows);
+  for (i = stmt->trans->nrows - 2; i >= pos; i--) {
+    stmt->psa_hyp_types[i + 1] = stmt->psa_hyp_types[i];
+  }
+  stmt->psa_hyp_types[pos] = PSA_H_SCALAR;
+  /* Jie Added - End */
 }
 
 /* Make loop the innermost loop; all loops below move up by one */
@@ -133,4 +155,130 @@ void pluto_make_innermost_loop(Ploop *loop, PlutoProg *prog) {
       pluto_stmt_loop_interchange(stmt, d, d + 1, prog);
     }
   }
+}
+
+/* Tile the single loop */
+void psa_tile_loop(PlutoProg *prog, Ploop *loop, int tile_factor, 
+                   PlutoHypType htype, PSAHypType psa_htype) {
+  int i, j, s;
+  int npar;
+
+  npar = prog->npar;
+
+  int firstD = loop->depth;
+  int depth = loop->depth;  
+  int num_domain_supernodes[loop->nstmts];
+
+  for (s = 0; s < loop->nstmts; s++) {
+    num_domain_supernodes[s] = 0;
+  }
+
+  for (s = 0; s < loop->nstmts; s++) {
+    Stmt *stmt = loop->stmts[s];
+    /* 1. Specify tiles in the original domain */
+    /* 1.1 Add additional dimensions */
+    char iter[6];
+    sprintf(iter, "zT%d", stmt->dim);
+
+    int hyp_type = (stmt->hyp_types[depth] == H_SCALAR)
+                      ? H_SCALAR    
+                      : htype;
+
+    int psa_hyp_type = (stmt->psa_hyp_types[depth] == PSA_H_SCALAR)
+                      ? PSA_H_SCALAR
+                      : psa_htype;
+
+    /* 1.2 Specify tile shapes in the original domain */
+    /* Domain supernodes aren't added for scalar dimensions */
+    if (hyp_type != H_SCALAR) {
+      assert(tile_factor >= 1);
+      pluto_stmt_add_dim(stmt, num_domain_supernodes[s], depth, iter,
+                          hyp_type, psa_hyp_type, prog);
+
+      /* Add relation b/w tile space variable and intra-tile variables like
+       * 32*xt <= 2t+i <= 32xt + 31 */
+      /* Lower bound */
+      pluto_constraints_add_inequality(stmt->domain);
+
+      for (j = num_domain_supernodes[s] + 1; j < stmt->dim + npar; j++) {
+        stmt->domain->val[stmt->domain->nrows - 1][j] = 
+          stmt->trans->val[1 + (depth - firstD) + depth][j];
+      }
+
+      stmt->domain->val[stmt->domain->nrows - 1][num_domain_supernodes[s]] = 
+        -tile_factor;
+      
+      stmt->domain->val[stmt->domain->nrows - 1][stmt->domain->ncols - 1] = 
+        stmt->trans->val[1 + (depth - firstD) + depth][stmt->dim + prog->npar];
+
+      PlutoConstraints *lb =        
+        pluto_constraints_select_row(stmt->domain, stmt->domain->nrows - 1);
+      /* Add the new constraints into dependence polyhedron */
+      pluto_update_deps(stmt, lb, prog); 
+      pluto_constraints_free(lb);
+
+      /* Upper bound */
+      pluto_constraints_add_inequality(stmt->domain);
+      for (j = num_domain_supernodes[s] + 1; j < stmt->dim + npar; j++) {
+        stmt->domain->val[stmt->domain->nrows - 1][j] = 
+          -stmt->trans->val[1 + (depth - firstD) + depth][j];
+      }
+
+      stmt->domain->val[stmt->domain->nrows - 1][num_domain_supernodes[s]] =
+        tile_factor;
+
+      stmt->domain->val[stmt->domain->nrows - 1][stmt->domain->ncols - 1] = 
+        -stmt->trans->val[1 + (depth - firstD) + depth][stmt->dim + prog->npar] + 
+        tile_factor - 1;
+
+      PlutoConstraints *ub =
+        pluto_constraints_select_row(stmt->domain, stmt->domain->nrows - 1);
+      /* Add the new constraints into dependence polyhedron */
+      pluto_update_deps(stmt, ub, prog);
+      pluto_constraints_free(ub);
+
+      num_domain_supernodes[s]++;
+
+    } else {
+      /* Scattering function for the tile space iterator is set the same as its
+       * associated domain iterator. Dimension is not a loop; tile it trivially
+       */
+      pluto_stmt_add_hyperplane(stmt, H_SCALAR, PSA_H_SCALAR, depth);
+      for (j = 0; j < stmt->dim + npar + 1; j++) {
+        stmt->trans->val[depth][j] = 
+          stmt->trans->val[1 + (depth - firstD) + depth][j];
+      }
+    } 
+    stmt->num_tiled_loops++;
+    // stmt->first_tile_dim = firstD;
+    // stmt->last_tile_dim = lastD;    
+  } /* all statements */
+
+  /* Sink everything to the same depth */
+  int max = 0, curr;
+  for (i = 0; i < loop->nstmts; i++) {
+    max = PLMAX(loop->stmts[i]->trans->nrows, max);
+  }
+  for (i = 0; i < loop->nstmts; i++) {
+    curr = loop->stmts[i]->trans->nrows; 
+    for (j = curr; j < max; j++) {
+      pluto_sink_transformation(loop->stmts[i], loop->stmts[i]->trans->nrows, prog);
+    }
+  }
+
+  curr = prog->num_hyperplanes;  
+  for (depth = curr; depth < max; depth++) {
+    pluto_prog_add_hyperplane(prog, depth, H_UNKNOWN, PSA_H_UNKNOWN);
+  }  
+
+  /* Re-detect hyperplane types (H_SCALAR, H_LOOP) */
+  pluto_detect_hyperplane_types(prog);
+  pluto_detect_hyperplane_types_stmtwise(prog);
+  psa_detect_hyperplane_types(prog, prog->array_dim, prog->array_part_dim);
+  psa_detect_hyperplane_types_stmtwise(prog, prog->array_dim, prog->array_part_dim);  
+
+  /* Detect properties after permuation */
+  pluto_compute_dep_directions(prog);
+  pluto_compute_dep_satisfaction(prog);
+  psa_compute_dep_distances(prog);
 }

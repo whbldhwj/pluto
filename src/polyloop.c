@@ -492,6 +492,34 @@ Ploop **pluto_get_dom_parallel_loops(const PlutoProg *prog,
   return dom_loops;
 }
 
+/* Jie Added - Start */
+/* Get the outermost loop at certain depth */
+Ploop **psa_get_outermost_loops(const PlutoProg *prog, 
+                                Stmt **stmts, int nstmts,
+                                int depth, int *ndploops) {
+  Ploop **loops, **dom_loops;
+  int i, j;
+  unsigned ndomloops, nploops;
+
+  loops = pluto_get_loops_under(stmts, nstmts, depth, prog, &nploops);
+
+  dom_loops = NULL;
+  ndomloops = 0;
+  for (i = 0; i < nploops; i++) {
+    for (j = 0; j < nploops; j++) {
+      if (is_loop_dominated(loops[i], loops[j], prog))
+        break;
+    }
+    if (j == nploops) {
+      dom_loops = pluto_loops_cat(dom_loops, ndomloops++, &loops[i], 1);
+    }
+  }
+  *ndploops = ndomloops;
+
+  return dom_loops;
+}
+/* Jie Added - End */
+
 /* Returns a list of outermost loops */
 Ploop **pluto_get_outermost_loops(const PlutoProg *prog, int *ndploops) {
   Ploop **loops, **dom_loops;

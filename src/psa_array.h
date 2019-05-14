@@ -16,13 +16,15 @@
 #include "pet.h"
 #include "osl/scop.h"
 
-void psa_compute_dep_distances(PlutoProg *prog);
-DepDis get_dep_distance(const Dep *dep, const PlutoProg *prog, int level);
 //HyperplaneProperties *hyperplane_properties_dup(const HyperplaneProperties *hProps);
 Dep *pluto_dep_prog_dup(Dep *d, int num_hyperplanes);
 PlutoOptions *pluto_options_dup(const PlutoOptions *options);
 Graph *graph_dup(const Graph *graph);
 PlutoProg *pluto_prog_dup(const PlutoProg *prog);
+DepDis get_dep_distance(const Dep *dep, const PlutoProg *prog, int level);
+void psa_compute_dep_distances(PlutoProg *prog);
+PlutoProg **sa_candidates_generation_band(Band *band, int array_dim, 
+              PlutoProg *prog, int *nprogs);
 PlutoProg **sa_candidates_generation(PlutoProg *prog, int *nprogs_p);
 
 #endif

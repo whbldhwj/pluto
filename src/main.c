@@ -44,6 +44,9 @@
 #include "program.h"
 #include "version.h"
 #include "psa_dep.h"
+#include "psa_array.h"
+#include "psa_partition.h"
+#include "psa_pe_opt.h"
 
 #include "clan/clan.h"
 #include "candl/candl.h"
@@ -593,9 +596,9 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
     fprintf(stdout, "[PSA] Non-uniform dependence detected.\n");
     return 1;
   }
-#ifdef JIE_DEBUG
-  fprintf(stdout, "[Debug] Uniformity: %d\n", is_uniform);
-#endif
+//#ifdef JIE_DEBUG
+  fprintf(stdout, "[PSA] Uniformity: %d\n", is_uniform);
+//#endif
 
   fprintf(stdout, "[PSA] Filter out redundant dependences.\n");
   /* Filter out RAR dependences on scalar variables */
@@ -668,188 +671,210 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
     fprintf(stdout, "[Debug] progs pointer NULL!\n");
   }
 #endif  
-  prog = progs[0];
+  //prog = progs[0];
 
   /* Jie Added - End */
 
-  if (options->tile) {
-    pluto_tile(prog);
-  } else {
-    if (options->intratileopt) {
-      pluto_intra_tile_optimize(prog, 0);
+  unsigned prog_id;
+  //for (prog_id = 0; prog_id < nprogs; prog_id++) {
+  for (prog_id = 3; prog_id < 4; prog_id++) {
+
+    prog = progs[prog_id];
+
+    /* Jie Added - Start */
+    if (options->tile) {
+      fprintf(stdout, "[PSA] Apply array partitioning.\n");
+      psa_array_partition(prog);
     }
-  }
+    /* Jie Added - End */
 
-  if (options->parallel && !options->tile && !options->identity) {
-    /* Obtain wavefront/pipelined parallelization by skewing if
-     * necessary */
-    unsigned nbands;
-    Band **bands;
-    pluto_compute_dep_satisfaction(prog);
-    bands = pluto_get_outermost_permutable_bands(prog, &nbands);
-    bool retval = pluto_create_tile_schedule(prog, bands, nbands);
-    pluto_bands_free(bands, nbands);
-
-    /* If the user hasn't supplied --tile and there is only pipelined
-     * parallelism, we will warn the user */
-    if (retval) {
-      printf("[pluto] WARNING: pipelined parallelism exists and --tile is not "
-             "used.\n");
-      printf("\tUse --tile for better parallelization \n");
-      fprintf(stdout, "[pluto] After skewing:\n");
-      pluto_transformations_pretty_print(prog);
+    /* Jie Added - Start */
+    if (options->tile) {
+      fprintf(stdout, "[PSA] Apply PE Optimization.\n");
+      psa_pe_optimize(prog);
     }
-  }
+    /* Jie Added - End */
 
-  if (options->unroll) {
-    /* Will generate a .unroll file */
-    /* plann/plorc needs a .params */
-    FILE *paramsFP = fopen(".params", "w");
-    if (paramsFP) {
-      int i;
-      for (i = 0; i < prog->npar; i++) {
-        fprintf(paramsFP, "%s\n", prog->params[i]);
+    // if (options->tile) {
+    //   pluto_tile(prog);
+    // } else {
+    //   if (options->intratileopt) {
+    //     pluto_intra_tile_optimize(prog, 0);
+    //   }
+    // }
+  
+    if (options->parallel && !options->tile && !options->identity) {
+      /* Obtain wavefront/pipelined parallelization by skewing if
+       * necessary */
+      unsigned nbands;
+      Band **bands;
+      pluto_compute_dep_satisfaction(prog);
+      bands = pluto_get_outermost_permutable_bands(prog, &nbands);
+      bool retval = pluto_create_tile_schedule(prog, bands, nbands);
+      pluto_bands_free(bands, nbands);
+  
+      /* If the user hasn't supplied --tile and there is only pipelined
+       * parallelism, we will warn the user */
+      if (retval) {
+        printf("[pluto] WARNING: pipelined parallelism exists and --tile is not "
+               "used.\n");
+        printf("\tUse --tile for better parallelization \n");
+        fprintf(stdout, "[pluto] After skewing:\n");
+        pluto_transformations_pretty_print(prog);
       }
-      fclose(paramsFP);
     }
-    pluto_detect_mark_unrollable_loops(prog);
-  }
-
-  if (!options->pet && !strcmp(srcFileName, "stdin")) {
-    // input stdin == output stdout
-    pluto_populate_scop(scop, prog, options);
-    osl_scop_print(stdout, scop);
-  } else { // do the usual Pluto stuff
-
-    /* NO MORE TRANSFORMATIONS BEYOND THIS POINT */
-    /* Since meta info about loops is printed to be processed by scripts - if
-     * transformations are performed, changed loop order/iterator names will
-     * be missed. */
-    gen_unroll_file(prog);
-
-    char *basec, *bname;
-    char *outFileName;
-    if (options->out_file == NULL) {
-      /* Get basename, remove .c extension and append a new one */
-      basec = strdup(srcFileName);
-      bname = basename(basec);
-
-      /* max size when tiled.* */
-      outFileName = malloc(strlen(bname) + strlen(".pluto.c") + 1);
-
-      if (strlen(bname) >= 2 && !strcmp(bname + strlen(bname) - 2, ".c")) {
-        memcpy(outFileName, bname, strlen(bname) - 2);
-        outFileName[strlen(bname) - 2] = '\0';
-      } else {
+  
+    if (options->unroll) {
+      /* Will generate a .unroll file */
+      /* plann/plorc needs a .params */
+      FILE *paramsFP = fopen(".params", "w");
+      if (paramsFP) {
+        int i;
+        for (i = 0; i < prog->npar; i++) {
+          fprintf(paramsFP, "%s\n", prog->params[i]);
+        }
+        fclose(paramsFP);
+      }
+      pluto_detect_mark_unrollable_loops(prog);
+    }
+  
+    if (!options->pet && !strcmp(srcFileName, "stdin")) {
+      // input stdin == output stdout
+      pluto_populate_scop(scop, prog, options);
+      osl_scop_print(stdout, scop);
+    } else { // do the usual Pluto stuff
+  
+      /* NO MORE TRANSFORMATIONS BEYOND THIS POINT */
+      /* Since meta info about loops is printed to be processed by scripts - if
+       * transformations are performed, changed loop order/iterator names will
+       * be missed. */
+      gen_unroll_file(prog);
+  
+      char *basec, *bname;
+      char *outFileName;
+      if (options->out_file == NULL) {
+        /* Get basename, remove .c extension and append a new one */
+        basec = strdup(srcFileName);
+        bname = basename(basec);
+  
+        /* max size when tiled.* */
         outFileName = malloc(strlen(bname) + strlen(".pluto.c") + 1);
-        strcpy(outFileName, bname);
+  
+        if (strlen(bname) >= 2 && !strcmp(bname + strlen(bname) - 2, ".c")) {
+          memcpy(outFileName, bname, strlen(bname) - 2);
+          outFileName[strlen(bname) - 2] = '\0';
+        } else {
+          outFileName = malloc(strlen(bname) + strlen(".pluto.c") + 1);
+          strcpy(outFileName, bname);
+        }
+        strcat(outFileName, ".pluto.c");
+      } else {
+        basec = strdup(options->out_file);
+        bname = basename(basec);
+  
+        outFileName = malloc(strlen(options->out_file) + 1);
+        strcpy(outFileName, options->out_file);
       }
-      strcat(outFileName, ".pluto.c");
-    } else {
-      basec = strdup(options->out_file);
-      bname = basename(basec);
-
-      outFileName = malloc(strlen(options->out_file) + 1);
-      strcpy(outFileName, options->out_file);
-    }
-
-    char *cloogFileName;
-    if (strlen(bname) >= 2 && !strcmp(bname + strlen(bname) - 2, ".c")) {
-      cloogFileName = malloc(strlen(bname) - 2 + strlen(".pluto.cloog") + 1);
-      strncpy(cloogFileName, bname, strlen(bname) - 2);
-      cloogFileName[strlen(bname) - 2] = '\0';
-    } else {
-      cloogFileName = malloc(strlen(bname) + strlen(".pluto.cloog") + 1);
-      strcpy(cloogFileName, bname);
-    }
-    strcat(cloogFileName, ".pluto.cloog");
-    free(basec);
-
-    cloogfp = fopen(cloogFileName, "w+");
-    if (!cloogfp) {
-      fprintf(stderr, "[Pluto] Can't open .cloog file: '%s'\n", cloogFileName);
+  
+      char *cloogFileName;
+      if (strlen(bname) >= 2 && !strcmp(bname + strlen(bname) - 2, ".c")) {
+        cloogFileName = malloc(strlen(bname) - 2 + strlen(".pluto.cloog") + 1);
+        strncpy(cloogFileName, bname, strlen(bname) - 2);
+        cloogFileName[strlen(bname) - 2] = '\0';
+      } else {
+        cloogFileName = malloc(strlen(bname) + strlen(".pluto.cloog") + 1);
+        strcpy(cloogFileName, bname);
+      }
+      strcat(cloogFileName, ".pluto.cloog");
+      free(basec);
+  
+      cloogfp = fopen(cloogFileName, "w+");
+      if (!cloogfp) {
+        fprintf(stderr, "[Pluto] Can't open .cloog file: '%s'\n", cloogFileName);
+        free(cloogFileName);
+        pluto_options_free(options);
+        pluto_prog_free(prog);
+        return 9;
+      }
       free(cloogFileName);
-      pluto_options_free(options);
-      pluto_prog_free(prog);
-      return 9;
-    }
-    free(cloogFileName);
-
-    outfp = fopen(outFileName, "w");
-    if (!outfp) {
-      fprintf(stderr, "[Pluto] Can't open file '%s' for writing\n",
-              outFileName);
-      free(outFileName);
-      pluto_options_free(options);
-      pluto_prog_free(prog);
-      fclose(cloogfp);
-      return 10;
-    }
-
-    if (options->moredebug) {
-      printf("After scalar dimension detection (final transformations)\n");
-      pluto_transformations_pretty_print(prog);
-    }
-
-    /* Generate .cloog file */
-    pluto_gen_cloog_file(cloogfp, prog);
-    /* Add the <irregular> tag from clan, if any */
-    if (!options->pet) {
-      if (irroption) {
-        fprintf(cloogfp, "<irregular>\n%s\n</irregular>\n\n", irroption);
-        free(irroption);
+  
+      outfp = fopen(outFileName, "w");
+      if (!outfp) {
+        fprintf(stderr, "[Pluto] Can't open file '%s' for writing\n",
+                outFileName);
+        free(outFileName);
+        pluto_options_free(options);
+        pluto_prog_free(prog);
+        fclose(cloogfp);
+        return 10;
       }
+  
+      if (options->moredebug) {
+        printf("After scalar dimension detection (final transformations)\n");
+        pluto_transformations_pretty_print(prog);
+      }
+  
+      /* Generate .cloog file */
+      pluto_gen_cloog_file(cloogfp, prog);
+      /* Add the <irregular> tag from clan, if any */
+      if (!options->pet) {
+        if (irroption) {
+          fprintf(cloogfp, "<irregular>\n%s\n</irregular>\n\n", irroption);
+          free(irroption);
+        }
+      }
+      rewind(cloogfp);
+  
+      /* Very important: Dont change the order of calls to print_dynsched_file
+       * between pluto_gen_cloog_file() and pluto_*_codegen()
+       */
+  
+      /* Generate code using Cloog and add necessary stuff before/after code */
+      t_start = rtclock();
+      pluto_multicore_codegen(cloogfp, outfp, prog);
+      t_c = rtclock() - t_start;
+  
+      FILE *tmpfp = fopen(".outfilename", "w");
+      if (tmpfp) {
+        fprintf(tmpfp, "%s\n", outFileName);
+        fclose(tmpfp);
+        PLUTO_MESSAGE(printf("[Pluto] Output written to %s\n", outFileName););
+      }
+      free(outFileName);
+  
+      fclose(cloogfp);
+      fclose(outfp);
     }
-    rewind(cloogfp);
-
-    /* Very important: Dont change the order of calls to print_dynsched_file
-     * between pluto_gen_cloog_file() and pluto_*_codegen()
-     */
-
-    /* Generate code using Cloog and add necessary stuff before/after code */
-    t_start = rtclock();
-    pluto_multicore_codegen(cloogfp, outfp, prog);
-    t_c = rtclock() - t_start;
-
-    FILE *tmpfp = fopen(".outfilename", "w");
-    if (tmpfp) {
-      fprintf(tmpfp, "%s\n", outFileName);
-      fclose(tmpfp);
-      PLUTO_MESSAGE(printf("[Pluto] Output written to %s\n", outFileName););
+  
+    t_all = rtclock() - t_start_all;
+  
+    if (options->time && !options->silent) {
+      printf("\n[pluto] Timing statistics\n[pluto] SCoP extraction + dependence "
+             "analysis time: %0.6lfs\n",
+             t_d);
+      printf("[pluto] Auto-transformation time: %0.6lfs\n", t_t);
+      if (options->dfp) {
+        printf("[pluto] \t\tTotal FCG Construction Time: %0.6lfs\n",
+               prog->fcg_const_time);
+        printf("[pluto] \t\tTotal FCG Colouring Time: %0.6lfs\n",
+               prog->fcg_colour_time);
+        printf("[pluto] \t\tTotal Scaling + Shifting time: %0.6lfs\n",
+               prog->fcg_dims_scale_time);
+        printf("[pluto] \t\tTotal Skewing time: %0.6lfs\n", prog->skew_time);
+      }
+      printf("[pluto] \t\tTotal constraint solving time (LP/MIP/ILP) time: "
+             "%0.6lfs\n",
+             prog->mipTime);
+      printf("[pluto] Code generation time: %0.6lfs\n", t_c);
+      printf("[pluto] Other/Misc time: %0.6lfs\n", t_all - t_c - t_t - t_d);
+      printf("[pluto] Total time: %0.6lfs\n", t_all);
+      printf("[pluto] All times: %0.6lf %0.6lf %.6lf %.6lf\n", t_d, t_t, t_c,
+             t_all - t_c - t_t - t_d);
     }
-    free(outFileName);
+  
+    pluto_prog_free(prog);
 
-    fclose(cloogfp);
-    fclose(outfp);
   }
-
-  t_all = rtclock() - t_start_all;
-
-  if (options->time && !options->silent) {
-    printf("\n[pluto] Timing statistics\n[pluto] SCoP extraction + dependence "
-           "analysis time: %0.6lfs\n",
-           t_d);
-    printf("[pluto] Auto-transformation time: %0.6lfs\n", t_t);
-    if (options->dfp) {
-      printf("[pluto] \t\tTotal FCG Construction Time: %0.6lfs\n",
-             prog->fcg_const_time);
-      printf("[pluto] \t\tTotal FCG Colouring Time: %0.6lfs\n",
-             prog->fcg_colour_time);
-      printf("[pluto] \t\tTotal Scaling + Shifting time: %0.6lfs\n",
-             prog->fcg_dims_scale_time);
-      printf("[pluto] \t\tTotal Skewing time: %0.6lfs\n", prog->skew_time);
-    }
-    printf("[pluto] \t\tTotal constraint solving time (LP/MIP/ILP) time: "
-           "%0.6lfs\n",
-           prog->mipTime);
-    printf("[pluto] Code generation time: %0.6lfs\n", t_c);
-    printf("[pluto] Other/Misc time: %0.6lfs\n", t_all - t_c - t_t - t_d);
-    printf("[pluto] Total time: %0.6lfs\n", t_all);
-    printf("[pluto] All times: %0.6lf %0.6lf %.6lf %.6lf\n", t_d, t_t, t_c,
-           t_all - t_c - t_t - t_d);
-  }
-
-  pluto_prog_free(prog);
   pluto_options_free(options);
 
   osl_scop_free(scop);

@@ -140,12 +140,16 @@ void pluto_tile_band(PlutoProg *prog, Band *band, int *tile_sizes) {
                          ? H_SCALAR
                          : H_TILE_SPACE_LOOP;
 
+      int psa_hyp_type = (stmt->hyp_types[depth + depth - firstD] == PSA_H_SCALAR)
+                         ? PSA_H_SCALAR
+                         : PSA_H_ARRAY_PART_LOOP;
+
       /* 1.2 Specify tile shapes in the original domain */
       if (hyp_type != H_SCALAR) {
         assert(tile_sizes[depth - firstD] >= 1);
         /* Domain supernodes aren't added for scalar dimensions */
         pluto_stmt_add_dim(stmt, num_domain_supernodes[s], depth, iter,
-                           hyp_type, prog);
+                           hyp_type, psa_hyp_type, prog);
         /* Add relation b/w tile space variable and intra-tile variables like
          * 32*xt <= 2t+i <= 32xt + 31 */
         /* Lower bound */
@@ -197,7 +201,7 @@ void pluto_tile_band(PlutoProg *prog, Band *band, int *tile_sizes) {
          * same as its associated domain iterator
          * Dimension is not a loop; tile it trivially
          */
-        pluto_stmt_add_hyperplane(stmt, H_SCALAR, depth);
+        pluto_stmt_add_hyperplane(stmt, H_SCALAR, PSA_H_SCALAR, depth);
         for (j = 0; j < stmt->dim + npar + 1; j++) {
           stmt->trans->val[depth][j] =
               stmt->trans->val[firstD + (depth - firstD) + 1 + (depth - firstD)]
@@ -371,7 +375,7 @@ void pluto_tile_scattering_dims(PlutoProg *prog, Band **bands, int nbands,
 
   curr = prog->num_hyperplanes;
   for (depth = curr; depth < max; depth++) {
-    pluto_prog_add_hyperplane(prog, depth, H_UNKNOWN);
+    pluto_prog_add_hyperplane(prog, depth, H_UNKNOWN, PSA_H_UNKNOWN);
   }
   /* Re-detect hyperplane types (H_SCALAR, H_LOOP) */
   pluto_detect_hyperplane_types(prog);

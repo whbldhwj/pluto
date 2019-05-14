@@ -57,9 +57,9 @@ void pluto_add_stmt_to_end(PlutoProg *prog, const PlutoConstraints *domain,
                            PlutoStmtType type);
 
 void pluto_stmt_add_dim(Stmt *stmt, int pos, int time_pos, const char *iter,
-                        PlutoHypType type, PlutoProg *prog);
+                        PlutoHypType type, PSAHypType psa_type, PlutoProg *prog);
 void pluto_stmt_remove_dim(Stmt *stmt, int pos, PlutoProg *prog);
-void pluto_prog_add_hyperplane(PlutoProg *prog, int pos, PlutoHypType type);
+void pluto_prog_add_hyperplane(PlutoProg *prog, int pos, PlutoHypType type, PSAHypType psa_hyp_type);
 
 int get_const_bound_difference(const PlutoConstraints *cst, int depth);
 PlutoMatrix *get_alpha(const Stmt *stmt, const PlutoProg *prog);
@@ -83,7 +83,7 @@ int pluto_is_hyperplane_scalar(const Stmt *stmt, int level);
 int pluto_stmt_is_member_of(int stmt_id, Stmt **slist, int len);
 PlutoAccess **pluto_get_all_waccs(const PlutoProg *prog, int *num);
 int pluto_stmt_is_subset_of(Stmt **s1, int n1, Stmt **s2, int n2);
-void pluto_stmt_add_hyperplane(Stmt *stmt, PlutoHypType type, int pos);
+void pluto_stmt_add_hyperplane(Stmt *stmt, PlutoHypType type, PSAHypType psa_type, int pos);
 PlutoMatrix *pluto_get_new_access_func(const Stmt *stmt, const PlutoMatrix *acc,
                                        int **divs);
 

@@ -21,6 +21,7 @@
 #define _TRANSFORMS_H_
 
 #include "pluto.h"
+#include "psa_array.h"
 
 void pluto_sink_statement(Stmt *stmt, int depth, int val, PlutoProg *prog);
 void pluto_stripmine(Stmt *stmt, int dim, int factor, char *supernode,
@@ -33,5 +34,7 @@ void pluto_sink_transformation(Stmt *stmt, int pos, PlutoProg *prog);
 void pluto_make_innermost_loop(Ploop *loop, PlutoProg *prog);
 void pluto_stmt_loop_interchange(Stmt *stmt, int level1, int level2,
                                  PlutoProg *prog);
+void psa_tile_loop(PlutoProg *prog, Ploop *loop, int tile_factor, 
+                   PlutoHypType htype, PSAHypType psa_htype);
 
 #endif

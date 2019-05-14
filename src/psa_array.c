@@ -97,14 +97,14 @@ Dep *pluto_dep_prog_dup(Dep *d, int num_hyperplanes) {
     }
   }
   //dep->disvec
-#ifdef JIE_DEBUG
-  fprintf(stdout, "[Debug] dep->id: %d\n", dep->id);
-#endif
+// #ifdef JIE_DEBUG
+//   fprintf(stdout, "[Debug] dep->id: %d\n", dep->id);
+// #endif
   dep->disvec = NULL;
   if (d->disvec) {
-#ifdef JIE_DEBUG
-    fprintf(stdout, "[Debug] duplicate disvec.\n");
-#endif
+// #ifdef JIE_DEBUG
+//     fprintf(stdout, "[Debug] duplicate disvec.\n");
+// #endif
     dep->disvec = (DepDis *)malloc(num_hyperplanes * sizeof(DepDis));
     for (i = 0; i < num_hyperplanes; i++) {
       dep->disvec[i] = d->disvec[i];
@@ -306,18 +306,18 @@ PlutoProg *pluto_prog_dup(const PlutoProg *prog) {
 
   /* Array of dependences */
   new_prog->ndeps = prog->ndeps;
-#ifdef JIE_DEBUG
-  fprintf(stdout, "[Debug] deps dup.\n");
-#endif
+// #ifdef JIE_DEBUG
+//   fprintf(stdout, "[Debug] deps dup.\n");
+// #endif
   new_prog->deps = (Dep **)malloc(prog->ndeps * sizeof(Dep *));
   for (i = 0; i < prog->ndeps; i++) {
 	  new_prog->deps[i] = pluto_dep_prog_dup(prog->deps[i], prog->num_hyperplanes);
   }
 
   /* Array of dependences */
-#ifdef JIE_DEBUG
-  fprintf(stdout, "[Debug] transdeps dup.\n");
-#endif
+// #ifdef JIE_DEBUG
+//   fprintf(stdout, "[Debug] transdeps dup.\n");
+// #endif
   new_prog->ntransdeps = prog->ntransdeps;
   new_prog->transdeps = (Dep **)malloc(prog->ntransdeps * sizeof(Dep *));
   for (i = 0; i < prog->ntransdeps; i++) {
@@ -379,6 +379,7 @@ PlutoProg *pluto_prog_dup(const PlutoProg *prog) {
   for (i = 0; i < new_prog->num_hyperplanes; i++) {
     new_prog->hProps[i].dep_prop = prog->hProps[i].dep_prop;
     new_prog->hProps[i].type = prog->hProps[i].type;
+    new_prog->hProps[i].psa_type = prog->hProps[i].psa_type;
     new_prog->hProps[i].band_num = prog->hProps[i].band_num;
     new_prog->hProps[i].unroll = prog->hProps[i].unroll;
     new_prog->hProps[i].prevec = prog->hProps[i].prevec;
@@ -458,6 +459,12 @@ PlutoProg *pluto_prog_dup(const PlutoProg *prog) {
   new_prog->fcg_cst_alloc_time = prog->fcg_cst_alloc_time;
 
   new_prog->num_lp_calls = prog->num_lp_calls;
+
+  /* Systolic array dimension */
+  new_prog->array_dim = prog->array_dim;
+
+  /* Systolic array partition dimension */
+  new_prog->array_part_dim = prog->array_part_dim;
 
   return new_prog;
 }
@@ -681,17 +688,17 @@ void psa_compute_dep_distances(PlutoProg *prog) {
     for (level = 0; level < prog->num_hyperplanes; level++) {
       deps[i]->disvec[level] = get_dep_distance(deps[i], prog, level);
     }
-#ifdef JIE_DEBUG
-    Dep *dep = deps[i];
-    fprintf(stdout, "[Debug] id: %d\n", dep->id);
-    fprintf(stdout, "[Debug] type: %d\n", dep->type);
-    fprintf(stdout, "[Debug] name: %s\n", dep->src_acc->name);
-    PlutoConstraints *dpolytope = dep->dpolytope;
-    pluto_constraints_pretty_print(stdout, dpolytope);
-    for (level = 0; level < prog->num_hyperplanes; level++) {
-      fprintf(stdout, "[Debug] dep dis %d: %c\n", level, deps[i]->disvec[level]);
-    }
-#endif
+// #ifdef JIE_DEBUG
+//     Dep *dep = deps[i];
+//     fprintf(stdout, "[Debug] id: %d\n", dep->id);
+//     fprintf(stdout, "[Debug] type: %d\n", dep->type);
+//     fprintf(stdout, "[Debug] name: %s\n", dep->src_acc->name);
+//     PlutoConstraints *dpolytope = dep->dpolytope;
+//     pluto_constraints_pretty_print(stdout, dpolytope);
+//     for (level = 0; level < prog->num_hyperplanes; level++) {
+//       fprintf(stdout, "[Debug] dep dis %d: %c\n", level, deps[i]->disvec[level]);
+//     }
+// #endif
   }
 }
 
@@ -730,20 +737,22 @@ PlutoProg **sa_candidates_generation_band(Band *band, int array_dim,
 
         Ploop *loop = new_bands[0]->loop;
         /* Make the loop i the outermost loop */
-        for (j = 0; j < loop->nstmts; j++) {
-          Stmt *stmt = loop->stmts[j];
-#ifdef JIE_DEBUG
-          fprintf(stdout, "[Debug] stmts nrows: %d\n", stmt->trans->nrows);
-          fprintf(stdout, "[Debug] stmts ncols: %d\n", stmt->trans->ncols);
-#endif          
-          unsigned d;
-          for (d = i; d > firstD; d--) {
-            pluto_stmt_loop_interchange(stmt, d, d - 1, new_prog);
-          }
+        unsigned d;
+        for (d = i; d > firstD; d--) {
+          pluto_interchange(new_prog, d, d - 1);
         }
 
         pluto_compute_dep_directions(new_prog);
         pluto_compute_dep_satisfaction(new_prog);
+
+        /* Update psa_hyp_type */
+        psa_detect_hyperplane_types(new_prog, array_dim, 0);
+        psa_detect_hyperplane_types_stmtwise(new_prog, array_dim, 0);
+
+        /* Update array dim */
+        new_prog->array_dim = array_dim;
+        new_prog->array_part_dim = band->width;
+
         /* Add the new invariant to the list */
         if (progs) {
           progs = (PlutoProg **)realloc(progs, (*nprogs + 1) * sizeof(PlutoProg));
@@ -769,20 +778,25 @@ PlutoProg **sa_candidates_generation_band(Band *band, int array_dim,
 
             Ploop *loop = new_bands[0]->loop;
             /* Make the loop i, j the outermost loops */
-            unsigned s;
-            for (s = 0; s < loop->nstmts; s++) {
-              Stmt *stmt = loop->stmts[s];
-              unsigned d;
-              for (d = j; d > firstD; d--) {
-                pluto_stmt_loop_interchange(stmt, d, d - 1, new_prog);
-              }
-              for (d = i + 1; d > firstD; d--) {
-                pluto_stmt_loop_interchange(stmt, d, d - 1, new_prog);
-              }
+            unsigned d;
+            for (d = j; d > firstD; d--) {
+              pluto_interchange(new_prog, d, d - 1);
+            }
+            for (d = i + 1; d > firstD; d--) {
+              pluto_interchange(new_prog, d, d - 1);
             }
 
             pluto_compute_dep_directions(new_prog);
             pluto_compute_dep_satisfaction(new_prog);
+
+            /* Update psa_hyp_type */
+            psa_detect_hyperplane_types(new_prog, array_dim, 0);
+            psa_detect_hyperplane_types_stmtwise(new_prog, array_dim, 0);
+
+            /* Update array dim */
+            new_prog->array_dim = array_dim;
+            new_prog->array_part_dim = band->width;
+
             /* Add the new invariant to the list */
             if (progs) {
               progs = (PlutoProg **)realloc(progs, (*nprogs + 1) * sizeof(PlutoProg));
@@ -840,10 +854,10 @@ PlutoProg **sa_candidates_generation(PlutoProg *prog, int *nprogs_p) {
     int new_nprogs = 0;
     new_progs = sa_candidates_generation_band(bands[0], 1, prog, &new_nprogs);
     if (!progs) {
-#ifdef JIE_DEBUG
-      fprintf(stdout, "[Debug] in 1D branch.\n");
-      fprintf(stdout, "[Debug] number of 1D systolic array: %d\n", new_nprogs);
-#endif      
+// #ifdef JIE_DEBUG
+//       fprintf(stdout, "[Debug] in 1D branch.\n");
+//       fprintf(stdout, "[Debug] number of 1D systolic array: %d\n", new_nprogs);
+// #endif      
       nprogs += new_nprogs;
       progs = new_progs;
     } else {
@@ -859,10 +873,10 @@ PlutoProg **sa_candidates_generation(PlutoProg *prog, int *nprogs_p) {
     PlutoProg **new_progs = NULL;
     int new_nprogs = 0;
     new_progs = sa_candidates_generation_band(bands[0], 2, prog, &new_nprogs);
-#ifdef JIE_DEBUG
-    fprintf(stdout, "[Debug] in 2D branch.\n");
-    fprintf(stdout, "[Debug] number of 2D systolic array: %d\n", new_nprogs);
-#endif    
+// #ifdef JIE_DEBUG
+//     fprintf(stdout, "[Debug] in 2D branch.\n");
+//     fprintf(stdout, "[Debug] number of 2D systolic array: %d\n", new_nprogs);
+// #endif    
     if (!progs) {
       nprogs += new_nprogs;
       progs = new_progs;

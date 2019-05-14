@@ -465,10 +465,10 @@ int cut_between_sccs(PlutoProg *prog, Graph *ddg, int scc1, int scc2) {
 
   IF_DEBUG(printf("[pluto] Cutting between SCC id %d and id %d\n", scc1, scc2));
 
-  pluto_prog_add_hyperplane(prog, prog->num_hyperplanes, H_SCALAR);
+  pluto_prog_add_hyperplane(prog, prog->num_hyperplanes, H_SCALAR, PSA_H_SCALAR);
 
   for (i = 0; i < nstmts; i++) {
-    pluto_stmt_add_hyperplane(stmts[i], H_SCALAR, stmts[i]->trans->nrows);
+    pluto_stmt_add_hyperplane(stmts[i], H_SCALAR, PSA_H_SCALAR, stmts[i]->trans->nrows);
     for (j = 0; j < nvar + npar; j++) {
       stmts[i]->trans->val[stmts[i]->trans->nrows - 1][j] = 0;
     }
@@ -510,10 +510,10 @@ int cut_all_sccs(PlutoProg *prog, Graph *ddg) {
     return 0;
   }
 
-  pluto_prog_add_hyperplane(prog, prog->num_hyperplanes, H_SCALAR);
+  pluto_prog_add_hyperplane(prog, prog->num_hyperplanes, H_SCALAR, PSA_H_SCALAR);
 
   for (i = 0; i < nstmts; i++) {
-    pluto_stmt_add_hyperplane(stmts[i], H_SCALAR, stmts[i]->trans->nrows);
+    pluto_stmt_add_hyperplane(stmts[i], H_SCALAR, PSA_H_SCALAR, stmts[i]->trans->nrows);
     for (j = 0; j < nvar + npar; j++) {
       stmts[i]->trans->val[stmts[i]->trans->nrows - 1][j] = 0;
     }
@@ -552,7 +552,7 @@ int cut_scc_dim_based(PlutoProg *prog, Graph *ddg) {
 
   int cur_max_dim = ddg->sccs[0].max_dim;
 
-  pluto_prog_add_hyperplane(prog, prog->num_hyperplanes, H_SCALAR);
+  pluto_prog_add_hyperplane(prog, prog->num_hyperplanes, H_SCALAR, PSA_H_SCALAR);
 
   for (k = 0; k < ddg->num_sccs; k++) {
     if (cur_max_dim != ddg->sccs[k].max_dim) {
@@ -562,7 +562,7 @@ int cut_scc_dim_based(PlutoProg *prog, Graph *ddg) {
 
     for (i = 0; i < prog->nstmts; i++) {
       if (stmts[i]->scc_id == k) {
-        pluto_stmt_add_hyperplane(stmts[i], H_SCALAR, stmts[i]->trans->nrows);
+        pluto_stmt_add_hyperplane(stmts[i], H_SCALAR, PSA_H_SCALAR, stmts[i]->trans->nrows);
         for (j = 0; j < nvar; j++) {
           stmts[i]->trans->val[stmts[i]->trans->nrows - 1][j] = 0;
         }
@@ -811,11 +811,11 @@ int find_permutable_hyperplanes(PlutoProg *prog, bool hyp_search_mode,
           stdout, "[pluto] find_permutable_hyperplanes: found a hyperplane\n"));
       num_sols_found++;
 
-      pluto_prog_add_hyperplane(prog, prog->num_hyperplanes, H_LOOP);
+      pluto_prog_add_hyperplane(prog, prog->num_hyperplanes, H_LOOP, PSA_H_UNKNOWN);
 
       for (j = 0; j < nstmts; j++) {
         Stmt *stmt = stmts[j];
-        pluto_stmt_add_hyperplane(stmt, H_UNKNOWN, stmt->trans->nrows);
+        pluto_stmt_add_hyperplane(stmt, H_UNKNOWN, PSA_H_UNKNOWN, stmt->trans->nrows);
         for (k = 0; k < nvar; k++) {
           stmt->trans->val[stmt->trans->nrows - 1][k] =
               bestsol[npar + 1 + j * (nvar + 1) + k];
@@ -912,7 +912,7 @@ bool precut(PlutoProg *prog, Graph *ddg, int depth) {
 
     /* Update transformation matrices */
     for (i = 0; i < nstmts; i++) {
-      pluto_stmt_add_hyperplane(stmts[i], H_SCALAR, stmts[i]->trans->nrows);
+      pluto_stmt_add_hyperplane(stmts[i], H_SCALAR, PSA_H_SCALAR, stmts[i]->trans->nrows);
     }
 
     for (i = 0; i < ncomps; i++) {
@@ -925,7 +925,7 @@ bool precut(PlutoProg *prog, Graph *ddg, int depth) {
       }
     }
 
-    pluto_prog_add_hyperplane(prog, prog->num_hyperplanes, H_SCALAR);
+    pluto_prog_add_hyperplane(prog, prog->num_hyperplanes, H_SCALAR, PSA_H_SCALAR);
 
     dep_satisfaction_update(prog, prog->num_hyperplanes - 1);
     ddg_update(ddg, prog);
@@ -958,7 +958,7 @@ bool precut(PlutoProg *prog, Graph *ddg, int depth) {
           fscanf(precut, "%d", &ignore);
           assert(ignore == 0);
 
-          pluto_stmt_add_hyperplane(stmts[i], H_UNKNOWN,
+          pluto_stmt_add_hyperplane(stmts[i], H_UNKNOWN, PSA_H_UNKNOWN,
                                     stmts[i]->trans->nrows);
 
           for (j = 0; j < nvar; j++) {
@@ -997,7 +997,7 @@ bool precut(PlutoProg *prog, Graph *ddg, int depth) {
 
       /* Set hProps correctly and update satisfied dependences */
       for (k = 0; k < rows; k++) {
-        pluto_prog_add_hyperplane(prog, prog->num_hyperplanes, H_UNKNOWN);
+        pluto_prog_add_hyperplane(prog, prog->num_hyperplanes, H_UNKNOWN, PSA_H_UNKNOWN);
         for (i = 0; i < nstmts; i++) {
           if (get_loop_type(stmts[i], stmts[0]->trans->nrows - rows + k) ==
               H_LOOP) {
@@ -1031,6 +1031,102 @@ void pluto_compute_dep_directions(PlutoProg *prog) {
     }
   }
 }
+
+/* Jie Added - Start */
+/* This function is used when first generating the array candidates.
+ * The first array_dim hyperplanes will be assigned as PSA_H_SPACE_LOOP,
+ * and the rest will be assigend as PSA_H_TIME_LOOP and PSA_SCALAR
+ */
+void psa_detect_hyperplane_types_stmtwise(PlutoProg *prog, int array_dim, int array_part_dim) {
+  int s, i;
+  int num_array_part_loop = 0;
+  int num_array_space_loop = 0;
+
+  for (s = 0; s < prog->nstmts; s++) {
+    Stmt *stmt = prog->stmts[s];
+    for (i = 0; i < stmt->trans->nrows; i++) {
+      if (pluto_is_hyperplane_loop(stmt, i)) {
+        if (num_array_part_loop < array_part_dim) {
+          stmt->psa_hyp_types[i] = PSA_H_ARRAY_PART_LOOP;
+          num_array_part_loop++;
+        } else if (num_array_space_loop < array_dim) {
+          stmt->psa_hyp_types[i] = PSA_H_SPACE_LOOP;
+          num_array_space_loop++;
+        } else {
+          stmt->psa_hyp_types[i] = PSA_H_TIME_LOOP;
+        }
+      } else {
+        stmt->psa_hyp_types[i] = PSA_H_SCALAR;
+      }
+
+//      if (stmt->psa_hyp_types[i] == PSA_H_UNKNOWN) {
+//        if (i < array_dim) {
+//          stmt->psa_hyp_types[i] = pluto_is_hyperplane_loop(stmt, i) ? PSA_H_SPACE_LOOP : PSA_H_SCALAR;
+//        } else {
+//          stmt->psa_hyp_types[i] = pluto_is_hyperplane_loop(stmt, i) ? PSA_H_TIME_LOOP : PSA_H_SCALAR;
+//        }      
+//      }
+    }
+  }
+}
+
+void psa_detect_hyperplane_types(PlutoProg *prog, int array_dim, int array_part_dim) {
+  int i, depth;
+  int nstmts = prog->nstmts;
+  int num_array_part_loop = 0;
+  int num_array_space_loop = 0;
+
+  for (depth = 0; depth < prog->num_hyperplanes; depth++) {
+    for (i = 0; i < nstmts; i++) {
+      if (pluto_is_hyperplane_loop(prog->stmts[i], depth))
+        break;
+    }
+    if (i < nstmts) {
+      if (num_array_part_loop < array_part_dim) {
+        prog->hProps[depth].psa_type = PSA_H_ARRAY_PART_LOOP;
+        num_array_part_loop++;
+      } else if (num_array_space_loop < array_dim) {
+        prog->hProps[depth].psa_type = PSA_H_SPACE_LOOP;
+        num_array_space_loop++;
+      } else {
+        prog->hProps[depth].psa_type = PSA_H_TIME_LOOP;
+      }
+    } else {
+      prog->hProps[depth].psa_type = PSA_H_SCALAR;
+    }
+
+//    if (prog->hProps[depth].psa_type == PSA_H_UNKNOWN) {
+//      for (i = 0; i < nstmts; i++) {
+//        if (pluto_is_hyperplane_loop(prog->stmts[i], depth))
+//          break;
+//      }      
+//      if (depth < array_dim) {
+//        prog->hProps[depth].psa_type = (i < nstmts) ? PSA_H_SPACE_LOOP : PSA_H_SCALAR;      
+//      } else {
+//        prog->hProps[depth].psa_type = (i < nstmts) ? PSA_H_TIME_LOOP : PSA_H_SCALAR;
+//      }
+//    }
+  }
+}
+
+/* This is based on the hyperplane type of each statement has been detected */
+// void psa_redetect_hyperplane_types(PlutoProg *prog, int array_dim) {
+//   int i, depth;
+//   int nstmts = prog->nstmts;
+
+//   for (depth = 0; depth < prog->num_hyperplanes; depth++) {
+//     for (i = 0; i < nstmts; i++) {
+//       if (pluto_is_hyperplane_loop(prog->stmts[i], depth))
+//         break;
+//     }
+//     if (i < nstmts) {
+//       prog->hProps[depth].psa_type = prog->stmts[i]->psa_hyp_types[depth];
+//     } else {
+//       prog->hProps[depth].psa_type = PSA_H_SCALAR;
+//     }
+//   }  
+// }
+/* Jie Added - End */
 
 void pluto_detect_hyperplane_types_stmtwise(PlutoProg *prog) {
   int s, i;
