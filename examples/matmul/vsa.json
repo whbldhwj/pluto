@@ -1,0 +1,18 @@
+{
+  "OP_NAME": [
+    "A",
+    "B"
+  ],
+  "RES_NAME": [
+    "C"
+  ],
+  "OP_DIM": [
+    2,
+    2
+  ],
+  "RES_DIM": [
+    2
+  ],
+  "OP_CHANNEL_NUM": 2,
+  "RES_CHANNEL_NUM": 1,
+}

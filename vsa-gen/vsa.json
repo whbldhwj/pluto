@@ -1,0 +1,10 @@
+{
+  "OP_NAME": [
+    "A",
+    "B"
+    ],
+  "RES_NAME": [
+    "C"
+    ],
+  "SIMD_FACTOR": 8
+}

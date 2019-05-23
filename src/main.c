@@ -47,6 +47,7 @@
 #include "psa_array.h"
 #include "psa_partition.h"
 #include "psa_pe_opt.h"
+#include "psa_vsa.h"
 
 #include "clan/clan.h"
 #include "candl/candl.h"
@@ -590,6 +591,7 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
 
   /* Jie Added - Start */
   /* Dependence Checker for Systolic Array */
+  // TODO: Move this part to post-auto-transform phase
   fprintf(stdout, "[PSA] Check uniformity of the design.\n");
   bool is_uniform = systolic_array_dep_checker(prog);
   if (!is_uniform) {
@@ -694,6 +696,21 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
       psa_pe_optimize(prog);
     }
     /* Jie Added - End */
+    
+    /* Jie Added - Start */
+    fprintf(stdout, "[PSA] Generate Virtual Systolic Array (VSA).\n");
+    VSA* psa_vsa = NULL;
+    psa_vsa = pluto_prog_to_vsa(prog);
+    FILE *vsa_fp = fopen("vsa.json", "w");
+    if (vsa_fp) {
+      psa_vsa_pretty_print(vsa_fp, psa_vsa);
+    } else {
+      fprintf(stdout, "[PSA] ERROR! File %s can't be opened!\n", "vsa.json");
+      return 1;
+    }
+    fclose(vsa_fp);
+
+    /* Jie Added - End */
 
     // if (options->tile) {
     //   pluto_tile(prog);
@@ -703,40 +720,40 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
     //   }
     // }
   
-    if (options->parallel && !options->tile && !options->identity) {
-      /* Obtain wavefront/pipelined parallelization by skewing if
-       * necessary */
-      unsigned nbands;
-      Band **bands;
-      pluto_compute_dep_satisfaction(prog);
-      bands = pluto_get_outermost_permutable_bands(prog, &nbands);
-      bool retval = pluto_create_tile_schedule(prog, bands, nbands);
-      pluto_bands_free(bands, nbands);
+    // if (options->parallel && !options->tile && !options->identity) {
+    //   /* Obtain wavefront/pipelined parallelization by skewing if
+    //    * necessary */
+    //   unsigned nbands;
+    //   Band **bands;
+    //   pluto_compute_dep_satisfaction(prog);
+    //   bands = pluto_get_outermost_permutable_bands(prog, &nbands);
+    //   bool retval = pluto_create_tile_schedule(prog, bands, nbands);
+    //   pluto_bands_free(bands, nbands);
   
-      /* If the user hasn't supplied --tile and there is only pipelined
-       * parallelism, we will warn the user */
-      if (retval) {
-        printf("[pluto] WARNING: pipelined parallelism exists and --tile is not "
-               "used.\n");
-        printf("\tUse --tile for better parallelization \n");
-        fprintf(stdout, "[pluto] After skewing:\n");
-        pluto_transformations_pretty_print(prog);
-      }
-    }
+    //   /* If the user hasn't supplied --tile and there is only pipelined
+    //    * parallelism, we will warn the user */
+    //   if (retval) {
+    //     printf("[pluto] WARNING: pipelined parallelism exists and --tile is not "
+    //            "used.\n");
+    //     printf("\tUse --tile for better parallelization \n");
+    //     fprintf(stdout, "[pluto] After skewing:\n");
+    //     pluto_transformations_pretty_print(prog);
+    //   }
+    // }
   
-    if (options->unroll) {
-      /* Will generate a .unroll file */
-      /* plann/plorc needs a .params */
-      FILE *paramsFP = fopen(".params", "w");
-      if (paramsFP) {
-        int i;
-        for (i = 0; i < prog->npar; i++) {
-          fprintf(paramsFP, "%s\n", prog->params[i]);
-        }
-        fclose(paramsFP);
-      }
-      pluto_detect_mark_unrollable_loops(prog);
-    }
+    // if (options->unroll) {
+    //   /* Will generate a .unroll file */
+    //   /* plann/plorc needs a .params */
+    //   FILE *paramsFP = fopen(".params", "w");
+    //   if (paramsFP) {
+    //     int i;
+    //     for (i = 0; i < prog->npar; i++) {
+    //       fprintf(paramsFP, "%s\n", prog->params[i]);
+    //     }
+    //     fclose(paramsFP);
+    //   }
+    //   pluto_detect_mark_unrollable_loops(prog);
+    // }
   
     if (!options->pet && !strcmp(srcFileName, "stdin")) {
       // input stdin == output stdout

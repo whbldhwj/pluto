@@ -5004,7 +5004,7 @@ Stmt *pluto_stmt_dup(const Stmt *stmt) {
   }
 
   for (i = 0; i < stmt->nwrites; i++) {
-    nstmt->writes[i] = pluto_access_dup(stmt->reads[i]);
+    nstmt->writes[i] = pluto_access_dup(stmt->writes[i]); // Jie: fixed bugs
   }
 
   return nstmt;

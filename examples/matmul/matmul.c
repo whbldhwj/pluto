@@ -79,9 +79,13 @@ int main()
     IF_TIME(t_start = rtclock());
 
 #pragma scop
-    for(i=0; i<M; i++)
-        for(j=0; j<N; j++)  
-            for(k=0; k<K; k++)
+//    for(i=0; i<M; i++)
+//        for(j=0; j<N; j++)  
+//            for(k=0; k<K; k++)
+//                C[i][j] = beta*C[i][j] + alpha*A[i][k] * B[k][j];
+    for(i=0; i<1024; i++)
+        for(j=0; j<1024; j++)  
+            for(k=0; k<1024; k++)
                 C[i][j] = beta*C[i][j] + alpha*A[i][k] * B[k][j];
 #pragma endscop
 

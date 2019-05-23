@@ -78,6 +78,7 @@
 
 /* Jie Added - Start */
 #define DEFAULT_TASK_INTERLEAVE_TILE_FACTOR 8
+#define DEFAULT_SIMD_TILE_FACTOR 2
 /* Jie Added - End */
 
 #define PI_TABLE_SIZE 256
@@ -118,10 +119,12 @@ typedef enum hyptype {
 /* Jie Added - Start */
 typedef enum psahyptype {
   PSA_H_UNKNOWN = 0,
-  PSA_H_SPACE_LOOP,
-  PSA_H_TIME_LOOP,
-  PSA_H_ARRAY_PART_LOOP,
-  PSA_H_SCALAR
+  PSA_H_SPACE_LOOP = 1,
+  PSA_H_TIME_LOOP = 2,
+  PSA_H_ARRAY_PART_LOOP = 4,
+  PSA_H_TASK_INTER_LOOP = 8,
+  PSA_H_SIMD_LOOP = 16,
+  PSA_H_SCALAR = 32
 } PSAHypType;
 /* Jie Added - End */
 
@@ -133,11 +136,13 @@ typedef enum psahyptype {
 #define IS_WAW(type) (type == OSL_DEPENDENCE_WAW)
 
 /* Jie Added - Start */
-#define IS_PSA_ARRAY_PART_LOOP(type)  (type == PSA_H_ARRAY_PART_LOOP)
-#define IS_PSA_SPACE_LOOP(type)       (type == PSA_H_SPACE_LOOP)
-#define IS_PSA_TIME_LOOP(type)        (type == PSA_H_TIME_LOOP)
-#define IS_PSA_SCALAR(type)           (type == PSA_H_SCALAR)
-#define IS_PSA_UNKNOWN(type)          (type == PSA_H_UNKNOWN)
+#define IS_PSA_UNKNOWN(type)          ((int)(type & 0x00) == (int)PSA_H_UNKNOWN)
+#define IS_PSA_SPACE_LOOP(type)       ((int)(type & 0x01) == (int)PSA_H_SPACE_LOOP)
+#define IS_PSA_TIME_LOOP(type)        ((int)(type & 0x02) == (int)PSA_H_TIME_LOOP)
+#define IS_PSA_ARRAY_PART_LOOP(type)  ((int)(type & 0x04) == (int)PSA_H_ARRAY_PART_LOOP)
+#define IS_PSA_TASK_INTER_LOOP(type)  ((int)(type & 0x08) == (int)PSA_H_TASK_INTER_LOOP)
+#define IS_PSA_SIMD_LOOP(type)        ((int)(type & 0x10) == (int)PSA_H_SIMD_LOOP)
+#define IS_PSA_SCALAR(type)           ((int)(type & 0x20) == (int)PSA_H_SCALAR)
 /* Jie Added - End */
 
 typedef enum looptype {

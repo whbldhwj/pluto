@@ -140,7 +140,7 @@ void pluto_tile_band(PlutoProg *prog, Band *band, int *tile_sizes) {
                          ? H_SCALAR
                          : H_TILE_SPACE_LOOP;
 
-      int psa_hyp_type = (stmt->hyp_types[depth + depth - firstD] == PSA_H_SCALAR)
+      int psa_hyp_type = (stmt->psa_hyp_types[depth + depth - firstD] == PSA_H_SCALAR)
                          ? PSA_H_SCALAR
                          : PSA_H_ARRAY_PART_LOOP;
 
