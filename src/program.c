@@ -2723,6 +2723,12 @@ PlutoProg *pluto_prog_alloc() {
   /* Jie Added - Start */
   prog->array_dim = 0;
   prog->array_part_dim = 0;
+  prog->array_nrow = 0;
+  prog->array_ncol = 0;
+  prog->array_il_enable = 0;
+  prog->array_il_factor = (int *)malloc(2 * sizeof(int));
+  prog->array_simd_factor = 0;
+  prog->array_io_enable = 0;
   /* Jie Added - End */
 
   return prog;
@@ -2777,6 +2783,10 @@ void pluto_prog_free(PlutoProg *prog) {
     free(prog->data_names[i]);
   }
   free(prog->data_names);
+
+  /* Jie Added - Start */
+  free(prog->array_il_factor);
+  /* Jie Added - End */
 
   free(prog);
 }
@@ -3009,6 +3019,10 @@ void pluto_stmt_add_dim(Stmt *stmt, int pos, int time_pos, const char *iter,
   }
 
   for (i = 0; i < prog->ntransdeps; i++) {
+// #ifdef JIE_DEBUG
+//     fprintf(stdout, "[Debug] i: %d nrows: %d ncols: %d\n", i, 
+//         prog->transdeps[i]->dpolytope->nrows, prog->transdeps[i]->dpolytope->ncols);
+// #endif
     assert(prog->transdeps[i] != NULL);
     if (prog->transdeps[i]->src == stmt->id) {
       pluto_constraints_add_dim(prog->transdeps[i]->dpolytope, pos, NULL);
@@ -3022,6 +3036,10 @@ void pluto_stmt_add_dim(Stmt *stmt, int pos, int time_pos, const char *iter,
                                 prog->stmts[prog->transdeps[i]->src]->dim + pos,
                                 NULL);
     }
+// #ifdef JIE_DEBUG
+//     fprintf(stdout, "[Debug] i: %d nrows: %d ncols: %d\n", i, 
+//         prog->transdeps[i]->dpolytope->nrows, prog->transdeps[i]->dpolytope->ncols);
+// #endif    
   }
 }
 
@@ -3530,6 +3548,7 @@ int get_const_bound_difference(const PlutoConstraints *cnst, int depth) {
           continue;
         if (cst->val[r1][depth] >= 1) {
           for (c = 0; c < cst->ncols - 1; c++) {
+            /* Make sure all non-constant coefficients are zeros */
             if (cst->val[r1][c] + cst->val[r][c] != 0) {
               break;
             }
@@ -3644,6 +3663,7 @@ char *get_expr(PlutoConstraints *cst, int pos, const char **params,
 /*
  * Get min or max of all upper or lower bounds (resp).
  * Returned string should be freed with free
+ * offset is the row index to operate on in cst
  */
 char *get_func_of_expr(PlutoConstraints *cst, int offset, int bound_type,
                        const char **params) {

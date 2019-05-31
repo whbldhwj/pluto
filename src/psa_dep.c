@@ -14,6 +14,7 @@
 #include "math_support.h"
 #include "constraints.h"
 #include "psa_dep.h"
+#include "psa_helpers.h"
 #include "program.h"
 
 #include "osl/macros.h"

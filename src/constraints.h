@@ -132,6 +132,10 @@ void pluto_constraints_project_out(PlutoConstraints *cst, int start, int end);
 
 void pluto_constraints_project_out_isl_single(PlutoConstraints **cst, int start,
                                               int num);
+/* Jie Added - Start */                                              
+PlutoConstraints *pluto_constraints_difference_isl(const PlutoConstraints *cst1,
+                                                   const PlutoConstraints *cst2);
+/* Jie Added - End */                                                   
 
 int pluto_constraints_num_in_list(const PlutoConstraints *const cst);
 

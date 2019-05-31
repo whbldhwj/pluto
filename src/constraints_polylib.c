@@ -56,7 +56,7 @@ Polyhedron *pluto_constraints_to_polylib(const PlutoConstraints *cst) {
 
   polymat = pluto_matrix_to_polylib(mat);
 
-  pol = Constraints2Polyhedron(polymat, 50);
+  pol = Constraints2Polyhedron(polymat, 100);
 
   Matrix_Free(polymat);
   pluto_matrix_free(mat);
@@ -130,7 +130,8 @@ PlutoConstraints *pluto_constraints_difference(const PlutoConstraints *cst1,
 
   Polyhedron *pol1 = pluto_constraints_to_polylib(cst1);
   Polyhedron *pol2 = pluto_constraints_to_polylib(cst2);
-  Polyhedron *pol3 = DomainDifference(pol1, pol2, 50);
+  //Polyhedron *pol3 = DomainDifference(pol1, pol2, 50);
+  Polyhedron *pol3 = DomainDifference(pol1, pol2, 100);
 
   PlutoConstraints *diffcst = polylib_to_pluto_constraints(pol3);
 

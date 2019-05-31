@@ -7,6 +7,9 @@
 #define _PSA_VSA_H
 
 #include "pluto.h"
+#include "assert.h"
+#include "distmem.h"
+#include "program.h"
 
 struct codeBlock {
   /* Number of lines */
@@ -66,6 +69,12 @@ struct psaVSA {
 
   /* RES_NAME */
   char **res_names;
+
+  /* OP_INTERIOR_IO_ELIMINATE */
+  bool *op_io_enable;
+
+  /* RES_INTERIOR_IO_ELIMINATE */
+  bool *res_io_enable;
 
   /* ROW_IL_FACTOR */
   int row_il_factor;
@@ -147,9 +156,32 @@ struct psaVSA {
 };
 typedef struct psaVSA VSA;
 
-VSA *pluto_prog_to_vsa(PlutoProg *prog);
+void vsa_op_res_extract(PlutoProg *prog, VSA *vsa);
+void vsa_channel_dir_extract(PlutoProg *prog, VSA *vsa);
+void vsa_engine_num_extract(PlutoProg *prog, VSA *vsa);
+void vsa_type_extract(PlutoProg *prog, VSA *vsa);
+void vsa_df_code_extract(PlutoProg *prog, VSA *vsa);
+void vsa_dc_code_extract(PlutoProg *prog, VSA *vsa);
+Band **psa_get_part_space_bands(PlutoProg *prog, int *nbands);
+Ploop **psa_get_intra_tile_dist_loops(Band *band, PlutoProg *prog, int *nloops);
+Stmt **psa_gen_write_out_code(
+  struct stmt_access_pair **wacc_stmts, int num_accs,
+  PlutoProg *prog, Stmt *anchor_stmt, int *copy_level, 
+  int outer_dist_loop_level, int loop_num, VSA *vsa
+);
+void psa_init_copy_level(PlutoProg *prog, Ploop **loops, int nloops,
+                         int *copy_level, int *outer_dist_loop_level);
+                         
+
+void pluto_prog_to_vsa(PlutoProg *prog, VSA *vsa);
 VSA *vsa_alloc();
 void vsa_free(VSA *vsa);
+void psa_print_string_with_indent(FILE *fp, int indent, char *to_print);
+void psa_print_int_with_indent(FILE *fp, int indent, int to_print);
+void psa_print_string_list_with_indent(FILE *fp, int indent, char **list, int len);
+void psa_print_int_list_with_indent(FILE *fp, int indent, int *list, int len);
 void psa_vsa_pretty_print(FILE *fp, const VSA *vsa);
+
+
 
 #endif

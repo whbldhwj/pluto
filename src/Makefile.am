@@ -17,7 +17,7 @@ endif
 
 bin_PROGRAMS = pluto
 
-pluto_SOURCES = psa_dep.c constraints.c constraints_polylib.c constraints_isl.c math_support.c gurobi-plugin.c ddg.c transforms.c pluto.c post_transform.c framework.c framework-dfp.c pluto_codegen_if.c polyloop.c ast_transform.c iss.c main.c psa_dep.h constraints.h math_support.h pluto.h program.c program.h tile.c unit_tests.c psa_array.c psa_array.h psa_partition.c psa_partition.h psa_pe_opt.c psa_pe_opt.h psa_vsa.h psa_vsa.c
+pluto_SOURCES = psa_dep.c constraints.c constraints_polylib.c constraints_isl.c math_support.c gurobi-plugin.c ddg.c transforms.c pluto.c post_transform.c framework.c framework-dfp.c pluto_codegen_if.c polyloop.c ast_transform.c iss.c main.c psa_dep.h constraints.h math_support.h pluto.h program.c program.h tile.c unit_tests.c psa_array.c psa_array.h psa_partition.c psa_partition.h psa_pe_opt.c psa_pe_opt.h psa_vsa.h psa_vsa.c psa_helpers.h distmem.h distmem.c
 
 nodist_EXTRA_pluto_SOURCES = dummy.cc
 

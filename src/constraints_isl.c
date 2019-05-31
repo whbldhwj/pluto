@@ -19,6 +19,8 @@
 #include "isl/space.h"
 #include "isl/val_gmp.h"
 
+
+
 /* start: 0-indexed */
 void pluto_constraints_project_out_isl(PlutoConstraints *cst, int start,
                                        int num) {
@@ -59,6 +61,38 @@ void pluto_constraints_project_out_isl_single(PlutoConstraints **cst, int start,
   *cst = isl_basic_set_to_pluto_constraints(bset);
   isl_basic_set_free(bset);
   isl_ctx_free(ctx);
+}
+
+PlutoConstraints *pluto_constraints_difference_isl(const PlutoConstraints *cst1,
+                                                   const PlutoConstraints *cst2) {
+  assert(cst1->ncols == cst2->ncols);
+
+  isl_ctx *ctx = isl_ctx_alloc();
+  isl_set *set1, *set2;
+
+  //bset1 = isl_basic_set_from_pluto_constraints(ctx, cst1);
+  //bset2 = isl_basic_set_from_pluto_constraints(ctx, cst2);
+  //bset3 = isl_set_subtract(bset1, bset2);
+  
+  set1 = isl_set_from_pluto_constraints(cst1, ctx);
+  set2 = isl_set_from_pluto_constraints(cst2, ctx);
+  set1 = isl_set_subtract(set1, set2);
+
+  assert(!isl_set_is_empty(set1));
+  
+  //PlutoConstraints *diffcst = isl_basic_set_to_pluto_constraints(bset3);    
+  PlutoConstraints *diffcst = isl_set_to_pluto_constraints(set1); 
+
+// #ifdef JIE_DEBUG
+//   fprintf(stdout, "[Debug] Diff:\n");
+//   pluto_constraints_pretty_print(stdout, diffcst);
+// #endif
+
+  isl_set_free(set1);
+  //isl_set_free(set2);  
+  isl_ctx_free(ctx);
+
+  return diffcst;  
 }
 
 /*

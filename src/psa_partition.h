@@ -9,6 +9,7 @@
 #include "pluto.h"
 #include "constraints.h"
 #include "program.h"
+#include "psa_vsa.h"
 
 #include "clan/clan.h"
 #include "candl/candl.h"

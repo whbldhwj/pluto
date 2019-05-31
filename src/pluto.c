@@ -1080,16 +1080,22 @@ void psa_detect_hyperplane_types(PlutoProg *prog, int array_dim, int array_part_
     for (i = 0; i < nstmts; i++) {
       if (pluto_is_hyperplane_loop(prog->stmts[i], depth))
         break;
-    }
+    }    
     if (i < nstmts) {
+      // get intra-pe optimization info
+      bool is_task_inter_loop = IS_PSA_TASK_INTER_LOOP(prog->hProps[depth].psa_type);
+      bool is_simd_loop = IS_PSA_SIMD_LOOP(prog->hProps[depth].psa_type);
+      PSAHypType psa_hyp_type_mask = (is_task_inter_loop)? PSA_H_TASK_INTER_LOOP : 0;
+      psa_hyp_type_mask = (is_simd_loop)? psa_hyp_type_mask | PSA_H_SIMD_LOOP : psa_hyp_type_mask;
+
       if (num_array_part_loop < array_part_dim) {
-        prog->hProps[depth].psa_type = PSA_H_ARRAY_PART_LOOP;
+        prog->hProps[depth].psa_type = PSA_H_ARRAY_PART_LOOP | psa_hyp_type_mask;
         num_array_part_loop++;
       } else if (num_array_space_loop < array_dim) {
-        prog->hProps[depth].psa_type = PSA_H_SPACE_LOOP;
+        prog->hProps[depth].psa_type = PSA_H_SPACE_LOOP | psa_hyp_type_mask;
         num_array_space_loop++;
       } else {
-        prog->hProps[depth].psa_type = PSA_H_TIME_LOOP;
+        prog->hProps[depth].psa_type = PSA_H_TIME_LOOP | psa_hyp_type_mask;
       }
     } else {
       prog->hProps[depth].psa_type = PSA_H_SCALAR;
@@ -2432,4 +2438,17 @@ int pluto_diamond_tile(PlutoProg *prog) {
   }
 
   return conc_start_enabled;
+}
+
+int is_access_scalar(PlutoAccess *access) {
+  int i = 0;
+
+  if (access->mat->nrows > 1)
+    return 0;
+
+  for (i = 0; i < access->mat->ncols; i++)
+    if (access->mat->val[0][i] != 0)
+      return 0;
+
+  return 1;
 }

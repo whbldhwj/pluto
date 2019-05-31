@@ -84,9 +84,9 @@ void pluto_stmt_loop_interchange(Stmt *stmt, int level1, int level2,
   stmt->hyp_types[level2] = tmp_htype;
 
   /* Permute the PSA hyperplane types */
-  tmp_psahtype = stmt->hyp_types[level1];
-  stmt->hyp_types[level1] = stmt->hyp_types[level2];
-  stmt->hyp_types[level2] = tmp_psahtype;
+  tmp_psahtype = stmt->psa_hyp_types[level1];
+  stmt->psa_hyp_types[level1] = stmt->psa_hyp_types[level2];
+  stmt->psa_hyp_types[level2] = tmp_psahtype;
   /* Jie Added - End */
 }
 
@@ -104,6 +104,7 @@ void pluto_interchange(PlutoProg *prog, int level1, int level2) {
   hTmp = prog->hProps[level1];
   prog->hProps[level1] = prog->hProps[level2];
   prog->hProps[level2] = hTmp;
+
 }
 
 void pluto_sink_transformation(Stmt *stmt, int pos, PlutoProg *prog) {
@@ -266,10 +267,9 @@ void psa_tile_loop(PlutoProg *prog, Ploop *loop, int tile_factor,
     }
   }
 
-  curr = prog->num_hyperplanes;  
-  for (depth = curr; depth < max; depth++) {
-    pluto_prog_add_hyperplane(prog, depth, H_UNKNOWN, PSA_H_UNKNOWN);
-  }  
+  // curr = prog->num_hyperplanes;  
+  curr = firstD + 1;
+  pluto_prog_add_hyperplane(prog, depth, H_UNKNOWN, PSA_H_UNKNOWN);  
 
   /* Re-detect hyperplane types (H_SCALAR, H_LOOP) */
   pluto_detect_hyperplane_types(prog);

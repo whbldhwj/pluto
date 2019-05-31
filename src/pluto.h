@@ -278,6 +278,102 @@ struct stmt_access_pair {
   Stmt *stmt;
 };
 
+struct TiledHyperplane {
+
+  // Is the corresponding loop hyperplane tiled?
+  int loop_tiled;
+
+  // already tiled?
+  int is_tiled;
+
+  // Used to store the tile size tiled dim
+  int tile_sizes;
+
+  // Indicates the tile loop dim corresponding to original array dim
+  int tiled_dim;
+
+  // current col number of orignal dim
+  int orig_dim;
+
+  int depth;
+
+  int firstD;
+
+  int lastD;
+
+  char *size_buffer;
+};
+
+struct array {
+
+  int id;
+
+  /*name of the array*/
+  char *text;
+
+  // datatype
+  char *data_type;
+
+  PlutoConstraints *array_bounds;
+
+  PlutoConstraints **parmetric_domain;
+
+  int dim_updated;
+
+  /*Dimensionality of array*/
+  int dim;
+
+  /*Original dimensionality of array*/
+  int dim_orig;
+
+  //	Should the data layout of the array be changed?
+  int change_layout;
+
+  // Affine data transformation matrix of array
+  // Size: nvar+npar+1
+  PlutoMatrix *trans;
+  PlutoMatrix *trans_orig;
+
+  // Read access of the array
+  PlutoAccess **reads;
+  int nreads;
+
+  // Write access of the array
+  PlutoAccess **writes;
+  int nwrites;
+
+  // Statements that have this array reference
+  int nstmts;
+  Stmt **stmts;
+
+  // Num of hyperplanes found
+  int num_hyperplanes_found;
+
+  // iterator names
+  char **iterators;
+
+  struct TiledHyperplane *tiled_hyperplane;
+
+  int num_tiled_loops;
+
+  int first_tile_dim;
+
+  int last_tile_dim;
+
+  int num_cur_tiled_loops;
+
+  // dim upto copy level should be treated as parameters
+  int *copy_level;
+
+  int copy_level_used;
+
+  // npar in arr parametric domain
+  int npar;
+
+  int *hyperplane_mapping;
+};
+typedef struct array Array;
+
 struct dependence {
 
   /* Unique number of the dependence: starts with 0  */
@@ -482,6 +578,19 @@ struct plutoProg {
 
   /* Systolic array array partition loops num */
   int array_part_dim;
+
+  /* Systolic array num_rows, num_cols */
+  int array_nrow, array_ncol;
+
+  /* Systolic array row/col interleave factor */
+  bool array_il_enable;
+  int *array_il_factor;    
+
+  /* SIMD */
+  int array_simd_factor;
+
+  /* Interior I/O elimination */
+  bool array_io_enable;
 };
 typedef struct plutoProg PlutoProg;
 

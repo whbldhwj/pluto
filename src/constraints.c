@@ -33,6 +33,12 @@
 #include "pluto.h"
 
 #include "piplib/piplib64.h"
+#include "isl/aff.h"
+#include "isl/ctx.h"
+#include "isl/map.h"
+#include "isl/set.h"
+#include "isl/space.h"
+#include "isl/val_gmp.h"
 
 #define UB 0
 #define LB 1
@@ -1851,6 +1857,34 @@ void pluto_constraints_project_out(PlutoConstraints *cst, int start, int num) {
     pluto_constraints_project_out(cst->next, start, num);
   }
 }
+
+/* Jie Added - Start */
+// void psa_constraints_project_out(PlutoConstraints *cst, int start, int num) {
+//   psa_constraints_project_out_single(cst, start, num);
+
+//   if (cst->next != NULL) {
+//     psa_constraints_project_out(cst->next, start, num);
+//   }
+// }
+
+// void psa_constraints_project_out_single(PlutoConstraints *cst, int start, int num) {}
+//   isl_set *iset1, *iset2;
+
+//   isl_ctx *ctx = isl_ctx_alloc();
+
+//   iset1 = isl_set_from_pluto_constraints(cst, ctx);
+//   iset2 = isl_set_project_out(iset1, isl_dim_set, start, num);
+
+//   PlutoConstraints *icst = isl_set_to_pluto_constraints(iset2);
+
+//   isl_set_free(iset1);
+//   isl_set_free(iset2);
+//   isl_ctx_free(ctx);
+
+//   pluto_constraints_free(cst);
+//   cst = icst;
+// }
+/* Jie Added - Start */
 
 void pluto_constraints_interchange_cols(PlutoConstraints *cst, int col1,
                                         int col2) {

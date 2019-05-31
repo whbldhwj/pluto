@@ -18,6 +18,7 @@
 #include "psa_array.h"
 #include "psa_partition.h"
 #include "psa_pe_opt.h"
+#include "psa_helpers.h"
 
 #include "osl/macros.h"
 #include "osl/scop.h"
@@ -108,6 +109,7 @@ int psa_read_task_interleave_tile_sizes(
  * move the sync-free (RAW, WAW, WAR) loops inside. If there is no sync-free
  * loop in the current loop bands, see if we could extend it to space loops
  * and tile it twice and move it inside.
+ * NOTE: currently only consider space loops
  */
 int psa_pe_task_interleave_optimize(Band *band, PlutoProg *prog) {  
   unsigned i, j;
@@ -177,16 +179,16 @@ int psa_pe_task_interleave_optimize(Band *band, PlutoProg *prog) {
   /* count if there is any sync-free loop among time loops */  
   unsigned num_parallel_time_loop = 0;
   int *parallel_time_hyp_id = (int *)malloc(prog->num_hyperplanes * sizeof(int));
-  for (i = first_time_hyp; i < prog->num_hyperplanes; i++) {
-    /* The current hyperplane should be a loop */
-    int psa_h_type = prog->hProps[i].psa_type;
-    if (IS_PSA_TIME_LOOP(psa_h_type)) {
-      if (dep_dis_hyp[i] == 0) {
-        parallel_time_hyp_id[num_parallel_time_loop] = i;
-        num_parallel_time_loop++;      
-      }
-    }
-  }
+  // for (i = first_time_hyp; i < prog->num_hyperplanes; i++) {
+  //   /* The current hyperplane should be a loop */
+  //   int psa_h_type = prog->hProps[i].psa_type;
+  //   if (IS_PSA_TIME_LOOP(psa_h_type)) {
+  //     if (dep_dis_hyp[i] == 0) {
+  //       parallel_time_hyp_id[num_parallel_time_loop] = i;
+  //       num_parallel_time_loop++;      
+  //     }
+  //   }
+  // }
 
   /* count if there is any sync-free loop among space loops */  
   unsigned num_parallel_space_loop = 0;
@@ -205,7 +207,8 @@ int psa_pe_task_interleave_optimize(Band *band, PlutoProg *prog) {
   if (num_parallel_time_loop) {
     /* Permute sync-free loop innermost */
     for (i = 0; i < num_parallel_time_loop; i++) {
-      unsigned cur_depth = parallel_time_hyp_id[i] - i;
+      unsigned cur_depth = parallel_time_hyp_id[i] - i;      
+      prog->hProps[cur_depth].psa_type = PSA_H_TASK_INTER_LOOP;
       for (j = cur_depth; j < prog->num_hyperplanes - 1; j++) {
         pluto_interchange(prog, j, j + 1);
       }
@@ -224,6 +227,18 @@ int psa_pe_task_interleave_optimize(Band *band, PlutoProg *prog) {
 
     psa_read_task_interleave_tile_sizes(tile_sizes, num_parallel_space_loop);
 
+    /* Complete the array_row_il_factor and array_col_il_factor */
+    prog->array_il_factor[0] = 1;
+    prog->array_il_factor[1] = 1;
+
+    if (prog->array_dim == 1) {      
+      prog->array_il_factor[1] = tile_sizes[0];
+    } else if (prog->array_dim == 2) {      
+      for (i = 0; i < num_parallel_space_loop; i++) {
+        prog->array_il_factor[parallel_space_hyp_id[i] - first_space_hyp] = tile_sizes[i];
+      }      
+    }
+
     for (i = 0; i < num_parallel_space_loop; i++) {
       unsigned cur_depth = parallel_space_hyp_id[i];
       unsigned nloops;
@@ -233,6 +248,8 @@ int psa_pe_task_interleave_optimize(Band *band, PlutoProg *prog) {
       );      
       assert(nloops == 1);
       psa_tile_loop(prog, loops[0], tile_sizes[i], H_TILE_SPACE_LOOP, PSA_H_SPACE_LOOP);      
+
+      prog->hProps[cur_depth + 1].psa_type = PSA_H_TASK_INTER_LOOP;
 
       for (j = cur_depth + 1; j < prog->num_hyperplanes - 1; j++) {
         pluto_interchange(prog, j, j + 1);
@@ -328,6 +345,7 @@ bool psa_loop_is_vectorizable(Ploop *loop, PlutoProg *prog) {
  * index). If the loop is sync-free or pipelined (reduction), tile the loop and
  * move it innermost.
  * TODO: currently only support single-statement reduction vectorization 
+ * NOTE: currently only consider time loops
  */
 int psa_pe_simd_optimize(Band *band, PlutoProg *prog) {  
   unsigned i, j, l, nloops;  
@@ -422,9 +440,14 @@ int psa_pe_simd_optimize(Band *band, PlutoProg *prog) {
     tile_sizes[0] = DEFAULT_SIMD_TILE_FACTOR;    
 
     psa_read_simd_tile_sizes(tile_sizes, 1);
-    
+
+    /* complete array_simd_factor */
+    prog->array_simd_factor = tile_sizes[0];
+
     psa_tile_loop(prog, best_loop, tile_sizes[0], H_TILE_SPACE_LOOP, PSA_H_TIME_LOOP);
+    
     unsigned cur_depth = best_loop->depth;
+    prog->hProps[cur_depth + 1].psa_type = PSA_H_SIMD_LOOP;
 
     for (j = cur_depth + 1; j < prog->num_hyperplanes - 1; j++) {
       pluto_interchange(prog, j, j + 1);
@@ -441,17 +464,66 @@ int psa_pe_simd_optimize(Band *band, PlutoProg *prog) {
   }
 }
 
-// int psa_pe_io_eliminate_optimize(Band *band, PlutoProg *prog) {
+/*
+ * Apply techniques in FCCM 2018 to eliminate interior I/O
+ * TODO: to be completed.
+ * Currently assign on interior I/O to "D" direction.
+ */
+int psa_pe_io_eliminate_optimize(Band *band, PlutoProg *prog, VSA *vsa) {
+  int i, j;
+  
+  /* Detect if there exists any interior I/Os */
+  for (i = 0; i < vsa->op_num; i++) {
+    if (!strcmp(vsa->op_channel_dirs[i], "I")) {
+      break;
+    }
+  }
 
-// }
+  for (j = 0; j < vsa->res_num; j++) {
+    if (!strcmp(vsa->res_channel_dirs[i], "I")) {
+      break;
+    }
+  }
+
+  if ((i != vsa->op_num) || (j != vsa->res_num)) {
+    prog->array_io_enable = 1;
+  } else {
+    prog->array_io_enable = 0;
+  }
+
+  vsa->op_io_enable = (bool *)malloc(vsa->op_num * sizeof(bool));
+  vsa->res_io_enable = (bool *)malloc(vsa->res_num * sizeof(bool));
+
+  if (prog->array_io_enable) {
+    for (i = 0; i < vsa->op_num; i++) {
+      if (!strcmp(vsa->op_channel_dirs[i], "I")) {
+        vsa->op_io_enable[i] = 1;
+        vsa->op_channel_dirs[i] = "D";
+      } else {
+        vsa->op_io_enable[i] = 0;
+      }
+    }
+
+    for (i = 0; i < vsa->res_num; i++) {
+      if (!strcmp(vsa->res_channel_dirs[i], "I")) {
+        vsa->res_io_enable[i] = 1;
+        vsa->res_channel_dirs[i] = "D";
+      } else {
+        vsa->res_io_enable[i] = 0;
+      }
+    }
+  }
+
+  return 1;
+}
 
 /*
  * Intra-PE optimization.
  * Task interleaving, SIMD vectorization, and interior I/O optimization
  */
-void psa_pe_optimize(PlutoProg *prog) {  
+void psa_pe_optimize(PlutoProg *prog, VSA *vsa) {  
   unsigned nbands, i;
-  int ret1, ret2;  
+  int ret1, ret2, ret3;  
   Band **bands = pluto_get_outermost_permutable_bands(prog, &nbands);
   assert(nbands == 1);
 
@@ -466,10 +538,21 @@ void psa_pe_optimize(PlutoProg *prog) {
     ret1 = psa_pe_task_interleave_optimize(bands[i], prog);
     if (ret1 == 0) {
       fprintf(stdout, "[PSA] Completed task interleaving optimizaiton.\n");
+      /* Update the fields of VSA */
+      prog->array_il_enable = 1;      
     } else {
       fprintf(stdout, "[PSA] Failed task interleaving optimization.\n");
+      prog->array_il_enable = 0;
     }
   }
+
+#ifdef JIE_DEBUG
+  for (i = 0; i < prog->num_hyperplanes; i++) {
+    if (IS_PSA_TASK_INTER_LOOP(prog->hProps[i].psa_type)) {
+      fprintf(stdout, "[Debug] after task interleave hyp %d is TASK_INTER_LOOP\n", i);
+    }
+  }
+#endif
 
   /* Detect hyperplane types */
   pluto_detect_hyperplane_types(prog);
@@ -490,14 +573,14 @@ void psa_pe_optimize(PlutoProg *prog) {
   /* SIMD Vectorization */
   fprintf(stdout, "[PSA] Apply SIMD vectorization.\n");  
   bands = pluto_get_outermost_permutable_bands(prog, &nbands);
- for (i = 0; i < nbands; i++) {
-   ret2 = psa_pe_simd_optimize(bands[i], prog);
-   if (ret2 == 0) {
-     fprintf(stdout, "[PSA] Completed SIMD vectorization.\n");
-   } else {
-     fprintf(stdout, "[PSA] Failed SIMD vectorization.\n");
-   }
- }
+  for (i = 0; i < nbands; i++) {
+    ret2 = psa_pe_simd_optimize(bands[i], prog);
+    if (ret2 == 0) {
+      fprintf(stdout, "[PSA] Completed SIMD vectorization.\n");
+    } else {
+      fprintf(stdout, "[PSA] Failed SIMD vectorization.\n");
+    }
+  }
 
   /* Detect hyperplane types */
   pluto_detect_hyperplane_types(prog);
@@ -515,15 +598,28 @@ void psa_pe_optimize(PlutoProg *prog) {
     pluto_transformations_pretty_print(prog);
   }
 
-//  /* Interior I/O Elimination */
-//  for (i = 0; i < nbands; i++) {
-//    ret3 = psa_pe_io_eliminate_optimize(bands[i], prog);
-//  }
-//
-//  /* Detect properties after transformation */
-//  pluto_compute_dep_directions(prog);
-//  pluto_compute_dep_satisfaction(prog);
-//  psa_compute_dep_distances(prog);
+  /* Interior I/O Elimination */
+  fprintf(stdout, "[PSA] Apply interior I/O elimination.\n");
+  bands = pluto_get_outermost_permutable_bands(prog, &nbands);
+  for (i = 0; i < nbands; i++) {
+    ret3 = psa_pe_io_eliminate_optimize(bands[i], prog, vsa);
+    if (ret3 == 0) {
+      fprintf(stdout, "[PSA] Completed Interior I/O elimination.");      
+    } else {
+      fprintf(stdout, "[PSA] Failed interior I/O elimination.\n");
+    }
+  }
+
+  /* Detect hyperplane types */
+  pluto_detect_hyperplane_types(prog);
+  pluto_detect_hyperplane_types_stmtwise(prog);
+  psa_detect_hyperplane_types(prog, prog->array_dim, prog->array_part_dim);
+  psa_detect_hyperplane_types_stmtwise(prog, prog->array_dim, prog->array_part_dim);      
+
+  /* Detect properties after transformation */
+  pluto_compute_dep_directions(prog);
+  pluto_compute_dep_satisfaction(prog);
+  psa_compute_dep_distances(prog);
 
   pluto_bands_free(bands, nbands);
 }

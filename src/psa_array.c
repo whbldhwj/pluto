@@ -14,6 +14,7 @@
 #include "math_support.h"
 #include "constraints.h"
 #include "psa_dep.h"
+#include "psa_helpers.h"
 
 #include "osl/macros.h"
 #include "osl/scop.h"
@@ -466,6 +467,21 @@ PlutoProg *pluto_prog_dup(const PlutoProg *prog) {
   /* Systolic array partition dimension */
   new_prog->array_part_dim = prog->array_part_dim;
 
+  /* Systolic array num_rows, num_cols */
+  new_prog->array_nrow = prog->array_nrow;
+  new_prog->array_ncol = prog->array_ncol;
+
+  /* Systolic array row/col interleave factor */
+  new_prog->array_il_enable = prog->array_il_enable;
+  new_prog->array_il_factor[0] = prog->array_il_factor[0];
+  new_prog->array_il_factor[1] = prog->array_il_factor[1];
+
+  /* SIMD */
+  new_prog->array_simd_factor = prog->array_simd_factor;
+
+  /* Systolic array interior I/O elimination */
+  new_prog->array_io_enable = prog->array_io_enable;
+
   return new_prog;
 }
 
@@ -751,7 +767,8 @@ PlutoProg **sa_candidates_generation_band(Band *band, int array_dim,
 
         /* Update array dim */
         new_prog->array_dim = array_dim;
-        new_prog->array_part_dim = band->width;
+        // new_prog->array_part_dim = band->width;
+        new_prog->array_part_dim = 0;
 
         /* Add the new invariant to the list */
         if (progs) {
@@ -795,7 +812,8 @@ PlutoProg **sa_candidates_generation_band(Band *band, int array_dim,
 
             /* Update array dim */
             new_prog->array_dim = array_dim;
-            new_prog->array_part_dim = band->width;
+            // new_prog->array_part_dim = band->width;
+            new_prog->array_part_dim = 0;
 
             /* Add the new invariant to the list */
             if (progs) {
@@ -872,7 +890,17 @@ PlutoProg **sa_candidates_generation(PlutoProg *prog, int *nprogs_p) {
   if (bands[0]->width >= 2) {
     PlutoProg **new_progs = NULL;
     int new_nprogs = 0;
+#ifdef JIE_DEBUG
+    fprintf(stdout, "[Debug] prog ntransdeps: %d\n", prog->ntransdeps);
+    fprintf(stdout, "[Debug] prog transdep[2] nrows: %d\n", prog->transdeps[2]->dpolytope->nrows);
+    fprintf(stdout, "[Debug] prog transdep[2] ncols: %d\n", prog->transdeps[2]->dpolytope->ncols);
+#endif
     new_progs = sa_candidates_generation_band(bands[0], 2, prog, &new_nprogs);
+#ifdef JIE_DEBUG
+    fprintf(stdout, "[Debug] new_prog ntransdeps: %d\n", new_progs[0]->ntransdeps);
+    fprintf(stdout, "[Debug] new_prog transdep[2] nrows: %d\n", new_progs[0]->transdeps[2]->dpolytope->nrows);
+    fprintf(stdout, "[Debug] new_prog transdep[2] ncols: %d\n", new_progs[0]->transdeps[2]->dpolytope->ncols);
+#endif    
 // #ifdef JIE_DEBUG
 //     fprintf(stdout, "[Debug] in 2D branch.\n");
 //     fprintf(stdout, "[Debug] number of 2D systolic array: %d\n", new_nprogs);

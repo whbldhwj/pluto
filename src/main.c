@@ -621,24 +621,57 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
     fprintf(stdout, "[pluto] Number of parameters: %d\n", prog->npar);
   }
 
-//#ifdef JIE_DEBUG
-//  fprintf(stdout, "print out the dependences\n");
-//  for (i = 0; i < prog->ndeps; i++) {
-//    Dep* dep = prog->deps[i];
-//    fprintf(stdout, "[Debug] Dependence ID: %d\n", i);
-//    fprintf(stdout, "[Debug] src ID: %d\n", dep->src);
-//    fprintf(stdout, "[Debug] dest ID: %d\n", dep->dest);
-//    PlutoConstraints* dpolytope = dep->dpolytope;
-//    pluto_constraints_pretty_print(stdout, dpolytope);
-//    fprintf(stdout, "[Debug] type: %d\n", dep->type);
-//    if (IS_RAR(dep->type)) {
-//      // print out access functions of RAR deps
-//      PlutoAccess *acc = dep->src_acc;
-//      fprintf(stdout, "[Debug] name: %s\n", acc->name);
-//      pluto_matrix_print(stdout, acc->mat);
-//    }
-// }
-//#endif
+#ifdef JIE_DEBUG
+  fprintf(stdout, "print out the dependences\n");
+  for (i = 0; i < prog->ndeps; i++) {
+    Dep *dep = prog->deps[i];
+    fprintf(stdout, "[Debug] Dependence ID: %d\n", i);
+    fprintf(stdout, "[Debug] src ID: %d\n", dep->src);
+    fprintf(stdout, "[Debug] dest ID: %d\n", dep->dest);
+    PlutoConstraints* dpolytope = dep->dpolytope;
+    pluto_constraints_pretty_print(stdout, dpolytope);
+   //fprintf(stdout, "[Debug] type: %d\n", dep->type);
+    if (IS_WAR(dep->type)) {
+      fprintf(stdout, "[Debug] type: WAR\n");
+    } else if (IS_WAW(dep->type)) {
+      fprintf(stdout, "[Debug] type: WAW\n");
+    } else if (IS_RAW(dep->type)) {
+      fprintf(stdout, "[Debug] type: RAW\n");
+    } else if (IS_RAR(dep->type)) {
+      fprintf(stdout, "[Debug] type: RAR\n");
+    }
+    PlutoAccess *acc = dep->src_acc;
+    fprintf(stdout, "[Debug] name: %s\n", acc->name);
+  //  if (IS_RAR(dep->type)) {
+  //    // print out access functions of RAR deps
+  //    PlutoAccess *acc = dep->src_acc;
+  //    fprintf(stdout, "[Debug] name: %s\n", acc->name);
+  //    pluto_matrix_print(stdout, acc->mat);
+  //  }
+  }
+
+  fprintf(stdout, "print out the trans dependences\n");
+  for (i = 0; i < prog->ntransdeps; i++) {
+    Dep *dep = prog->transdeps[i];
+    fprintf(stdout, "[Debug] Dependence ID: %d\n", i);
+    fprintf(stdout, "[Debug] src ID: %d\n", dep->src);
+    fprintf(stdout, "[Debug] dest ID: %d\n", dep->dest);
+    PlutoConstraints* dpolytope = dep->dpolytope;
+    pluto_constraints_pretty_print(stdout, dpolytope);
+   //fprintf(stdout, "[Debug] type: %d\n", dep->type);
+    if (IS_WAR(dep->type)) {
+      fprintf(stdout, "[Debug] type: WAR\n");
+    } else if (IS_WAW(dep->type)) {
+      fprintf(stdout, "[Debug] type: WAW\n");
+    } else if (IS_RAW(dep->type)) {
+      fprintf(stdout, "[Debug] type: RAW\n");
+    } else if (IS_RAR(dep->type)) {
+      fprintf(stdout, "[Debug] type: RAR\n");
+    }
+    PlutoAccess *acc = dep->src_acc;
+    fprintf(stdout, "[Debug] name: %s\n", acc->name);    
+  }
+#endif
 
   if (options->iss) {
     pluto_iss_dep(prog);
@@ -668,39 +701,77 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
   int nprogs;
   progs = sa_candidates_generation(prog, &nprogs);
   fprintf(stdout, "[PSA] Number of array candidates: %d\n", nprogs);
-#ifdef JIE_DEBUG  
-  if (progs[0] == NULL) {
-    fprintf(stdout, "[Debug] progs pointer NULL!\n");
-  }
-#endif  
+// #ifdef JIE_DEBUG  
+//   if (progs[0] == NULL) {
+//     fprintf(stdout, "[Debug] progs pointer NULL!\n");
+//   }
+// #endif  
   //prog = progs[0];
 
   /* Jie Added - End */
 
   unsigned prog_id;
   //for (prog_id = 0; prog_id < nprogs; prog_id++) {
-  for (prog_id = 3; prog_id < 4; prog_id++) {
+  for (prog_id = 3; prog_id < 4; prog_id++) {    
+    VSA *psa_vsa = vsa_alloc();    
 
     prog = progs[prog_id];
+
+    /* OP_NUM, RES_NUM, OP_DIM, RES_DIM, OP_NAME, RES_NAME */      
+    vsa_op_res_extract(prog, psa_vsa);
+    /* Extract OP_CHANNEL_DIR and RES_CHANNEL_DIR */    
+    vsa_channel_dir_extract(prog, psa_vsa);    
+    /* TYPE */
+    vsa_type_extract(prog, psa_vsa);
+    /* Jie Added - End */
+
+// #ifdef JIE_DEBUG
+//     fprintf(stdout, "[Debug1] prog ntransdeps: %d\n", prog->ntransdeps);
+//     fprintf(stdout, "[Debug1] prog transdep[2] nrows: %d\n", prog->transdeps[2]->dpolytope->nrows);
+//     fprintf(stdout, "[Debug1] prog transdep[2] ncols: %d\n", prog->transdeps[2]->dpolytope->ncols);
+//     pluto_constraints_pretty_print(stdout, prog->transdeps[2]->dpolytope);
+// #endif    
+
+    /* NOTE: Due to the supernode tiling, we will tile from the lower level to 
+     * upper level. Therefore, we will perform the intra-PE optimization first,
+     * then, array tiling.
+     */
+
+    /* Jie Added - Start */
+    if (options->tile) {
+      fprintf(stdout, "[PSA] Apply PE Optimization.\n");
+      psa_pe_optimize(prog, psa_vsa);      
+    }
+    /* Jie Added - End */
 
     /* Jie Added - Start */
     if (options->tile) {
       fprintf(stdout, "[PSA] Apply array partitioning.\n");
       psa_array_partition(prog);
     }
-    /* Jie Added - End */
-
-    /* Jie Added - Start */
-    if (options->tile) {
-      fprintf(stdout, "[PSA] Apply PE Optimization.\n");
-      psa_pe_optimize(prog);
-    }
-    /* Jie Added - End */
     
+// #ifdef JIE_DEBUG
+//     fprintf(stdout, "[Debug2] prog ntransdeps: %d\n", prog->ntransdeps);
+//     fprintf(stdout, "[Debug2] prog transdep[2] nrows: %d\n", prog->transdeps[2]->dpolytope->nrows);
+//     fprintf(stdout, "[Debug2] prog transdep[2] ncols: %d\n", prog->transdeps[2]->dpolytope->ncols);
+//     pluto_constraints_pretty_print(stdout, prog->transdeps[2]->dpolytope);
+// #endif    
+
+// #ifdef JIE_DEBUG
+//     fprintf(stdout, "[Debug3] prog ntransdeps: %d\n", prog->ntransdeps);
+//     fprintf(stdout, "[Debug3] prog transdep[2] nrows: %d\n", prog->transdeps[2]->dpolytope->nrows);
+//     fprintf(stdout, "[Debug3] prog transdep[2] ncols: %d\n", prog->transdeps[2]->dpolytope->ncols);
+// #endif
+
+// #ifdef JIE_DEBUG
+//     fprintf(stdout, "[Debug4] prog ntransdeps: %d\n", prog->ntransdeps);
+//     fprintf(stdout, "[Debug4] prog transdep[2] nrows: %d\n", prog->transdeps[2]->dpolytope->nrows);
+//     fprintf(stdout, "[Debug4] prog transdep[2] ncols: %d\n", prog->transdeps[2]->dpolytope->ncols);
+// #endif    
     /* Jie Added - Start */
-    fprintf(stdout, "[PSA] Generate Virtual Systolic Array (VSA).\n");
-    VSA* psa_vsa = NULL;
-    psa_vsa = pluto_prog_to_vsa(prog);
+    fprintf(stdout, "[PSA] Generate Virtual Systolic Array (VSA).\n");    
+    /* Complete the rest of VSA fields */
+    pluto_prog_to_vsa(prog, psa_vsa);
     FILE *vsa_fp = fopen("vsa.json", "w");
     if (vsa_fp) {
       psa_vsa_pretty_print(vsa_fp, psa_vsa);
