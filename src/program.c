@@ -3699,13 +3699,50 @@ char *get_func_of_expr(PlutoConstraints *cst, int offset, int bound_type,
   return fexpr;
 }
 
+/*
+ * Return the lower bound of each dimension of the parametric bounding box for a 
+ * (contiguous) block of dimensions
+ * start: position of start of block
+ * num: number of dimensions in block
+ * npar: number of parameters in terms of which expression with be computed;
+ * these are assumed to be the last 'npar' variables of cst
+ * params: strings for 'npar' parameters
+ */
+// PlutoConstraints **get_parametric_bounding_box_lb(
+//   const PlutoConstraints *cst, int start,
+//   int num, int npar, const char **params
+// ) {
+//   int k;
+//   PlutoConstraints **lbs = (PlutoConstraints **)malloc(num * sizeof(PlutoConstraints *));
+//   for (k = 0; k < num; k++) {
+//     lbs[k] = get_parametric_bounding_box_dim_lb(
+//       cst, start + k, npar, params
+//     );
+//   }
+
+//   return lbs;
+// }
+
+// PlutoConstraints **get_parametric_bounding_box_ub(
+//   const PlutoConstraints *cst, int start,
+//   int num, int npar, const char **params
+// ) {
+
+// }
+
+// PlutoConstraints *get_parametric_bounding_box_dim_lb(
+//   const PlutoConstraints *cst, int pos, int npar, const char **params
+// ) {
+  
+// }
+
 /* Return the size of the parametric bounding box for a (contiguous)
  * block of dimensions
  * start: position of start of block
  * num: number of dimensions in block
  * npar: number of parameters in terms of which expression will be computed;
  * these are assumed to be the last 'npar' variables of cst
- * parmas: strings for 'npar' parameters
+ * params: strings for 'npar' parameters
  * Return: expression describing the maximum number of points 'block'
  * vars traverse for any value of '0..start-1' variables
  *

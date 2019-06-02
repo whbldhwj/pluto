@@ -1859,15 +1859,15 @@ void pluto_constraints_project_out(PlutoConstraints *cst, int start, int num) {
 }
 
 /* Jie Added - Start */
-// void psa_constraints_project_out(PlutoConstraints *cst, int start, int num) {
-//   psa_constraints_project_out_single(cst, start, num);
+// void pluto_constraints_project_out_isl(PlutoConstraints *cst, int start, int num) {
+//   psa_constraints_project_out_single_isl(cst, start, num);
 
 //   if (cst->next != NULL) {
-//     psa_constraints_project_out(cst->next, start, num);
+//     psa_constraints_project_out_isl(cst->next, start, num);
 //   }
 // }
 
-// void psa_constraints_project_out_single(PlutoConstraints *cst, int start, int num) {}
+// void pluto_constraints_project_out_isl_single(PlutoConstraints *cst, int start, int num) {
 //   isl_set *iset1, *iset2;
 
 //   isl_ctx *ctx = isl_ctx_alloc();

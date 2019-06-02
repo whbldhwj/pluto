@@ -753,6 +753,7 @@ PlutoConstraints *pluto_compute_region_data(const Stmt *stmt,
                                             const PlutoProg *prog);
 
 int generate_declarations(const PlutoProg *prog, FILE *outfp);
+int psa_generate_declarations(const PlutoProg *prog, FILE *outfp);
 int pluto_gen_cloog_code(const PlutoProg *prog, int cloogf, int cloogl,
                          FILE *cloogfp, FILE *outfp);
 void pluto_add_given_stmt(PlutoProg *prog, Stmt *stmt);
@@ -779,6 +780,12 @@ void compute_flow_out_partitions(struct stmt_access_pair *wacc_stmt,
                                  int *pi_mappings);
 PlutoConstraints *compute_write_out(struct stmt_access_pair *wacc_stmt,
                                     int copy_level, PlutoProg *prog);
+PlutoConstraints *compute_write_out_iter(
+  struct stmt_access_pair *wacc_stmt, int copy_level, PlutoProg *prog
+);                                   
+PlutoConstraints *compute_loader_write_out_iter(
+  struct stmt_access_pair *wacc_stmt, int copy_level, PlutoProg *prog
+);
 void split_deps_acc_flowout(PlutoConstraintsList *atomic_flowouts,
                             int copy_level, int access_nrows, PlutoProg *prog);
 

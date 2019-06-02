@@ -30,7 +30,7 @@
     "D"
   ],
   "RES_CHANNEL_DIR": [
-    "I"
+    "D"
   ],
   "IL_ENABLE": 1,
   "ROW_IL_FACTOR": 16,
@@ -43,7 +43,7 @@
     32
   ],
   "RES_ENGINE_NUM": [
-    64
+    32
   ],
   "TYPE": "local",
 }

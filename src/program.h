@@ -118,4 +118,7 @@ void pluto_remove_stmt(PlutoProg *prog, int stmt_id);
 
 int pluto_prog_get_largest_const_in_domains(const PlutoProg *prog);
 
+static __isl_give isl_space *set_names(__isl_take isl_space *space,
+                                       enum isl_dim_type type, char **names);
+
 #endif

@@ -168,6 +168,42 @@ static void gen_stmt_macro(const Stmt *stmt, FILE *outfp) {
 }
 
 /* Generate variable declarations and macros */
+int psa_generate_declarations(const PlutoProg *prog, FILE *outfp) {
+  int i;
+
+  Stmt **stmts = prog->stmts;
+  int nstmts = prog->nstmts;
+
+  /* Generate statement macros */
+  for (i = 0; i < nstmts; i++) {
+    gen_stmt_macro(stmts[i], outfp);
+  }
+  fprintf(outfp, "\n");
+
+  /* Scattering iterators. */
+  if (prog->num_hyperplanes >= 1) {
+    fprintf(outfp, "int ");
+    for (i = 0; i < prog->num_hyperplanes; i++) {
+      if (i != 0)
+        fprintf(outfp, ", ");
+      fprintf(outfp, "t%d", i + 1);
+      if (prog->hProps[i].unroll) {
+        fprintf(outfp, ", t%dt, newlb_t%d, newub_t%d", i + 1, i + 1, i + 1);
+      }
+    }
+    fprintf(outfp, ";\n\n");
+  }
+
+  // if (options->parallel) {
+  //   fprintf(outfp, "\tint lb, ub, lbp, ubp, lb2, ub2;\n");
+  // }
+  /* For vectorizable loop bound replacement */
+  //fprintf(outfp, "\tregister int lbv, ubv;\n\n");
+
+  return 0;
+}
+
+/* Generate variable declarations and macros */
 int generate_declarations(const PlutoProg *prog, FILE *outfp) {
   int i;
 
@@ -277,8 +313,9 @@ int pluto_gen_cloog_code(const PlutoProg *prog, int cloogf, int cloogl,
     }
   }
 
-  if (options->cloogsh)
-    cloogOptions->sh = 1;
+  // if (options->cloogsh)
+  //   cloogOptions->sh = 1;
+  //cloogOptions->sh = 1;
 
   cloogOptions->name = "PLUTO-produced CLooG file";
 
@@ -288,12 +325,12 @@ int pluto_gen_cloog_code(const PlutoProg *prog, int cloogf, int cloogl,
   input = cloog_input_read(cloogfp, cloogOptions);
   IF_DEBUG(printf("[pluto] cloog_clast_create\n"));
   root = cloog_clast_create_from_input(input, cloogOptions);
-  if (options->prevector) {
-    pluto_mark_vector(root, prog, cloogOptions);
-  }
-  if (options->parallel) {
-    pluto_mark_parallel(root, prog, cloogOptions);
-  }
+  // if (options->prevector) {
+  //   pluto_mark_vector(root, prog, cloogOptions);
+  // }
+  // if (options->parallel) {
+  //   pluto_mark_parallel(root, prog, cloogOptions);
+  // }
   clast_pprint(outfp, root, 0, cloogOptions);
   cloog_clast_free(root);
 

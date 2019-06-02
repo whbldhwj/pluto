@@ -480,7 +480,7 @@ int psa_pe_io_eliminate_optimize(Band *band, PlutoProg *prog, VSA *vsa) {
   }
 
   for (j = 0; j < vsa->res_num; j++) {
-    if (!strcmp(vsa->res_channel_dirs[i], "I")) {
+    if (!strcmp(vsa->res_channel_dirs[j], "I")) {
       break;
     }
   }

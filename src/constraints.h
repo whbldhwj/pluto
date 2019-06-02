@@ -128,10 +128,13 @@ PlutoConstraints *pluto_constraints_from_mixed_matrix(const PlutoMatrix *mat,
                                                       int *is_eq);
 PlutoConstraints *pluto_constraints_image(const PlutoConstraints *cst,
                                           const PlutoMatrix *func);
-void pluto_constraints_project_out(PlutoConstraints *cst, int start, int end);
-
+void pluto_constraints_project_out(PlutoConstraints *cst, int start, int num);
+void pluto_constraints_project_out_single(PlutoConstraints *cst, int start,
+                                          int num);
+void pluto_constraints_project_out_isl(PlutoConstraints *cst, int start,
+                                       int num);
 void pluto_constraints_project_out_isl_single(PlutoConstraints **cst, int start,
-                                              int num);
+                                              int num);                                       
 /* Jie Added - Start */                                              
 PlutoConstraints *pluto_constraints_difference_isl(const PlutoConstraints *cst1,
                                                    const PlutoConstraints *cst2);

@@ -381,6 +381,116 @@ char *reconstruct_access(PlutoAccess *acc) {
   return access;
 }
 
+PlutoConstraints *compute_loader_write_out_iter(
+  struct stmt_access_pair *wacc_stmt, int copy_level, PlutoProg *prog 
+) {
+
+}
+
+PlutoConstraints *compute_write_out_iter(
+  struct stmt_access_pair *wacc_stmt, int copy_level, PlutoProg *prog
+) {
+  int i;
+
+  Stmt *wstmt = wacc_stmt->stmt;
+  PlutoAccess *wacc = wacc_stmt->acc;
+  Dep **deps;
+  int ndeps;
+  if (options->lastwriter) {
+    deps = prog->transdeps;
+    ndeps = prog->ntransdeps;
+  } else {
+    deps = prog->deps;
+    ndeps = prog->ndeps;
+  }
+
+  PlutoConstraints *srcdomain = pluto_get_new_domain(wstmt);
+
+  /* Locations written to inside this tile */
+  // PlutoConstraints *uwcst =
+  //     pluto_compute_region_data(wstmt, srcdomain, wacc, copy_level, prog);  
+
+  // requires transitive WAR dependences if they exist
+  for (i = 0; i < ndeps; i++) {
+    Dep *dep = deps[i];
+    // if (dep->type != OSL_DEPENDENCE_WAW && dep->type != OSL_DEPENDENCE_WAR)
+    // continue;
+    if (dep->type != OSL_DEPENDENCE_WAW)
+      continue;
+
+    Stmt *src = prog->stmts[dep->src];
+    Stmt *dest = prog->stmts[dep->dest];
+
+    /* Only dependences with this one as source access */
+    if (wacc != src->writes[0])
+      continue;
+
+    IF_DEBUG(printf("For dep %d\n", dep->id + 1));
+
+    const PlutoAccess *wacc_src = src->writes[0];
+
+// #ifdef JIE_DEBUG
+//     pluto_constraints_pretty_print(stdout, dep->dpolytope);
+// #endif
+    PlutoConstraints *tdpoly = pluto_get_transformed_dpoly(dep, src, dest);
+// #ifdef JIE_DEBUG
+//     pluto_constraints_pretty_print(stdout, tdpoly);
+// #endif
+
+    assert(tdpoly->ncols ==
+           src->trans->nrows + dest->trans->nrows + prog->npar + 1);
+
+    // printf("tdpoly\n");
+    // pluto_constraints_print(stdout, tdpoly);
+
+    PlutoConstraints *param_eq;
+
+    /* No need to check whether source and target share all of the
+     * copy_level loops; handled naturally since those scalar dimensions
+     * would be part of the 'copy_level' dimensions. If the statements are
+     * separated somewhere, subtracting param_eq will not changed tdpoly
+     */
+    param_eq =
+        get_context_equality(copy_level, src->trans->nrows, tdpoly->ncols);
+
+// #ifdef JIE_DEBUG
+//     fprintf(stdout, "[Debug] PARAM_EQ:\n");
+//     pluto_constraints_pretty_print(stdout, param_eq);
+// #endif
+
+    /* Source/target iteration pairs with target lying outside the tile */
+    //PlutoConstraints *tile_dest_outside =
+    //    pluto_constraints_difference(tdpoly, param_eq);
+    PlutoConstraints *tile_dest_outside = 
+          pluto_constraints_difference_isl(tdpoly, param_eq);    
+
+    /* Parameteric in the outer source 'copy_level' dimensions (since
+     * uwcst is constructed that way) */
+    /* Yields iterations inside the tile whose write locations are again
+     * written to outside the tile */
+    pluto_constraints_project_out_isl_single(&tile_dest_outside, src->trans->nrows,
+                                  dest->trans->nrows);
+    
+    // /* Locations that will again be written to outside */
+    // PlutoConstraints *wcst = pluto_compute_region_data(
+    //     src, tile_dest_outside, wacc_src, copy_level, prog);    
+
+    /* Subtracting out locations that will be written to outside */
+    //uwcst = pluto_constraints_subtract(uwcst, wcst);
+    srcdomain = pluto_constraints_subtract(srcdomain, tile_dest_outside);
+
+    pluto_constraints_free(tdpoly);
+    //pluto_constraints_free(wcst);
+    pluto_constraints_free(tile_dest_outside);
+    pluto_constraints_free(param_eq);
+  }
+  //pluto_constraints_free(srcdomain);
+  // IF_DEBUG(printf("Last write out\n"););
+  // IF_DEBUG(pluto_constraints_print(stdout, uwcst););
+  //return uwcst;    
+  return srcdomain;
+}
+
 /*
  * Computes write-out set
  * wacc_stmt: access pair for which last writes need to be computed
@@ -559,7 +669,7 @@ PlutoConstraints *pluto_compute_region_data(const Stmt *stmt,
 
   pluto_constraints_add_to_each(datadom, acc_cst);
 
-  pluto_constraints_project_out(datadom, copy_level, datadom->ncols -
+  pluto_constraints_project_out_isl_single(&datadom, copy_level, datadom->ncols -
                                                          copy_level - npar - 1 -
                                                          newacc->nrows);
 
