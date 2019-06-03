@@ -786,6 +786,19 @@ PlutoConstraints *compute_write_out_iter(
 PlutoConstraints *compute_loader_write_out_iter(
   struct stmt_access_pair *wacc_stmt, int copy_level, PlutoProg *prog
 );
+/* Jie Added - Start */
+PlutoConstraints *compute_read_in(
+  struct stmt_access_pair *racc_stmt,
+  int copy_level,   
+  PlutoProg *prog
+);
+PlutoConstraints *compute_read_in_engine_reuse(
+  struct stmt_access_pair *racc_stmt,
+  int copy_level, 
+  int reuse_level,
+  PlutoProg *prog
+);
+/* Jie Added - End */
 void split_deps_acc_flowout(PlutoConstraintsList *atomic_flowouts,
                             int copy_level, int access_nrows, PlutoProg *prog);
 

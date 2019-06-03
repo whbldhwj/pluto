@@ -12,28 +12,91 @@
  * - DFEngine read/feed code
  */
 void vsa_df_code_extract(PlutoProg *prog, VSA *vsa) {
-  int i;
+  int op_idx;
+  for (op_idx = 0; op_idx < vsa->op_num; op_idx++) {
+    char *op_name = vsa->op_names[op_idx];    
+    PlutoProg *new_prog = pluto_prog_dup(prog);
 
-  /* Get the tile and space band */
+    unsigned i;
 
-  /* Get the statements under the band */
+    /* Get the tile and space band */
+    int nbands;
+    Band **bands;
+    bands = psa_get_part_space_bands(new_prog, &nbands);
 
-  /* Get read/write access pairs with statements */
+    /* Get the statements under the band */
+    Ploop **loops;
+    unsigned nloops;
+    // Get the last space loop
+    loops = psa_get_intra_tile_dist_loops(bands[0], new_prog, &nloops);
 
-  /* Compute the read-in set */
+    /* Get read/write access pairs with statements */
+    unsigned l;
+    int *num_read_data, *num_data;
+    int *array_part_level, *space_level, *time_level;
 
-  /* Compute the buffer size */
+    // helper statements
+    Stmt ****df_comm_stmts;
 
-  /* Generate code for DFHead copy-in code, feeding code */
-  /* Copy-in code: Use the local-indexed buffers */
-  /* Feeding code: Use the incremental writing style */
+    num_read_data = (int *)malloc(nloops * sizeof(int));
+    num_data = (int *)malloc(nloops * sizeof(int));
 
-  /* Generate code for DFEngine copy-in code, feeding code */
-  /* Copy-in code: Use the incremental reading style */
-  /* Feeding code: Use the local-indexed buffers */
+    array_part_level = (int *)malloc(nloops * sizeof(int));
+    space_level = (int *)malloc(nloops * sizeof(int));
+    time_level = (int *)malloc(nloops * sizeof(int));
 
-  for (i = 0; i < vsa->op_num; i++) {
-    char *op_name = vsa->op_names[i];    
+    df_comm_stmts = (Stmt ****)malloc(nloops * sizeof(Stmt ***));
+    
+    psa_init_level(new_prog, loops, nloops, array_part_level, space_level, time_level);        
+
+    for (l = 0; l < nloops; l++) {
+      Ploop *loop = loops[l];
+   
+      //int *num_stmts_per_wacc; // indexed by data variable
+      int *num_stmts_per_racc; // indexed by data variable
+      //int *num_stmts_per_acc;  // indexed by data variable
+   
+      //struct stmt_access_pair ***wacc_stmts; // indexed by data variable
+      struct stmt_access_pair ***racc_stmts; // indexed by data variable
+      //struct stmt_access_pair ***acc_stmts;  // indexed by data variable
+   
+      // acc_stmts = get_read_write_access_with_stmts(
+      //   loop->stmts, loop->nstmts, &num_read_write_data[l], &num_stmts_per_acc);
+      racc_stmts = get_read_access_with_stmts(
+         loop->stmts, loop->nstmts, &num_read_data[l], &num_stmts_per_racc);
+      // wacc_stmts = get_write_access_with_stmts(
+      //  loop->stmts, loop->nstmts, &num_write_data[l], &num_stmts_per_wacc);
+   
+      num_data[l] = num_read_data[l];
+         
+      df_comm_stmts[l] = 
+           (Stmt ***)malloc(num_read_data[l] * sizeof(Stmt **));
+
+      /* 
+       * The anchor statement is with maximum dimension, and the domain is the 
+       * union of all the statements under the current loop.
+       */
+      Stmt *anchor_stmt = get_new_anchor_stmt(loop->stmts, loop->nstmts);      
+   
+      for (i = 0; i < num_read_data[l]; i++) {
+        if (!strcmp(op_name, racc_stmts[i][0]->acc->name)) {
+          df_comm_stmts[l][i] = psa_gen_read_in_code(
+            racc_stmts[i], num_stmts_per_racc[i], new_prog, anchor_stmt,
+            array_part_level[l], space_level[l], time_level[l], l, vsa    
+          );
+        } else {
+          df_comm_stmts[l][i] = NULL;
+        }
+      }   
+    }    
+   
+    free(num_read_data);    
+    free(num_data);
+    free(array_part_level);
+    free(space_level);    
+    free(time_level);
+
+    pluto_prog_free(new_prog);
   }
 }
 
@@ -228,28 +291,34 @@ Stmt **psa_gen_write_out_code(
                           wacc_stmts[0], 
                           array_part_level, space_level, time_level);
 
+#ifdef JIE_DEBUG
+  fprintf(stdout, "[Debug] Acc: %s\n", acc_name);
+  fprintf(stdout, "[Debug] engine_level: %d\n", dfc_engine_level);
+  fprintf(stdout, "[Debug] loader level: %d\n", dfc_loader_level);
+#endif
+
   /*
    * Generate code for engines
    */
   // Calculate the write out set, i.e., the data collect set for each DC engine
-  PlutoConstraints *write_out = NULL;
+  PlutoConstraints *write_out_engine = NULL;
   for (i = 0; i < num_accs; i++) {
     PlutoConstraints *write_out_one;
     // compute the write-out set based on the given access function
     write_out_one = compute_write_out(wacc_stmts[i], dfc_engine_level, prog);
-    if (write_out == NULL)
-      write_out = pluto_constraints_dup(write_out_one);
+    if (write_out_engine == NULL)
+      write_out_engine = pluto_constraints_dup(write_out_one);
     else
-      write_out = pluto_constraints_unionize(write_out, write_out_one);
+      write_out_engine = pluto_constraints_unionize(write_out_engine, write_out_one);
     pluto_constraints_free(write_out_one);    
   }
 
 // #ifdef JIE_DEBUG
-//   pluto_constraints_pretty_print(stdout, write_out);
+//   pluto_constraints_pretty_print(stdout, write_out_engine);
 // #endif
 
-  char *lw_buf_size =
-      get_parametric_bounding_box(write_out, dfc_engine_level, acc_nrows, 
+  char *engine_buf_size =
+      get_parametric_bounding_box(write_out_engine, dfc_engine_level, acc_nrows, 
                                   prog->npar, (const char **)prog->params);
 
 // #ifdef JIE_DEBUG
@@ -257,20 +326,61 @@ Stmt **psa_gen_write_out_code(
 // #endif    
 
   /* Start code generation */
-  generate_dc_engine_collect(
-    vsa, prog, write_out, dfc_engine_level,
-    acc_name, acc_nrows,
-    lw_buf_size    
-  );  
+  char *l_buf_name, *g_buf_name, *fifo_name;
+  char *l_count_name;
+  char *access_function;
 
-  generate_dc_engine_write(
-    vsa, prog, write_out, dfc_engine_level,
+  // dc_engine_collect_stmt
+  char *dc_engine_collect_module_name = "dc_engine_collect";
+  char *dc_engine_collect_stmt_text = "";
+
+  l_buf_name = concat("l_buf_", acc_name);
+  l_count_name = concat("l_count_", acc_name);
+  fifo_name = concat("fifo_", acc_name);
+  dc_engine_collect_stmt_text =   
+    malloc(strlen(l_buf_name) + strlen("[") + strlen(l_count_name) + 
+           strlen("++] = ") + strlen(fifo_name) + strlen(".read()") + 1);
+  sprintf(dc_engine_collect_stmt_text, "%s[%s++] = %s.read()", l_buf_name, 
+        l_count_name, fifo_name);
+
+  generate_dfc_code(
+    vsa, prog, write_out_engine, dfc_engine_level,
     acc_name, acc_nrows,
-    lw_buf_size
+    engine_buf_size, dc_engine_collect_stmt_text, dc_engine_collect_module_name
   );
 
-  pluto_constraints_free(write_out);  
-  free(lw_buf_size);
+  // dc_engine_write_stmt
+  char *dc_engine_write_module_name = "dc_engine_write";
+  char *dc_engine_write_stmt_text = "";
+
+  dc_engine_write_stmt_text = 
+    malloc(strlen(fifo_name) + strlen(".write(") + strlen(l_buf_name) + 
+            strlen("[") + strlen(l_count_name) + strlen("++])"));
+  sprintf(dc_engine_write_stmt_text, "%s.write(%s[%s++])", fifo_name, l_buf_name,
+        l_count_name);
+
+  generate_dfc_code(
+    vsa, prog, write_out_engine, dfc_engine_level,
+    acc_name, acc_nrows,
+    engine_buf_size, dc_engine_write_stmt_text, dc_engine_write_module_name
+  );        
+
+  // generate_dc_engine_collect(
+  //   vsa, prog, write_out, dfc_engine_level,
+  //   acc_name, acc_nrows,
+  //   lw_buf_size    
+  // );  
+
+  // generate_dc_engine_write(
+  //   vsa, prog, write_out, dfc_engine_level,
+  //   acc_name, acc_nrows,
+  //   lw_buf_size
+  // );
+
+  pluto_constraints_free(write_out_engine);  
+  free(engine_buf_size);
+  free(dc_engine_collect_stmt_text);
+  free(dc_engine_write_stmt_text);
 
   /*
    * Generate code for loaders
@@ -303,39 +413,93 @@ Stmt **psa_gen_write_out_code(
    * isl_fixed_box * isl_map_get_range_simple_fixed_box_hull)(isl_map *map)
    */
 
-  char *loader_lw_buf_size =
+  char *loader_buf_size =
       get_parametric_bounding_box(write_out_loader, dfc_loader_level, acc_nrows, 
                                   prog->npar, (const char **)prog->params);
 
-  generate_dc_loader_write(
+  /* Start code generation */
+  //char *l_buf_name, *g_buf_name, *fifo_name;
+
+  // dc_loader_write_stmt
+  char *dc_loader_write_module_name = "dc_loader_write";
+  char *dc_loader_write_stmt_text = "";
+
+  g_buf_name = concat("g_buf_", acc_name);    
+  access_function = "";
+  for (i = dfc_loader_level; i < dfc_loader_level + acc_nrows; i++) {
+    access_function = concat(access_function, "[");
+    char iter_tmp[100];
+    sprintf(iter_tmp, "d%d", i + 1);
+    access_function = concat(access_function, iter_tmp);
+    access_function = concat(access_function, "]");
+  }
+  dc_loader_write_stmt_text = concat(dc_loader_write_stmt_text, acc_name);
+  dc_loader_write_stmt_text = concat(dc_loader_write_stmt_text, access_function);  
+  dc_loader_write_stmt_text = concat(dc_loader_write_stmt_text, " = ");
+  dc_loader_write_stmt_text = concat(dc_loader_write_stmt_text, g_buf_name);
+  dc_loader_write_stmt_text = concat(dc_loader_write_stmt_text, access_function);  
+
+  generate_dfc_code(
     vsa, prog, write_out_loader, dfc_loader_level,
     acc_name, acc_nrows,
-    loader_lw_buf_size
+    loader_buf_size, dc_loader_write_stmt_text, dc_loader_write_module_name
   );
+
+  // generate_dc_loader_write(
+  //   vsa, prog, write_out_loader, dfc_loader_level,
+  //   acc_name, acc_nrows,
+  //   loader_lw_buf_size
+  // );
 
 // #ifdef JIE_DEBUG
 //   fprintf(stdout, "[Debug] Bounding box: %s\n", loader_lw_buf_size);
 // #endif  
   
-  PlutoConstraints *loader_collect;
-  loader_collect = compute_write_out(
+  PlutoConstraints *write_out_loader_collect;
+  write_out_loader_collect = compute_write_out(
     wacc_stmts[0], prog->num_hyperplanes, prog);  
 
 // #ifdef JIE_DEBUG
 //   pluto_constraints_pretty_print(stdout, loader_collect);
 // #endif  
 
-  /* Start code generation */  
-  generate_dc_loader_collect(
-    vsa, prog, loader_collect, prog->num_hyperplanes,
+  // dc_loader_collect_stmt
+  char *dc_loader_collect_module_name = "dc_loader_collect";
+  char *dc_loader_collect_stmt_text = "";
+
+  g_buf_name = concat("g_buf_", acc_name);    
+  access_function = "";
+  for (i = prog->num_hyperplanes; i < prog->num_hyperplanes + acc_nrows; i++) {
+    access_function = concat(access_function, "[");
+    char iter_tmp[100];
+    sprintf(iter_tmp, "d%d", i + 1);
+    access_function = concat(access_function, iter_tmp);
+    access_function = concat(access_function, "]");
+  }
+  dc_loader_collect_stmt_text = concat(dc_loader_write_stmt_text, g_buf_name);
+  dc_loader_collect_stmt_text = concat(dc_loader_write_stmt_text, access_function);  
+  dc_loader_collect_stmt_text = concat(dc_loader_write_stmt_text, " = ");
+  dc_loader_collect_stmt_text = concat(dc_loader_write_stmt_text, fifo_name);
+  dc_loader_collect_stmt_text = concat(dc_loader_write_stmt_text, ".read()");  
+
+  generate_dfc_code(
+    vsa, prog,
+    write_out_loader_collect, prog->num_hyperplanes,
     acc_name, acc_nrows,
-    loader_lw_buf_size
+    loader_buf_size, 
+    dc_loader_collect_stmt_text,
+    dc_loader_collect_module_name       
   );
 
+  // generate_dc_loader_collect(
+  //   vsa, prog, loader_collect, prog->num_hyperplanes,
+  //   acc_name, acc_nrows,
+  //   loader_lw_buf_size
+  // );
+
   pluto_constraints_free(write_out_loader);
-  pluto_constraints_free(loader_collect);
-  //pluto_constraints_free(write_out_iter_loader);
-  free(loader_lw_buf_size);
+  pluto_constraints_free(write_out_loader_collect);    
+  free(loader_buf_size);
 
   Stmt *dc_engine_collect_stmt = NULL;
   Stmt *dc_engine_write_stmt = NULL;
@@ -353,365 +517,6 @@ Stmt **psa_gen_write_out_code(
   
   return write_out_stmts;
 }
-
-/*
- * Generate the Data Collector Loader collect code
- */
-void generate_dc_loader_collect(
-  VSA *vsa, PlutoProg *prog,
-  PlutoConstraints *write_out, int copy_level,
-  char *acc_name, int acc_nrows,
-  char *lw_buf_size
-) {
-  int i;
-  char base_name[1024];
-  strcpy(base_name, "");
-  sprintf(base_name + strlen(base_name), acc_name);
-  sprintf(base_name + strlen(base_name), "_dc_loader_collect_code");
-
-  char file_name[1024];
-  strcpy(file_name, base_name);
-  sprintf(file_name + strlen(file_name), ".c");
-
-  char cloog_file_name[1024];
-  strcpy(cloog_file_name, base_name);
-  sprintf(cloog_file_name + strlen(cloog_file_name), ".cloog");
-
-  FILE *fp = fopen(file_name, "w");
-  assert(fp != NULL);
-
-  fprintf(fp, "data_t_%s lw_buf_%s[%s];\n", acc_name, acc_name, lw_buf_size);
-
-  char **iters = (char **)malloc((copy_level + acc_nrows) * sizeof(char *));  
-  for (i = 0; i < copy_level + acc_nrows; i++) {
-    iters[i] = malloc(13);
-    sprintf(iters[i], "d%d", i + 1);
-  }
-
-  char *lw_buf_name = concat("lw_buf_", acc_name);
-  // char *gw_count_name = concat("lw_count_", acc_name);
-  char *lw_fifo_name = concat("lw_fifo_", acc_name);
-  char *lw_stmt_text = "";
-  char *access_function = "";
-  for (i = copy_level; i < copy_level + acc_nrows; i++) {
-    access_function = concat(access_function, "[");
-    char iter_tmp[100];
-    sprintf(iter_tmp, "d%d", i + 1);
-    access_function = concat(access_function, iter_tmp);
-    access_function = concat(access_function, "]");
-  }
-  lw_stmt_text = concat(lw_stmt_text, lw_buf_name);
-  lw_stmt_text = concat(lw_stmt_text, access_function);
-  lw_stmt_text = concat(lw_stmt_text, " = ");
-  lw_stmt_text = concat(lw_stmt_text, lw_fifo_name);
-  lw_stmt_text = concat(lw_stmt_text, ".read()");  
-
-  FILE *cloogfp = NULL;
-  PlutoProg *dc_prog = pluto_prog_alloc();
-
-  for (i = 0; i < prog->npar; i++) {
-    pluto_prog_add_param(dc_prog, prog->params[i], dc_prog->npar);
-  }
-
-  for (i = 0; i < copy_level + acc_nrows; i++) {
-    pluto_prog_add_hyperplane(dc_prog, 0, H_UNKNOWN, PSA_H_UNKNOWN);
-  }  
-
-  PlutoMatrix *dc_trans;
-  dc_trans = pluto_matrix_identity(copy_level + acc_nrows);
-  for (i = 0; i < prog->npar + 1; i++) {
-    pluto_matrix_add_col(dc_trans, dc_trans->ncols);
-  }
-
-// #ifdef JIE_DEBUG
-//   fprintf(stdout, "[Debug] nrows: %d ncols: %d\n", dc_trans->nrows, dc_trans->ncols);
-// #endif
-  
-  pluto_add_stmt(dc_prog, write_out, dc_trans, iters, lw_stmt_text, ORIG);
-
-  cloogfp = fopen(cloog_file_name, "w+");
-  assert(cloogfp != NULL);
-  
-  pluto_gen_cloog_file(cloogfp, dc_prog);
-  rewind(cloogfp);
-  fflush(cloogfp);
-
-  // Generete the code
-  psa_generate_declarations(dc_prog, fp);
-  pluto_gen_cloog_code(dc_prog, 1, copy_level + acc_nrows, cloogfp, fp);
-
-  pluto_matrix_free(dc_trans);    
-  pluto_prog_free(dc_prog);
-  fclose(fp);
-  fclose(cloogfp);        
-}
-
-/*
- * Generate the Data Collector Loader write code
- */
-void generate_dc_loader_write(
-  VSA *vsa, PlutoProg *prog,
-  PlutoConstraints *write_out, int copy_level,
-  char *acc_name, int acc_nrows,
-  char *lw_buf_size  
-) {
-  int i;
-  char base_name[1024];
-  strcpy(base_name, "");
-  sprintf(base_name + strlen(base_name), acc_name);
-  sprintf(base_name + strlen(base_name), "_dc_loader_write_code");
-
-  char file_name[1024];
-  strcpy(file_name, base_name);
-  sprintf(file_name + strlen(file_name), ".c");
-
-  char cloog_file_name[1024];
-  strcpy(cloog_file_name, base_name);
-  sprintf(cloog_file_name + strlen(cloog_file_name), ".cloog");
-
-  FILE *fp = fopen(file_name, "w");
-  assert(fp != NULL);
-
-  fprintf(fp, "data_t_%s gw_buf_%s[%s];\n", acc_name, acc_name, lw_buf_size);
-
-  char **iters = (char **)malloc((copy_level + acc_nrows) * sizeof(char *));  
-  for (i = 0; i < copy_level + acc_nrows; i++) {
-    iters[i] = malloc(13);
-    sprintf(iters[i], "d%d", i + 1);
-  }
-
-  char *gw_buf_name = concat("gw_buf_", acc_name);
-  char *lw_buf_name = concat("lw_buf_", acc_name);
-  // char *gw_count_name = concat("lw_count_", acc_name);
-  // char *gw_fifo_name = concat("lw_fifo_", acc_name);
-  char *gw_stmt_text = "";
-  char *access_function = "";
-  for (i = copy_level; i < copy_level + acc_nrows; i++) {
-    access_function = concat(access_function, "[");
-    char iter_tmp[100];
-    sprintf(iter_tmp, "d%d", i + 1);
-    access_function = concat(access_function, iter_tmp);
-    access_function = concat(access_function, "]");
-  }
-  gw_stmt_text = concat(gw_stmt_text, gw_buf_name);
-  gw_stmt_text = concat(gw_stmt_text, access_function);
-  gw_stmt_text = concat(gw_stmt_text, " = ");
-  gw_stmt_text = concat(gw_stmt_text, lw_buf_name);
-  gw_stmt_text = concat(gw_stmt_text, access_function);
-
-// #ifdef JIE_DEBUG
-//   fprintf(stdout, "[Debug] %s\n", gw_stmt_text);    
-// #endif
-
-  FILE *cloogfp = NULL;
-  PlutoProg *dc_prog = pluto_prog_alloc();
-
-  for (i = 0; i < prog->npar; i++) {
-    pluto_prog_add_param(dc_prog, prog->params[i], dc_prog->npar);
-  }
-
-  for (i = 0; i < copy_level + acc_nrows; i++) {
-    pluto_prog_add_hyperplane(dc_prog, 0, H_UNKNOWN, PSA_H_UNKNOWN);
-  }  
-
-  PlutoMatrix *dc_trans;
-  dc_trans = pluto_matrix_identity(copy_level + acc_nrows);
-  for (i = 0; i < prog->npar + 1; i++) {
-    pluto_matrix_add_col(dc_trans, dc_trans->ncols);
-  }
-
-// #ifdef JIE_DEBUG
-//   fprintf(stdout, "[Debug] nrows: %d ncols: %d\n", dc_trans->nrows, dc_trans->ncols);
-// #endif
-  
-  pluto_add_stmt(dc_prog, write_out, dc_trans, iters, gw_stmt_text, ORIG);
-
-  cloogfp = fopen(cloog_file_name, "w+");
-  assert(cloogfp != NULL);
-  
-  pluto_gen_cloog_file(cloogfp, dc_prog);
-  rewind(cloogfp);
-  fflush(cloogfp);
-
-  // Generete the code
-  psa_generate_declarations(dc_prog, fp);
-  pluto_gen_cloog_code(dc_prog, 1, copy_level + acc_nrows, cloogfp, fp);
-
-  pluto_matrix_free(dc_trans);    
-  pluto_prog_free(dc_prog);
-  fclose(fp);
-  fclose(cloogfp);      
-}
-
-/*
- * Generate the Data Collector write code
- * This code writes data from local buffers in each engine
- */
-void generate_dc_engine_write(
-  VSA *vsa, PlutoProg *prog,
-  PlutoConstraints *write_out, int copy_level,
-  char *acc_name, int acc_nrows,
-  char *lw_buf_size
-) {
-  int i;
-  char base_name[1024];
-  strcpy(base_name, "");
-  sprintf(base_name + strlen(base_name), acc_name);
-  sprintf(base_name + strlen(base_name), "_dc_engine_write_code");
-
-  char file_name[1024];
-  strcpy(file_name, base_name);
-  sprintf(file_name + strlen(file_name), ".c");
-
-  char cloog_file_name[1024];
-  strcpy(cloog_file_name, base_name);
-  sprintf(cloog_file_name + strlen(cloog_file_name), ".cloog");
-
-  FILE *fp = fopen(file_name, "w");
-  assert(fp != NULL);
-
-  fprintf(fp, "data_t_%s lw_buf_%s[%s];\n", acc_name, acc_name, lw_buf_size);
-
-  char *lw_buf_name = concat("lw_buf_", acc_name);
-  char *lw_count_name = concat("lw_count_", acc_name);
-  char *lw_fifo_name = concat("lw_fifo_", acc_name);
-  char *lw_stmt_text = 
-    malloc(strlen(lw_fifo_name) + strlen(".write(") + strlen(lw_buf_name) + 
-           strlen("[") + strlen(lw_count_name) + strlen("++])") + 1);    
-  sprintf(lw_stmt_text, "%s.write(%s[%s++])", lw_fifo_name, lw_buf_name, lw_count_name);
-
-  FILE *cloogfp = NULL;
-  PlutoProg *dc_prog = pluto_prog_alloc();
-
-  for (i = 0; i < prog->npar; i++) {
-    pluto_prog_add_param(dc_prog, prog->params[i], dc_prog->npar);
-  }
-
-  for (i = 0; i < copy_level + acc_nrows; i++) {
-    pluto_prog_add_hyperplane(dc_prog, 0, H_UNKNOWN, PSA_H_UNKNOWN);
-  }  
-
-  PlutoMatrix *dc_trans;
-  dc_trans = pluto_matrix_identity(copy_level + acc_nrows);
-  for (i = 0; i < prog->npar + 1; i++) {
-    pluto_matrix_add_col(dc_trans, dc_trans->ncols);
-  }
-
-// #ifdef JIE_DEBUG
-//   fprintf(stdout, "[Debug] nrows: %d ncols: %d\n", dc_trans->nrows, dc_trans->ncols);
-// #endif
-
-  char **iters = (char **)malloc((copy_level + acc_nrows) * sizeof(char *));  
-  for (i = 0; i < copy_level + acc_nrows; i++) {
-    iters[i] = malloc(13);
-    sprintf(iters[i], "d%d", i + 1);
-  }
-  
-  pluto_add_stmt(dc_prog, write_out, dc_trans, iters, lw_stmt_text, ORIG);
-
-  cloogfp = fopen(cloog_file_name, "w+");
-  assert(cloogfp != NULL);
-  
-  pluto_gen_cloog_file(cloogfp, dc_prog);
-  rewind(cloogfp);
-  fflush(cloogfp);
-
-  // Generete the code
-  psa_generate_declarations(dc_prog, fp);
-  pluto_gen_cloog_code(dc_prog, 1, copy_level + acc_nrows, cloogfp, fp);
-
-  pluto_matrix_free(dc_trans);    
-  pluto_prog_free(dc_prog);
-  fclose(fp);
-  fclose(cloogfp);    
-}
-
-/*
- * Generate the Data Collector collection code
- * This code collects data from PEs in each engine
- */
-void generate_dc_engine_collect(
-  VSA *vsa, PlutoProg *prog, 
-  PlutoConstraints *write_out, int copy_level,
-  char *acc_name, int acc_nrows,
-  char *lw_buf_size
-) {
-  /* DC Engine Collect Code */  
-  int i;
-  char base_name[1024];
-  strcpy(base_name, "");
-  sprintf(base_name + strlen(base_name), acc_name);
-  sprintf(base_name + strlen(base_name), "_dc_engine_collect_code");
-    
-  char file_name[1024];
-  strcpy(file_name, base_name);
-  sprintf(file_name + strlen(file_name), ".c");
-
-  char cloog_file_name[1024];
-  strcpy(cloog_file_name, base_name);
-  sprintf(cloog_file_name + strlen(cloog_file_name), ".cloog");
-
-  FILE *fp = fopen(file_name, "w");
-  assert(fp != NULL);  
-
-  // Write the array decl
-  fprintf(fp, "data_t_%s lw_buf_%s[%s];\n", acc_name, acc_name, lw_buf_size);
-
-  char *lw_buf_name = concat("lw_buf_", acc_name);
-  char *lw_count_name = concat("lw_count_", acc_name);
-  char *lw_fifo_name = concat("lw_fifo_", acc_name);
-  char *lw_stmt_text = 
-    malloc(strlen(lw_buf_name) + strlen("[") + strlen(lw_count_name) + 
-           strlen("++] = ") + strlen(lw_fifo_name) + strlen(".read()") + 1);
-  sprintf(lw_stmt_text, "%s[%s++] = %s.read()", lw_buf_name, lw_count_name, lw_fifo_name);
-
-  FILE *cloogfp = NULL;
-  PlutoProg *dc_prog = pluto_prog_alloc();
-
-  for (i = 0; i < prog->npar; i++) {
-    pluto_prog_add_param(dc_prog, prog->params[i], dc_prog->npar);
-  }
-
-  for (i = 0; i < copy_level + acc_nrows; i++) {
-    pluto_prog_add_hyperplane(dc_prog, 0, H_UNKNOWN, PSA_H_UNKNOWN);
-  }  
-
-  PlutoMatrix *dc_trans;
-  dc_trans = pluto_matrix_identity(copy_level + acc_nrows);
-  for (i = 0; i < prog->npar + 1; i++) {
-    pluto_matrix_add_col(dc_trans, dc_trans->ncols);
-  }
-
-// #ifdef JIE_DEBUG
-//   fprintf(stdout, "[Debug] nrows: %d ncols: %d\n", dc_trans->nrows, dc_trans->ncols);
-// #endif
-
-  char **iters = (char **)malloc((copy_level + acc_nrows) * sizeof(char *));  
-  for (i = 0; i < copy_level + acc_nrows; i++) {
-    iters[i] = malloc(13);
-    sprintf(iters[i], "d%d", i + 1);
-  }
-  
-  pluto_add_stmt(dc_prog, write_out, dc_trans, iters, lw_stmt_text, ORIG);
-
-  cloogfp = fopen(cloog_file_name, "w+");
-  assert(cloogfp != NULL);
-  
-  pluto_gen_cloog_file(cloogfp, dc_prog);
-  rewind(cloogfp);
-  fflush(cloogfp);
-
-  // Generete the code
-  psa_generate_declarations(dc_prog, fp);
-  pluto_gen_cloog_code(dc_prog, 1, copy_level + acc_nrows, cloogfp, fp);
-
-  pluto_matrix_free(dc_trans);    
-  pluto_prog_free(dc_prog);
-  fclose(fp);
-  fclose(cloogfp);    
-}
-
-
 
 /* Set the dimension names of type "type" according to the elements
  * in the array "names".
@@ -904,4 +709,384 @@ Ploop **psa_get_intra_tile_dist_loops(Band *band, PlutoProg *prog, int *nloops) 
   *nloops = 1;
 
   return loops;
+}
+
+/*
+ * copy_level[loop_num]: number of outer loops of source loop to be treated as parameters
+ * (copy_level-1)^th (0-indexed) loop should be the parallel loop)
+ */
+Stmt **psa_gen_read_in_code(
+  struct stmt_access_pair **racc_stmts, int num_accs,
+  PlutoProg *prog, Stmt *anchor_stmt, 
+  int array_part_level, int space_level, int time_level, 
+  int loop_num, VSA *vsa
+) {
+  int i, acc_nrows;
+
+  // Generate access string, e.g., A[d1][d2];
+  char *access = reconstruct_access(racc_stmts[0]->acc);
+  acc_nrows = racc_stmts[0]->acc->mat->nrows;
+  char *acc_name = racc_stmts[0]->acc->name;
+
+  // Based on the channel direction, adjust the transformation matrix  
+  int dfc_engine_level;
+  int dfc_loader_level;
+
+#ifdef JIE_DEBUG
+  pluto_transformations_pretty_print(prog);
+#endif
+
+  pluto_prog_df_transform(prog, vsa, &dfc_engine_level, &dfc_loader_level,
+                          racc_stmts[0], 
+                          array_part_level, space_level, time_level);
+
+#ifdef JIE_DEBUG
+  pluto_transformations_pretty_print(prog);
+#endif
+
+#ifdef JIE_DEBUG
+  fprintf(stdout, "[Debug] acc: %s\n", acc_name);
+  fprintf(stdout, "[Debug] engine_level: %d\n", dfc_engine_level);
+  fprintf(stdout, "[Debug] loader_level: %d\n", dfc_loader_level);
+#endif
+
+  /* 
+   * Generate code for engines
+   */
+  PlutoConstraints *read_in_engine = NULL;
+  for (i = 0; i < num_accs; i++) {
+    PlutoConstraints *read_in_one;
+    // compute the write-out set based on the given access function
+    read_in_one = compute_read_in(racc_stmts[i], dfc_engine_level, prog);
+    if (read_in_engine == NULL)
+      read_in_engine = pluto_constraints_dup(read_in_one);
+    else
+      read_in_engine = pluto_constraints_unionize(read_in_engine, read_in_one);
+    pluto_constraints_free(read_in_one);    
+  }
+
+// #ifdef JIE_DEBUG
+//   pluto_constraints_pretty_print(stdout, read_in_engine);
+// #endif      
+
+  char *engine_buf_size =
+      get_parametric_bounding_box(read_in_engine, dfc_engine_level, acc_nrows, 
+                                  prog->npar, (const char **)prog->params);  
+
+  /* Start code generation */
+  char *l_buf_name, *g_buf_name, *fifo_name;
+  char *access_function;
+
+  char *df_engine_read_stmt_text = "";
+  char *df_engine_read_module_name = "df_engine_read";
+
+  l_buf_name = concat("l_buf_", acc_name);
+  g_buf_name = concat("g_buf_", acc_name);
+  fifo_name = concat("fifo_", acc_name);
+  access_function = "";
+  for (i = dfc_engine_level; i < dfc_engine_level + acc_nrows; i++) {
+    access_function = concat(access_function, "[");
+    char iter_tmp[100];
+    sprintf(iter_tmp, "d%d", i + 1);
+    access_function = concat(access_function, iter_tmp);
+    access_function = concat(access_function, "]");
+  }
+
+  df_engine_read_stmt_text = concat(df_engine_read_stmt_text, l_buf_name);
+  df_engine_read_stmt_text = concat(df_engine_read_stmt_text, access_function);
+  df_engine_read_stmt_text = concat(df_engine_read_stmt_text, " = ");
+  df_engine_read_stmt_text = concat(df_engine_read_stmt_text, fifo_name);
+  df_engine_read_stmt_text = concat(df_engine_read_stmt_text, ".read()");
+
+  generate_dfc_code(
+    vsa, prog, read_in_engine, dfc_engine_level,
+    acc_name, acc_nrows,
+    engine_buf_size,
+    df_engine_read_stmt_text,
+    df_engine_read_module_name
+  ); 
+
+  // generate_df_engine_read(
+  //   vsa, prog, read_in_engine, dfc_engine_level,
+  //   acc_name, acc_nrows,
+  //   loader_lr_buf_size
+  // );
+  PlutoConstraints *read_in_engine_feed = NULL;
+  int copy_level = racc_stmts[0]->stmt->dim;
+  // read_in_engine_feed = compute_read_in_engine_reuse(
+  //   racc_stmts[0], copy_level, dfc_engine_level, prog
+  // );
+  read_in_engine_feed = compute_read_in(
+    racc_stmts[0], copy_level, prog
+  );
+
+  char *df_engine_feed_stmt_text = "";
+  char *df_engine_feed_module_name = "df_engine_feed";
+
+  l_buf_name = concat("l_buf_", acc_name);
+  g_buf_name = concat("g_buf_", acc_name);
+  fifo_name = concat("fifo_", acc_name);
+  access_function = "";
+  for (i = copy_level; i < copy_level + acc_nrows; i++) {
+    access_function = concat(access_function, "[");
+    char iter_tmp[100];
+    sprintf(iter_tmp, "d%d", i + 1);
+    access_function = concat(access_function, iter_tmp);
+    access_function = concat(access_function, "]");
+  }
+
+  df_engine_feed_stmt_text = concat(df_engine_feed_stmt_text, fifo_name);
+  df_engine_feed_stmt_text = concat(df_engine_feed_stmt_text, ".write(");
+  df_engine_feed_stmt_text = concat(df_engine_feed_stmt_text, l_buf_name);
+  df_engine_feed_stmt_text = concat(df_engine_feed_stmt_text, access_function);
+  df_engine_feed_stmt_text = concat(df_engine_feed_stmt_text, ")");  
+
+  generate_dfc_code(
+    vsa, prog, read_in_engine_feed, copy_level,
+    acc_name, acc_nrows,
+    engine_buf_size,
+    df_engine_feed_stmt_text,
+    df_engine_feed_module_name
+  );   
+
+  /*
+   * Generate code for loaders
+   */  
+  PlutoConstraints *read_in_loader = NULL;
+  for (i = 0; i < num_accs; i++) {
+    PlutoConstraints *read_in_one;
+    // compute the write-out set based on the given access function
+    read_in_one = compute_read_in(racc_stmts[i], dfc_loader_level, prog);
+    if (read_in_loader == NULL)
+      read_in_loader = pluto_constraints_dup(read_in_one);
+    else
+      read_in_loader = pluto_constraints_unionize(read_in_loader, read_in_one);
+    pluto_constraints_free(read_in_one);    
+  }
+
+// #ifdef JIE_DEBUG
+//   pluto_constraints_pretty_print(stdout, read_in_loader);
+// #endif      
+
+  char *loader_buf_size =
+      get_parametric_bounding_box(read_in_loader, dfc_loader_level, acc_nrows, 
+                                  prog->npar, (const char **)prog->params);
+
+  l_buf_name = concat("l_buf_", acc_name);
+  g_buf_name = concat("g_buf_", acc_name);
+  fifo_name = concat("fifo_", acc_name);
+  access_function = "";
+  for (i = dfc_loader_level; i < dfc_loader_level + acc_nrows; i++) {
+    access_function = concat(access_function, "[");
+    char iter_tmp[100];
+    sprintf(iter_tmp, "d%d", i + 1);
+    access_function = concat(access_function, iter_tmp);
+    access_function = concat(access_function, "]");
+  }
+
+  char *df_loader_read_module_name = "df_loader_read";
+  char *df_loader_read_stmt_text = "";
+
+  df_loader_read_stmt_text = concat(df_loader_read_stmt_text, g_buf_name);
+  df_loader_read_stmt_text = concat(df_loader_read_stmt_text, access_function);
+  df_loader_read_stmt_text = concat(df_loader_read_stmt_text, " = ");
+  df_loader_read_stmt_text = concat(df_loader_read_stmt_text, acc_name);
+  df_loader_read_stmt_text = concat(df_loader_read_stmt_text, access_function);  
+
+  generate_dfc_code(
+    vsa, prog,
+    read_in_loader, dfc_loader_level,
+    acc_name, acc_nrows,
+    loader_buf_size,
+    df_loader_read_stmt_text,
+    df_loader_read_module_name
+  );
+
+  // generate_df_loader_read(
+  //   vsa, prog, read_in_loader, dfc_loader_level,
+  //   acc_name, acc_nrows,
+  //   loader_gr_buf_size
+  // );
+
+// #ifdef JIE_DEBUG
+//   fprintf(stdout, "[Debug] Bounding box: %s\n", loader_lw_buf_size);
+// #endif  
+  
+  PlutoConstraints *read_in_loader_feed = NULL;
+  read_in_loader_feed = compute_read_in(racc_stmts[0], dfc_engine_level, prog);
+
+  l_buf_name = concat("l_buf_", acc_name);
+  g_buf_name = concat("g_buf_", acc_name);
+  fifo_name = concat("fifo_", acc_name);
+  access_function = "";
+  for (i = dfc_engine_level; i < dfc_engine_level + acc_nrows; i++) {
+    access_function = concat(access_function, "[");
+    char iter_tmp[100];
+    sprintf(iter_tmp, "d%d", i + 1);
+    access_function = concat(access_function, iter_tmp);
+    access_function = concat(access_function, "]");
+  }
+
+  char *df_loader_feed_module_name = "df_loader_feed";
+  char *df_loader_feed_stmt_text = "";
+
+  df_loader_feed_stmt_text = concat(df_loader_feed_stmt_text, fifo_name);
+  df_loader_feed_stmt_text = concat(df_loader_feed_stmt_text, ".write(");
+  df_loader_feed_stmt_text = concat(df_loader_feed_stmt_text, g_buf_name);
+  df_loader_feed_stmt_text = concat(df_loader_feed_stmt_text, access_function);
+  df_loader_feed_stmt_text = concat(df_loader_feed_stmt_text, ")");
+
+  generate_dfc_code(
+    vsa, prog,
+    read_in_loader_feed, dfc_engine_level,
+    acc_name, acc_nrows,
+    loader_buf_size,
+    df_loader_feed_stmt_text,
+    df_loader_feed_module_name
+  );
+
+  // generate_df_loader_feed(
+  //   vsa, prog, read_in_loader_feed, dfc_engine_level,
+  //   acc_name, acc_nrows,
+  //   loader_gr_buf_size
+  // );
+
+  pluto_constraints_free(read_in_loader);
+  pluto_constraints_free(read_in_loader_feed);  
+  free(loader_buf_size);
+  free(engine_buf_size);
+
+  Stmt *df_engine_feed_stmt = NULL;
+  Stmt *df_engine_read_stmt = NULL;
+  Stmt *df_loader_feed_stmt = NULL;
+  Stmt *df_loader_read_stmt = NULL;
+
+#define NUM_READ_IN_STMTS 4  
+  Stmt **read_in_stmts = 
+    (Stmt **)malloc(NUM_READ_IN_STMTS * sizeof(Stmt *));
+
+  read_in_stmts[0] = df_engine_feed_stmt;
+  read_in_stmts[1] = df_engine_read_stmt;
+  read_in_stmts[2] = df_loader_feed_stmt;
+  read_in_stmts[3] = df_loader_read_stmt;
+  
+  return read_in_stmts;
+}
+
+/*
+ * Transform the space loop if needed
+ * TODO: temporary solution
+ */
+void pluto_prog_df_transform(PlutoProg *prog, VSA *vsa, 
+                             int *dfc_engine_level, int *dfc_loader_level,
+                             struct stmt_access_pair *acc_stmt,
+                             int array_part_level, int space_level, int time_level) {
+  int i;
+  char *acc_name = acc_stmt->acc->name;  
+
+  for (i = 0; i < vsa->op_num; i++) {
+    if (!strcmp(vsa->op_names[i], acc_name)) {
+      break;
+    }
+  }
+  char *acc_channel_dir = vsa->op_channel_dirs[i];
+  int array_dim = prog->array_dim;
+
+  if (array_dim == 2) {
+    if (!strcmp(acc_channel_dir, "D")) {
+      pluto_interchange(prog, space_level, space_level + 1);      
+
+      *dfc_engine_level = space_level + 1;      
+    } else if (!strcmp(acc_channel_dir, "R")) {      
+      
+      *dfc_engine_level = space_level + 1;
+    } else {
+      fprintf(stdout, "[PSA] Error! Not supported!\n");
+      exit(1);
+    }
+  } else if (array_dim == 1) {
+    if (!strcmp(acc_channel_dir, "D")) {      
+      *dfc_engine_level = space_level + 1;
+    } else if (!strcmp(acc_channel_dir, "R")) {      
+      *dfc_engine_level = space_level;
+    } else {
+      fprintf(stdout, "[PSA] Error! Not supporterd!\n");
+      exit(1);
+    }
+  }
+
+  *dfc_loader_level = space_level;
+}
+
+void generate_dfc_code(
+  VSA *vsa, PlutoProg *prog,
+  PlutoConstraints *read_in_write_out, int copy_level,
+  char *acc_name, int acc_nrows,
+  char *buf_size,
+  char *stmt_text,
+  char *module_name
+) {
+  int i;
+  char base_name[1024];
+  strcpy(base_name, "");
+  sprintf(base_name + strlen(base_name), "module_code/%s_%s_code", acc_name, module_name);  
+
+  char file_name[1024];
+  strcpy(file_name, base_name);
+  sprintf(file_name + strlen(file_name), ".c");
+
+  char cloog_file_name[1024];
+  strcpy(cloog_file_name, base_name);
+  sprintf(cloog_file_name + strlen(cloog_file_name), ".cloog");
+
+  FILE *fp = fopen(file_name, "w");
+  assert(fp != NULL);
+
+  fprintf(fp, "data_t_%s l_buf_%s[%s];\n", acc_name, acc_name, buf_size);
+
+  char **iters = (char **)malloc((copy_level + acc_nrows) * sizeof(char *));  
+  for (i = 0; i < copy_level + acc_nrows; i++) {
+    iters[i] = malloc(13);
+    sprintf(iters[i], "d%d", i + 1);
+  }
+
+  FILE *cloogfp = NULL;
+  PlutoProg *print_prog = pluto_prog_alloc();
+
+  for (i = 0; i < prog->npar; i++) {
+    pluto_prog_add_param(print_prog, prog->params[i], print_prog->npar);
+  }
+
+  for (i = 0; i < copy_level + acc_nrows; i++) {
+    pluto_prog_add_hyperplane(print_prog, 0, H_UNKNOWN, PSA_H_UNKNOWN);
+  }  
+
+  PlutoMatrix *trans;
+  trans = pluto_matrix_identity(copy_level + acc_nrows);
+  for (i = 0; i < prog->npar + 1; i++) {
+    pluto_matrix_add_col(trans, trans->ncols);
+  }
+
+// #ifdef JIE_DEBUG
+//   fprintf(stdout, "[Debug] nrows: %d ncols: %d\n", dc_trans->nrows, dc_trans->ncols);
+// #endif
+  
+  pluto_add_stmt(print_prog, read_in_write_out, trans, iters, stmt_text, ORIG);
+
+  cloogfp = fopen(cloog_file_name, "w+");
+  assert(cloogfp != NULL);
+  
+  pluto_gen_cloog_file(cloogfp, print_prog);
+  rewind(cloogfp);
+  fflush(cloogfp);
+
+  // Generete the code
+  psa_generate_declarations(print_prog, fp);
+  pluto_gen_cloog_code(print_prog, 1, copy_level + acc_nrows, cloogfp, fp);
+
+  pluto_matrix_free(trans);    
+  pluto_prog_free(print_prog);
+
+  fclose(fp);
+  fclose(cloogfp);        
 }

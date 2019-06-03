@@ -23,6 +23,12 @@ Stmt **psa_gen_write_out_code(
   int array_part_level, int space_level, int time_level, 
   int loop_num, VSA *vsa
 );
+Stmt **psa_gen_read_in_code(
+  struct stmt_access_pair **racc_stmts, int num_accs,
+  PlutoProg *prog, Stmt *anchor_stmt, 
+  int array_part_level, int space_level, int time_level, 
+  int loop_num, VSA *vsa
+);
 void pluto_stmt_loop_reverse(Stmt *stmt, int level, PlutoProg *prog);
 void pluto_reverse(PlutoProg *prog, int level);
 void pluto_prog_dc_transform(PlutoProg *prog, VSA *vsa, 
@@ -34,29 +40,17 @@ void psa_init_level(PlutoProg *prog, Ploop **loops, int nloops,
 PlutoConstraints *psa_convex_hull(PlutoConstraints *in);
 static __isl_give isl_space *set_names(__isl_take isl_space *space,
                                        enum isl_dim_type type, char **names);
-void generate_dc_engine_collect(
-  VSA *vsa, PlutoProg *prog, 
-  PlutoConstraints *write_out, int copy_level,
-  char *acc_name, int acc_nrows,
-  char *lw_buf_size
-);
-void generate_dc_engine_write(
+void generate_dfc_code(
   VSA *vsa, PlutoProg *prog,
-  PlutoConstraints *write_out, int copy_level,
+  PlutoConstraints *read_in_write_out, int copy_level,
   char *acc_name, int acc_nrows,
-  char *lw_buf_size
+  char *buf_size,
+  char *stmt_text,
+  char *module_name
 );
-void generate_dc_loader_write(
-  VSA *vsa, PlutoProg *prog,
-  PlutoConstraints *write_out, int copy_level,
-  char *acc_name, int acc_nrows,
-  char *lw_buf_size  
-);
-void generate_dc_loader_collect(
-  VSA *vsa, PlutoProg *prog,
-  PlutoConstraints *write_out, int copy_level,
-  char *acc_name, int acc_nrows,
-  char *lw_buf_size
-);
+void pluto_prog_df_transform(PlutoProg *prog, VSA *vsa, 
+                             int *dfc_engine_level, int *dfc_loader_level,
+                             struct stmt_access_pair *acc_stmt,
+                             int array_part_level, int space_level, int time_level);
 
 #endif

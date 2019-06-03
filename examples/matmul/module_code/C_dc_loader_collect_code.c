@@ -1,5 +1,5 @@
-data_t_C lw_buf_C[(+1*(512)*(512))];
-#define S1(d1,d2,d3,d4,d5,d6,d7,d8,d9,d10,d11)	lw_buf_C[d10][d11] = lw_fifo_C.read()
+data_t_C l_buf_C[(+1*(512)*(512))];
+#define S1(d1,d2,d3,d4,d5,d6,d7,d8,d9,d10,d11)	C[d4][d5] = g_buf_C[d4][d5].read()
 
 int t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11;
 

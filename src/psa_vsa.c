@@ -462,14 +462,14 @@ void pluto_prog_to_vsa(PlutoProg *prog, VSA *vsa) {
     vsa->fc_group_factors[i] = 1;
   }
 
-  /* ITERATORS */  
-  /* MAT_STAT */
-
   /* DF Code */
   vsa_df_code_extract(prog, vsa);
 
   /* DC Code */
   vsa_dc_code_extract(prog, vsa);
+
+  /* PE Code */
+  vsa_pe_code_extract(prog, vsa);
 
   return vsa;
 }

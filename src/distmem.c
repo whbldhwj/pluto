@@ -381,12 +381,6 @@ char *reconstruct_access(PlutoAccess *acc) {
   return access;
 }
 
-PlutoConstraints *compute_loader_write_out_iter(
-  struct stmt_access_pair *wacc_stmt, int copy_level, PlutoProg *prog 
-) {
-
-}
-
 PlutoConstraints *compute_write_out_iter(
   struct stmt_access_pair *wacc_stmt, int copy_level, PlutoProg *prog
 ) {
@@ -618,6 +612,48 @@ PlutoConstraints *compute_write_out(struct stmt_access_pair *wacc_stmt,
   // IF_DEBUG(printf("Last write out\n"););
   // IF_DEBUG(pluto_constraints_print(stdout, uwcst););
   return uwcst;  
+}
+
+PlutoConstraints *compute_read_in(
+  struct stmt_access_pair *racc_stmt,
+  int copy_level, PlutoProg *prog
+) {
+  Stmt *stmt = racc_stmt->stmt;
+  PlutoAccess *acc = racc_stmt->acc;
+
+  PlutoConstraints *new_domain = pluto_get_new_domain(stmt);
+
+  PlutoConstraints *access_region = pluto_compute_region_data(
+    stmt, new_domain, acc, copy_level, prog
+  );
+
+  pluto_constraints_free(new_domain);
+  return access_region;
+}
+
+PlutoConstraints *compute_read_in_engine_reuse(
+  struct stmt_access_pair *racc_stmt,
+  int copy_level, 
+  int reuse_level,
+  PlutoProg *prog
+) {
+  Stmt *stmt = racc_stmt->stmt;
+  PlutoAccess *acc = racc_stmt->acc;
+
+  PlutoConstraints *new_domain = pluto_get_new_domain(stmt);
+
+  PlutoConstraints *access_region = pluto_compute_region_data(
+    stmt, new_domain, acc, copy_level, prog
+  );
+  
+  pluto_constraints_project_out_isl_single(
+     &access_region, reuse_level, 1
+  );
+
+  pluto_constraints_add_dim(access_region, reuse_level, NULL);
+
+  pluto_constraints_free(new_domain);
+  return access_region;
 }
 
 /* Compute region(s) of data accessed by 'acc' with 'copy_level' number of
