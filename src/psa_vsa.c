@@ -6,6 +6,7 @@
 #include "pluto.h"
 #include "psa_vsa.h"
 #include "psa_vsa_dfc.h"
+#include "psa_vsa_pe.h"
 
 /*
  * This function analyzes the read/write access info from the program and extracts
@@ -463,13 +464,20 @@ void pluto_prog_to_vsa(PlutoProg *prog, VSA *vsa) {
   }
 
   /* DF Code */
-  vsa_df_code_extract(prog, vsa);
+  PlutoProg *new_prog;
+  new_prog = pluto_prog_dup(prog);
+  vsa_df_code_extract(new_prog, vsa);
+  pluto_prog_free(new_prog);
 
   /* DC Code */
-  vsa_dc_code_extract(prog, vsa);
+  new_prog = pluto_prog_dup(prog);
+  vsa_dc_code_extract(new_prog, vsa);
+  pluto_prog_free(new_prog);
 
   /* PE Code */
-  vsa_pe_code_extract(prog, vsa);
+  new_prog = pluto_prog_dup(prog);
+  vsa_pe_code_extract(new_prog, vsa);
+  pluto_prog_free(new_prog);
 
   return vsa;
 }

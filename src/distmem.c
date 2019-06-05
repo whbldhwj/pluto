@@ -524,6 +524,11 @@ PlutoConstraints *compute_write_out(struct stmt_access_pair *wacc_stmt,
   IF_DEBUG(printf("Data written to in tile\n"););
   IF_DEBUG(pluto_constraints_print(stdout, uwcst););
 
+// #ifdef JIE_DEBUG
+//   fprintf(stdout, "[Debug] write_out_function\n");
+//   pluto_constraints_print(stdout, uwcst);
+// #endif
+
   // requires transitive WAR dependences if they exist
   for (i = 0; i < ndeps; i++) {
     Dep *dep = deps[i];
@@ -541,11 +546,17 @@ PlutoConstraints *compute_write_out(struct stmt_access_pair *wacc_stmt,
 
     IF_DEBUG(printf("For dep %d\n", dep->id + 1));
 
+// #ifdef JIE_DEBUG
+//     fprintf(stdout, "[Debug] For dep %d\n", dep->id + 1);
+// #endif
+
     const PlutoAccess *wacc_src = src->writes[0];
 
-// #ifdef JIE_DEBUG
-//     pluto_constraints_pretty_print(stdout, dep->dpolytope);
-// #endif
+#ifdef JIE_DEBUG
+    fprintf(stdout, "[Debug] Print the dep in write-out\n");
+    pluto_constraints_pretty_print(stdout, dep->dpolytope);
+#endif
+
     PlutoConstraints *tdpoly = pluto_get_transformed_dpoly(dep, src, dest);
 // #ifdef JIE_DEBUG
 //     pluto_constraints_pretty_print(stdout, tdpoly);

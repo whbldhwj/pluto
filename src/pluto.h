@@ -32,7 +32,7 @@
 #include "osl/extensions/dependence.h"
 
 // -- Jie Added --
-#define JIE_DEBUG
+//#define JIE_DEBUG
 // ---------------
 
 #ifdef GLPK
@@ -176,6 +176,13 @@ typedef enum stmttype {
   MISC,
   STMT_UNKNOWN
 } PlutoStmtType;
+
+typedef enum psastmttype {
+  PSA_ORIG = 0,
+  PSA_PE_OP_TRANSFER,
+  PSA_PE_RES_TRANSFER,
+  PSA_STMT_UNKNOWN
+} PSAStmtType;
 
 typedef struct pluto_access {
   int sym_id;

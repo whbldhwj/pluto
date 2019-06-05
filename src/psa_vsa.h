@@ -10,7 +10,6 @@
 #include "assert.h"
 #include "distmem.h"
 #include "program.h"
-#include "psa_array.h"
 
 struct codeBlock {
   /* Number of lines */

@@ -80,7 +80,7 @@ void vsa_df_code_extract(PlutoProg *prog, VSA *vsa) {
    
       for (i = 0; i < num_read_data[l]; i++) {
         if (!strcmp(op_name, racc_stmts[i][0]->acc->name)) {
-          df_comm_stmts[l][i] = psa_gen_read_in_code(
+          df_comm_stmts[l][i] = psa_gen_dfc_read_in_code(
             racc_stmts[i], num_stmts_per_racc[i], new_prog, anchor_stmt,
             array_part_level[l], space_level[l], time_level[l], l, vsa    
           );
@@ -174,7 +174,7 @@ void vsa_dc_code_extract(PlutoProg *prog, VSA *vsa) {
    
       for (i = 0; i < num_write_data[l]; i++) {
         if (!strcmp(res_name, wacc_stmts[i][0]->acc->name)) {
-          dc_comm_stmts[l][i] = psa_gen_write_out_code(
+          dc_comm_stmts[l][i] = psa_gen_dfc_write_out_code(
             wacc_stmts[i], num_stmts_per_wacc[i], new_prog, anchor_stmt,
             array_part_level[l], space_level[l], time_level[l], l, vsa    
           );
@@ -271,7 +271,7 @@ void pluto_prog_dc_transform(PlutoProg *prog, VSA *vsa,
  * copy_level[loop_num]: number of outer loops of source loop to be treated as parameters
  * (copy_level-1)^th (0-indexed) loop should be the parallel loop)
  */
-Stmt **psa_gen_write_out_code(
+Stmt **psa_gen_dfc_write_out_code(
   struct stmt_access_pair **wacc_stmts, int num_accs,
   PlutoProg *prog, Stmt *anchor_stmt, 
   int array_part_level, int space_level, int time_level, 
@@ -291,11 +291,15 @@ Stmt **psa_gen_write_out_code(
                           wacc_stmts[0], 
                           array_part_level, space_level, time_level);
 
-#ifdef JIE_DEBUG
-  fprintf(stdout, "[Debug] Acc: %s\n", acc_name);
-  fprintf(stdout, "[Debug] engine_level: %d\n", dfc_engine_level);
-  fprintf(stdout, "[Debug] loader level: %d\n", dfc_loader_level);
-#endif
+// #ifdef JIE_DEBUG
+//   fprintf(stdout, "[Debug] Acc: %s\n", acc_name);
+//   fprintf(stdout, "[Debug] engine_level: %d\n", dfc_engine_level);
+//   fprintf(stdout, "[Debug] loader level: %d\n", dfc_loader_level);
+// #endif
+
+// #ifdef JIE_DEBUG
+//   fprintf(stdout, "[Debug] dfc_write_out\n");
+// #endif
 
   /*
    * Generate code for engines
@@ -343,7 +347,7 @@ Stmt **psa_gen_write_out_code(
   sprintf(dc_engine_collect_stmt_text, "%s[%s++] = %s.read()", l_buf_name, 
         l_count_name, fifo_name);
 
-  generate_dfc_code(
+  generate_scanner_code(
     vsa, prog, write_out_engine, dfc_engine_level,
     acc_name, acc_nrows,
     engine_buf_size, dc_engine_collect_stmt_text, dc_engine_collect_module_name
@@ -359,7 +363,7 @@ Stmt **psa_gen_write_out_code(
   sprintf(dc_engine_write_stmt_text, "%s.write(%s[%s++])", fifo_name, l_buf_name,
         l_count_name);
 
-  generate_dfc_code(
+  generate_scanner_code(
     vsa, prog, write_out_engine, dfc_engine_level,
     acc_name, acc_nrows,
     engine_buf_size, dc_engine_write_stmt_text, dc_engine_write_module_name
@@ -388,7 +392,7 @@ Stmt **psa_gen_write_out_code(
   PlutoConstraints *write_out_loader = NULL;
   for (i = 0; i < num_accs; i++) {
     PlutoConstraints *write_out_one;
-    // compute the write-out set based on the given access function
+    // compute the write-out set based on the given access function    
     write_out_one = compute_write_out(wacc_stmts[i], dfc_loader_level, prog);
     if (write_out_loader == NULL)
       write_out_loader = pluto_constraints_dup(write_out_one);
@@ -439,7 +443,7 @@ Stmt **psa_gen_write_out_code(
   dc_loader_write_stmt_text = concat(dc_loader_write_stmt_text, g_buf_name);
   dc_loader_write_stmt_text = concat(dc_loader_write_stmt_text, access_function);  
 
-  generate_dfc_code(
+  generate_scanner_code(
     vsa, prog, write_out_loader, dfc_loader_level,
     acc_name, acc_nrows,
     loader_buf_size, dc_loader_write_stmt_text, dc_loader_write_module_name
@@ -455,6 +459,9 @@ Stmt **psa_gen_write_out_code(
 //   fprintf(stdout, "[Debug] Bounding box: %s\n", loader_lw_buf_size);
 // #endif  
   
+// #ifdef JIE_DEBUG
+//   fprintf(stdout, "[Debug] Loader collect\n");
+// #endif
   PlutoConstraints *write_out_loader_collect;
   write_out_loader_collect = compute_write_out(
     wacc_stmts[0], prog->num_hyperplanes, prog);  
@@ -462,6 +469,11 @@ Stmt **psa_gen_write_out_code(
 // #ifdef JIE_DEBUG
 //   pluto_constraints_pretty_print(stdout, loader_collect);
 // #endif  
+
+// #ifdef JIE_DEBUG
+//   fprintf(stdout, "[Debug] Loader collect constraints:\n");
+//   pluto_constraints_pretty_print(stdout, write_out_loader_collect);
+// #endif
 
   // dc_loader_collect_stmt
   char *dc_loader_collect_module_name = "dc_loader_collect";
@@ -472,17 +484,17 @@ Stmt **psa_gen_write_out_code(
   for (i = prog->num_hyperplanes; i < prog->num_hyperplanes + acc_nrows; i++) {
     access_function = concat(access_function, "[");
     char iter_tmp[100];
-    sprintf(iter_tmp, "d%d", i + 1);
+    sprintf(iter_tmp, "t%d", i + 1);
     access_function = concat(access_function, iter_tmp);
     access_function = concat(access_function, "]");
   }
-  dc_loader_collect_stmt_text = concat(dc_loader_write_stmt_text, g_buf_name);
-  dc_loader_collect_stmt_text = concat(dc_loader_write_stmt_text, access_function);  
-  dc_loader_collect_stmt_text = concat(dc_loader_write_stmt_text, " = ");
-  dc_loader_collect_stmt_text = concat(dc_loader_write_stmt_text, fifo_name);
-  dc_loader_collect_stmt_text = concat(dc_loader_write_stmt_text, ".read()");  
+  dc_loader_collect_stmt_text = concat("", g_buf_name);
+  dc_loader_collect_stmt_text = concat(dc_loader_collect_stmt_text, access_function);  
+  dc_loader_collect_stmt_text = concat(dc_loader_collect_stmt_text, " = ");
+  dc_loader_collect_stmt_text = concat(dc_loader_collect_stmt_text, fifo_name);
+  dc_loader_collect_stmt_text = concat(dc_loader_collect_stmt_text, ".read()");  
 
-  generate_dfc_code(
+  generate_scanner_code(
     vsa, prog,
     write_out_loader_collect, prog->num_hyperplanes,
     acc_name, acc_nrows,
@@ -715,7 +727,7 @@ Ploop **psa_get_intra_tile_dist_loops(Band *band, PlutoProg *prog, int *nloops) 
  * copy_level[loop_num]: number of outer loops of source loop to be treated as parameters
  * (copy_level-1)^th (0-indexed) loop should be the parallel loop)
  */
-Stmt **psa_gen_read_in_code(
+Stmt **psa_gen_dfc_read_in_code(
   struct stmt_access_pair **racc_stmts, int num_accs,
   PlutoProg *prog, Stmt *anchor_stmt, 
   int array_part_level, int space_level, int time_level, 
@@ -732,23 +744,23 @@ Stmt **psa_gen_read_in_code(
   int dfc_engine_level;
   int dfc_loader_level;
 
-#ifdef JIE_DEBUG
-  pluto_transformations_pretty_print(prog);
-#endif
+// #ifdef JIE_DEBUG
+//   pluto_transformations_pretty_print(prog);
+// #endif
 
   pluto_prog_df_transform(prog, vsa, &dfc_engine_level, &dfc_loader_level,
                           racc_stmts[0], 
                           array_part_level, space_level, time_level);
 
-#ifdef JIE_DEBUG
-  pluto_transformations_pretty_print(prog);
-#endif
+// #ifdef JIE_DEBUG
+//   pluto_transformations_pretty_print(prog);
+// #endif
 
-#ifdef JIE_DEBUG
-  fprintf(stdout, "[Debug] acc: %s\n", acc_name);
-  fprintf(stdout, "[Debug] engine_level: %d\n", dfc_engine_level);
-  fprintf(stdout, "[Debug] loader_level: %d\n", dfc_loader_level);
-#endif
+// #ifdef JIE_DEBUG
+//   fprintf(stdout, "[Debug] acc: %s\n", acc_name);
+//   fprintf(stdout, "[Debug] engine_level: %d\n", dfc_engine_level);
+//   fprintf(stdout, "[Debug] loader_level: %d\n", dfc_loader_level);
+// #endif
 
   /* 
    * Generate code for engines
@@ -798,7 +810,7 @@ Stmt **psa_gen_read_in_code(
   df_engine_read_stmt_text = concat(df_engine_read_stmt_text, fifo_name);
   df_engine_read_stmt_text = concat(df_engine_read_stmt_text, ".read()");
 
-  generate_dfc_code(
+  generate_scanner_code(
     vsa, prog, read_in_engine, dfc_engine_level,
     acc_name, acc_nrows,
     engine_buf_size,
@@ -841,7 +853,7 @@ Stmt **psa_gen_read_in_code(
   df_engine_feed_stmt_text = concat(df_engine_feed_stmt_text, access_function);
   df_engine_feed_stmt_text = concat(df_engine_feed_stmt_text, ")");  
 
-  generate_dfc_code(
+  generate_scanner_code(
     vsa, prog, read_in_engine_feed, copy_level,
     acc_name, acc_nrows,
     engine_buf_size,
@@ -893,7 +905,7 @@ Stmt **psa_gen_read_in_code(
   df_loader_read_stmt_text = concat(df_loader_read_stmt_text, acc_name);
   df_loader_read_stmt_text = concat(df_loader_read_stmt_text, access_function);  
 
-  generate_dfc_code(
+  generate_scanner_code(
     vsa, prog,
     read_in_loader, dfc_loader_level,
     acc_name, acc_nrows,
@@ -936,7 +948,7 @@ Stmt **psa_gen_read_in_code(
   df_loader_feed_stmt_text = concat(df_loader_feed_stmt_text, access_function);
   df_loader_feed_stmt_text = concat(df_loader_feed_stmt_text, ")");
 
-  generate_dfc_code(
+  generate_scanner_code(
     vsa, prog,
     read_in_loader_feed, dfc_engine_level,
     acc_name, acc_nrows,
@@ -1018,7 +1030,7 @@ void pluto_prog_df_transform(PlutoProg *prog, VSA *vsa,
   *dfc_loader_level = space_level;
 }
 
-void generate_dfc_code(
+void generate_scanner_code(
   VSA *vsa, PlutoProg *prog,
   PlutoConstraints *read_in_write_out, int copy_level,
   char *acc_name, int acc_nrows,

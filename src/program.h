@@ -120,5 +120,8 @@ int pluto_prog_get_largest_const_in_domains(const PlutoProg *prog);
 
 static __isl_give isl_space *set_names(__isl_take isl_space *space,
                                        enum isl_dim_type type, char **names);
-
+/* Jie Added - Start */
+Stmt *psa_create_helper_stmt(const Stmt *anchor_stmt, unsigned level, const char *text,
+                             PlutoStmtType type, PSAStmtType psa_type, int ploop_num);
+/* Jie Added - End */
 #endif

@@ -3153,6 +3153,52 @@ void pluto_prog_add_hyperplane(PlutoProg *prog, int pos,
   prog->hProps[pos].psa_type = psa_hyp_type;
 }
 
+Stmt *psa_create_helper_stmt(const Stmt *anchor_stmt, unsigned level, const char *text,
+                             PlutoStmtType type, PSAStmtType psa_type, int ploop_num) {
+  int npar;
+
+  assert(level <= anchor_stmt->trans->nrows);
+
+  PlutoConstraints *newdom = pluto_get_new_domain(anchor_stmt);
+
+  /* Lose everything but 0 to level-1 loops */
+
+  pluto_constraints_project_out_isl_single(newdom, level,
+                                           anchor_stmt->trans->nrows - level);
+
+  npar = anchor_stmt->domain->ncols - anchor_stmt->dim - 1;
+  PlutoMatrix *newtrans = pluto_matrix_alloc(level, newdom->ncols);
+
+  char **iterators = (char **)malloc(sizeof(char *) * level);
+  for (unsigned i = 0; i < level; i++) {
+    char *tmpstr = (char *)malloc(5);
+    sprintf(tmpstr, "t%d", i + 1);
+    iterators[i] = tmpstr;
+  }
+
+  /* Create new stmt */
+  Stmt *newstmt =
+      pluto_create_stmt(level, newdom, newtrans, iterators, text, type);
+
+  newstmt->ploop_id = ploop_num;
+
+  pluto_matrix_set(newstmt->trans, 0);
+  for (unsigned i = 0; i < newstmt->trans->nrows; i++) {
+    newstmt->trans->val[i][i] = 1;
+  }
+
+  for (unsigned i = 0; i < level; i++) {
+    free(iterators[i]);
+  }
+  free(iterators);
+  pluto_constraints_free(newdom);
+  pluto_matrix_free(newtrans);
+
+  assert(newstmt->dim + npar + 1 == newstmt->domain->ncols);
+
+  return newstmt;  
+}
+
 /*
  * Create a new statement (see also pluto_stmt_dup)
  */
