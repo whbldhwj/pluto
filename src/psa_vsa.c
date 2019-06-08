@@ -463,6 +463,16 @@ void pluto_prog_to_vsa(PlutoProg *prog, VSA *vsa) {
     vsa->fc_group_factors[i] = 1;
   }
 
+  /* FC_SIMD_FACTOR */
+  // TODO: add this feature in the future
+  vsa->fc_simd_factors = (int *)malloc((vsa->op_num + vsa->res_num) *sizeof(int));
+  for (i = 0; i < vsa->op_num; i++) {
+    vsa->fc_simd_factors[i] = vsa->simd_factor;
+  }
+  for (i = vsa->op_num; i < vsa->op_num + vsa->res_num; i++) {
+    vsa->fc_simd_factors[i] = 1;
+  }
+
   /* DF Code */
   PlutoProg *new_prog;
   new_prog = pluto_prog_dup(prog);
@@ -503,6 +513,7 @@ VSA *vsa_alloc() {
   vsa->sa_cols = 0;
   vsa->fc_split_factors = NULL;
   vsa->fc_group_factors = NULL;
+  vsa->fc_simd_factors = NULL;
   vsa->iters = NULL;
   vsa->il_enable = 0;
   vsa->simd_factor = 0;
@@ -603,6 +614,11 @@ void psa_vsa_pretty_print(FILE *fp, const VSA *vsa) {
   psa_print_string_with_indent(fp, 2, "\"FC_GROUP_FACTOR\": [\n");
   psa_print_int_list_with_indent(fp, 4, vsa->fc_group_factors, vsa->op_num + vsa->res_num);
   psa_print_string_with_indent(fp, 2, "],\n");
+
+  /* FC_SIMD_FACTOR */
+  psa_print_string_with_indent(fp, 2, "\"FC_SIMD_FACTOR\": [\n");
+  psa_print_int_list_with_indent(fp, 4, vsa->fc_simd_factors, vsa->op_num + vsa->res_num);
+  psa_print_string_with_indent(fp, 2, "],\n");  
 
   /* OP_CHANNEL_DIR */
   psa_print_string_with_indent(fp, 2, "\"OP_CHANNEL_DIR\": [\n");

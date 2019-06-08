@@ -17,7 +17,7 @@ def run(input_code, vsa_file, app_name):
   vsa_c_pass(input_code, vsa, app_name)
 
   # Write out the VSA
-  vsa_dump('design_desp.json', vsa)
+  vsa_dump('vsa_extend.json', vsa)
 
 def vsa_dump(output_file, vsa):
   '''Dump out the vsa'''

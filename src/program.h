@@ -123,5 +123,9 @@ static __isl_give isl_space *set_names(__isl_take isl_space *space,
 /* Jie Added - Start */
 Stmt *psa_create_helper_stmt(const Stmt *anchor_stmt, unsigned level, const char *text,
                              PlutoStmtType type, PSAStmtType psa_type, int ploop_num);
+Stmt *psa_create_helper_stmt_raw(
+  unsigned level, PlutoConstraints *domain,
+  const char *text, PlutoStmtType type, PSAStmtType psa_type,
+  int ploop_num);                             
 /* Jie Added - End */
 #endif

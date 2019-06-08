@@ -1,0 +1,150 @@
+{
+  "DATA_TYPE": [
+    "float", 
+    "float", 
+    "float"
+  ], 
+  "KERNEL_ID": 1, 
+  "APP_NAME": "mm", 
+  "INIT_VALUE": 0, 
+  "SW_KERNEL_CODE": [
+    "int i, j, k;", 
+    "", 
+    "// hardware implmenetation", 
+    "// buffers - start", 
+    "data_t0 A[I][K];", 
+    "data_t1 B[J][K];", 
+    "data_t2 C[I][J];", 
+    "// buffers - end", 
+    "", 
+    "// initialization", 
+    "for (i = 0; i < I; i++)", 
+    "for (k = 0; k < K; k++)", 
+    "A[i][k] = i * K + k;", 
+    "for (j = 0; j < J; j++)", 
+    "for (k = 0; k < K; k++)", 
+    "B[j][k] = j * K + k;", 
+    "for (i = 0; i < I; i++)", 
+    "for (j = 0; j < J; j++)", 
+    "C[i][j] = 0;", 
+    "", 
+    "#pragma scop", 
+    "for (i = 0 ; i < I; i++)", 
+    "for (j = 0; j < J; j++)", 
+    "for (k = 0; k < K; k++)", 
+    "C[i][j] = C[i][j] + A[i][k] * B[j][k];", 
+    "#pragma endscop", 
+    "", 
+    "// software implementation", 
+    "data_t0 A_sw[I][K];", 
+    "data_t1 B_sw[J][K];", 
+    "data_t2 C_sw[I][J];", 
+    "", 
+    "// initialization", 
+    "for (i = 0; i < I; i++)", 
+    "for (k = 0; k < K; k++)", 
+    "A_sw[i][k] = i * K + k;", 
+    "for (j = 0; j < J; j++)", 
+    "for (k = 0; k < K; k++)", 
+    "B_sw[j][k] = j * K + k;", 
+    "for (i = 0; i < I; i++)", 
+    "for (j = 0; j < J; j++)", 
+    "C_sw[i][j] = 0;", 
+    "", 
+    "for (i = 0 ; i < I; i++)", 
+    "for (j = 0; j < J; j++)", 
+    "for (k = 0; k < K; k++)", 
+    "C_sw[i][j] = C_sw[i][j] + A_sw[i][k] * B_sw[j][k];", 
+    "", 
+    "// compare the results", 
+    "int err = 0;", 
+    "for (i = 0; i < I; i++)", 
+    "for (j = 0; j < J; j++) {", 
+    "if (abs(C_sw[i][j] - C[i][j]) > 0.01)", 
+    "err++;", 
+    "}", 
+    "", 
+    "if (err == 0) {", 
+    "printf(\"test passed!\\n\");"
+  ], 
+  "BUS_WIDTH": [
+    512, 
+    512, 
+    512
+  ], 
+  "FIXED_EN": 0, 
+  "ROW_IL_FACTOR": 16, 
+  "RES_REF": [
+    "C[I][J]"
+  ], 
+  "RES_ENGINE_NUM": [
+    2
+  ], 
+  "FC_SIMD_FACTOR": [
+    1, 
+    1, 
+    1
+  ], 
+  "PARAMETERS": {
+    "I": 64, 
+    "K": 64, 
+    "J": 64
+  }, 
+  "FC_SPLIT_FACTOR": [
+    1, 
+    1, 
+    1
+  ], 
+  "IL_ENABLE": 1, 
+  "SIMD_FACTOR": 1, 
+  "DATA_WIDTH": [
+    32, 
+    32, 
+    32
+  ], 
+  "RES_CHANNEL_NUM": 1, 
+  "FC_GROUP_FACTOR": [
+    1, 
+    1, 
+    1
+  ], 
+  "OP_CHANNEL_DIR": [
+    "R", 
+    "D"
+  ], 
+  "OP_ENGINE_NUM": [
+    2, 
+    2
+  ], 
+  "COL_IL_FACTOR": 16, 
+  "RES_DIM": [
+    2
+  ], 
+  "SA_COLS": 2, 
+  "OP_CHANNEL_NUM": 2, 
+  "RES_CHANNEL_DIR": [
+    "D"
+  ], 
+  "OP_DIM": [
+    2, 
+    2
+  ], 
+  "OP_NAME": [
+    "A", 
+    "B"
+  ], 
+  "SA_ROWS": 2, 
+  "RES_NAME": [
+    "C"
+  ], 
+  "OP_REF": [
+    "A[I][K]", 
+    "B[J][K]"
+  ], 
+  "OP_PE_SIMD_WIDTH": [
+    32, 
+    32
+  ], 
+  "CHANNEL_DEPTH": 2, 
+  "TYPE": "local"
+}

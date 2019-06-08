@@ -1,3 +1,10 @@
+/**
+  * This file is automatically gneerated by PolySA CodeGen.
+  * Author: Jie Wang
+  */
+
+#include "common_header_U1.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
@@ -35,12 +42,8 @@ int main(){
     for (j = 0; j < J; j++)
       C[i][j] = 0;
 
-#pragma scop
-  for (i = 0 ; i < I; i++)
-    for (j = 0; j < J; j++)
-      for (k = 0; k < K; k++)
-        C[i][j] = C[i][j] + A[i][k] * B[j][k];
-#pragma endscop  
+  // hardware kernel
+  top_kernel(A, B, C);
 
   // software implementation
   data_t0 A_sw[I][K];

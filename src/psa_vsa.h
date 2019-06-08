@@ -109,6 +109,9 @@ struct psaVSA {
   /* FC_GROUP_FACTOR */
   int *fc_group_factors; // TODO: to be implemented in the future
 
+  /* FC_SIMD_FACTOR */
+  int *fc_simd_factors; // TODO: to be implemented in the future
+
   /* ITERATORS */
   Iter **iters;
 
@@ -153,6 +156,9 @@ struct psaVSA {
 
   /* TYPE */
   char *type;
+
+  /* ARRAY_PART, SPACE, TIME LOOP_LEVEL */
+  
 };
 typedef struct psaVSA VSA;
 

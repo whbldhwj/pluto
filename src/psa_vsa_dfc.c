@@ -443,17 +443,16 @@ Stmt **psa_gen_dfc_write_out_code(
   dc_loader_write_stmt_text = concat(dc_loader_write_stmt_text, g_buf_name);
   dc_loader_write_stmt_text = concat(dc_loader_write_stmt_text, access_function);  
 
-  generate_scanner_code(
-    vsa, prog, write_out_loader, dfc_loader_level,
-    acc_name, acc_nrows,
-    loader_buf_size, dc_loader_write_stmt_text, dc_loader_write_module_name
-  );
-
-  // generate_dc_loader_write(
+  // generate_scanner_code(
   //   vsa, prog, write_out_loader, dfc_loader_level,
   //   acc_name, acc_nrows,
-  //   loader_lw_buf_size
-  // );
+  //   loader_buf_size, dc_loader_write_stmt_text, dc_loader_write_module_name
+  // );  
+
+  Stmt *loader_write_stmt = psa_create_helper_stmt_raw(
+    dfc_loader_level + acc_nrows, write_out_loader,
+    dc_loader_write_stmt_text,
+    STMT_UNKNOWN, PSA_DC_LOADER_WRITE, loop_num);
 
 // #ifdef JIE_DEBUG
 //   fprintf(stdout, "[Debug] Bounding box: %s\n", loader_lw_buf_size);
@@ -494,20 +493,31 @@ Stmt **psa_gen_dfc_write_out_code(
   dc_loader_collect_stmt_text = concat(dc_loader_collect_stmt_text, fifo_name);
   dc_loader_collect_stmt_text = concat(dc_loader_collect_stmt_text, ".read()");  
 
-  generate_scanner_code(
-    vsa, prog,
-    write_out_loader_collect, prog->num_hyperplanes,
-    acc_name, acc_nrows,
-    loader_buf_size, 
+  Stmt *loader_collect_stmt = psa_create_helper_stmt_raw(
+    prog->num_hyperplanes + acc_nrows, write_out_loader_collect,
     dc_loader_collect_stmt_text,
-    dc_loader_collect_module_name       
-  );
+    STMT_UNKNOWN, PSA_DC_LOADER_COLLECT, loop_num
+    );
 
-  // generate_dc_loader_collect(
-  //   vsa, prog, loader_collect, prog->num_hyperplanes,
+  // generate_scanner_code(
+  //   vsa, prog,
+  //   write_out_loader_collect, prog->num_hyperplanes,
   //   acc_name, acc_nrows,
-  //   loader_lw_buf_size
-  // );
+  //   loader_buf_size, 
+  //   dc_loader_collect_stmt_text,
+  //   dc_loader_collect_module_name       
+  // );  
+
+  // create the program
+  char *dc_loader_module_name = "dc_loader";
+
+  psa_gen_dc_loader_code (
+    loader_write_stmt, loader_collect_stmt,
+    dfc_loader_level,
+    dc_loader_module_name,
+    acc_name, acc_nrows,
+    loader_buf_size
+  );
 
   pluto_constraints_free(write_out_loader);
   pluto_constraints_free(write_out_loader_collect);    
@@ -863,7 +873,7 @@ Stmt **psa_gen_dfc_read_in_code(
 
   /*
    * Generate code for loaders
-   */  
+   */    
   PlutoConstraints *read_in_loader = NULL;
   for (i = 0; i < num_accs; i++) {
     PlutoConstraints *read_in_one;
@@ -905,20 +915,24 @@ Stmt **psa_gen_dfc_read_in_code(
   df_loader_read_stmt_text = concat(df_loader_read_stmt_text, acc_name);
   df_loader_read_stmt_text = concat(df_loader_read_stmt_text, access_function);  
 
-  generate_scanner_code(
-    vsa, prog,
-    read_in_loader, dfc_loader_level,
-    acc_name, acc_nrows,
-    loader_buf_size,
-    df_loader_read_stmt_text,
-    df_loader_read_module_name
-  );
-
-  // generate_df_loader_read(
-  //   vsa, prog, read_in_loader, dfc_loader_level,
+  // generate_scanner_code(
+  //   vsa, prog,
+  //   read_in_loader, dfc_loader_level,
   //   acc_name, acc_nrows,
-  //   loader_gr_buf_size
+  //   loader_buf_size,
+  //   df_loader_read_stmt_text,
+  //   df_loader_read_module_name
   // );
+
+  Stmt *loader_read_stmt = psa_create_helper_stmt_raw(
+      dfc_loader_level + acc_nrows, read_in_loader,
+      df_loader_read_stmt_text, 
+      STMT_UNKNOWN, PSA_DF_LOADER_READ, loop_num);
+
+  // Stmt *loader_read_stmt = psa_create_helper_stmt(
+  //   anchor_stmt, dfc_loader_level, df_loader_read_stmt_text,
+  //   STMT_UNKNOWN, PSA_DF_LOADER_READ, loop_num
+  // );  
 
 // #ifdef JIE_DEBUG
 //   fprintf(stdout, "[Debug] Bounding box: %s\n", loader_lw_buf_size);
@@ -948,20 +962,30 @@ Stmt **psa_gen_dfc_read_in_code(
   df_loader_feed_stmt_text = concat(df_loader_feed_stmt_text, access_function);
   df_loader_feed_stmt_text = concat(df_loader_feed_stmt_text, ")");
 
-  generate_scanner_code(
-    vsa, prog,
-    read_in_loader_feed, dfc_engine_level,
-    acc_name, acc_nrows,
-    loader_buf_size,
-    df_loader_feed_stmt_text,
-    df_loader_feed_module_name
-  );
-
-  // generate_df_loader_feed(
-  //   vsa, prog, read_in_loader_feed, dfc_engine_level,
+  // generate_scanner_code(
+  //   vsa, prog,
+  //   read_in_loader_feed, dfc_engine_level,
   //   acc_name, acc_nrows,
-  //   loader_gr_buf_size
+  //   loader_buf_size,
+  //   df_loader_feed_stmt_text,
+  //   df_loader_feed_module_name
   // );
+  Stmt *loader_feed_stmt = psa_create_helper_stmt_raw(
+      dfc_engine_level + acc_nrows, read_in_loader_feed,
+      df_loader_feed_stmt_text, 
+      STMT_UNKNOWN, PSA_DF_LOADER_FEED, loop_num
+      );      
+
+  // create the program 
+  char *df_loader_module_name = "df_loader";
+
+  psa_gen_df_loader_code(
+    loader_read_stmt, loader_feed_stmt,
+    dfc_loader_level,
+    df_loader_module_name,    
+    acc_name, acc_nrows,
+    loader_buf_size
+  );
 
   pluto_constraints_free(read_in_loader);
   pluto_constraints_free(read_in_loader_feed);  
@@ -983,6 +1007,112 @@ Stmt **psa_gen_dfc_read_in_code(
   read_in_stmts[3] = df_loader_read_stmt;
   
   return read_in_stmts;
+}
+
+void psa_gen_df_loader_code(
+  Stmt *read_write_stmt,
+  Stmt *feed_collect_stmt,
+  unsigned level,
+  char *module_name,
+  char *acc_name, unsigned acc_nrows,
+  char *buf_size
+) {
+  char base_name[1024];
+  strcpy(base_name, "");
+  sprintf(base_name + strlen(base_name), "module_code/%s_%s_code", acc_name, module_name);
+
+  char file_name[1024];
+  strcpy(file_name, base_name);
+  sprintf(file_name + strlen(file_name), ".c");
+
+  char cloog_file_name[1024];
+  strcpy(cloog_file_name, base_name);
+  sprintf(cloog_file_name + strlen(cloog_file_name), ".cloog");
+
+  FILE *fp = fopen(file_name, "w");
+  assert(fp != NULL);
+
+  fprintf(fp, "data_t_%s l_buf_%s[%s];\n", acc_name, acc_name, buf_size);
+
+  PlutoProg *prog = pluto_prog_alloc();
+  Stmt **sep_stmts = (Stmt **)malloc(2 * sizeof(Stmt *));
+
+  pluto_add_given_stmt(prog, read_write_stmt);
+  pluto_add_given_stmt(prog, feed_collect_stmt);
+  sep_stmts[0] = read_write_stmt;
+  sep_stmts[1] = feed_collect_stmt;
+
+  // seperate these stmts
+  pluto_separate_stmts(prog, sep_stmts, 2, level, 0);
+
+  // print out
+  FILE *cloogfp = fopen(cloog_file_name, "w+");
+  assert(cloogfp != NULL);
+
+  pluto_gen_cloog_file(cloogfp, prog);
+  rewind(cloogfp);
+  fflush(cloogfp);
+
+  psa_generate_declarations(prog, fp);
+  pluto_gen_cloog_code(prog, PLMAX(read_write_stmt->dim, feed_collect_stmt->dim),
+      1, cloogfp, fp);
+
+  fclose(fp);
+  fclose(cloogfp);
+}
+
+void psa_gen_dc_loader_code(
+  Stmt *read_write_stmt,
+  Stmt *feed_collect_stmt,
+  unsigned level,
+  char *module_name,
+  char *acc_name, unsigned acc_nrows,
+  char *buf_size
+) {
+  char base_name[1024];
+  strcpy(base_name, "");
+  sprintf(base_name + strlen(base_name), "module_code/%s_%s_code", acc_name, module_name);
+
+  char file_name[1024];
+  strcpy(file_name, base_name);
+  sprintf(file_name + strlen(file_name), ".c");
+
+  char cloog_file_name[1024];
+  strcpy(cloog_file_name, base_name);
+  sprintf(cloog_file_name + strlen(cloog_file_name), ".cloog");
+
+  FILE *fp = fopen(file_name, "w");
+  assert(fp != NULL);
+
+  fprintf(fp, "data_t_%s l_buf_%s[%s];\n", acc_name, acc_name, buf_size);
+
+  PlutoProg *prog = pluto_prog_alloc();
+  Stmt **sep_stmts = (Stmt **)malloc(2 * sizeof(Stmt *));
+
+  pluto_add_given_stmt(prog, read_write_stmt);
+  pluto_add_given_stmt(prog, feed_collect_stmt);
+  //sep_stmts[0] = read_write_stmt;
+  //sep_stmts[1] = feed_collect_stmt;
+  sep_stmts[0] = feed_collect_stmt;
+  sep_stmts[1] = read_write_stmt;
+
+  // seperate these stmts
+  pluto_separate_stmts(prog, sep_stmts, 2, level, 0);
+
+  // print out
+  FILE *cloogfp = fopen(cloog_file_name, "w+");
+  assert(cloogfp != NULL);
+
+  pluto_gen_cloog_file(cloogfp, prog);
+  rewind(cloogfp);
+  fflush(cloogfp);
+
+  psa_generate_declarations(prog, fp);
+  pluto_gen_cloog_code(prog, PLMAX(read_write_stmt->dim, feed_collect_stmt->dim),
+      1, cloogfp, fp);
+
+  fclose(fp);
+  fclose(cloogfp);
 }
 
 /*

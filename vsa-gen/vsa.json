@@ -2,9 +2,53 @@
   "OP_NAME": [
     "A",
     "B"
-    ],
+  ],
   "RES_NAME": [
     "C"
-    ],
-  "SIMD_FACTOR": 8
+  ],
+  "OP_DIM": [
+    2,
+    2
+  ],
+  "RES_DIM": [
+    2
+  ],
+  "OP_CHANNEL_NUM": 2,
+  "RES_CHANNEL_NUM": 1,
+  "FC_SPLIT_FACTOR": [
+    1,
+    1,
+    1
+  ],
+  "FC_GROUP_FACTOR": [
+    1,
+    1,
+    1
+  ],
+  "FC_SIMD_FACTOR": [
+    1,
+    1,
+    1
+  ],
+  "OP_CHANNEL_DIR": [
+    "R",
+    "D"
+  ],
+  "RES_CHANNEL_DIR": [
+    "D"
+  ],
+  "IL_ENABLE": 1,
+  "ROW_IL_FACTOR": 16,
+  "COL_IL_FACTOR": 16,
+  "SIMD_FACTOR": 1,
+  "SA_ROWS": 2,
+  "SA_COLS": 2,
+  "OP_ENGINE_NUM": [
+    2,
+    2
+  ],
+  "RES_ENGINE_NUM": [
+    2
+  ],
+  "TYPE": "local"
 }

@@ -3153,6 +3153,41 @@ void pluto_prog_add_hyperplane(PlutoProg *prog, int pos,
   prog->hProps[pos].psa_type = psa_hyp_type;
 }
 
+Stmt *psa_create_helper_stmt_raw(
+  unsigned level, PlutoConstraints *domain,
+  const char *text, PlutoStmtType type, PSAStmtType psa_type,
+  int ploop_num) {
+
+  int npar;
+  PlutoMatrix *newtrans = pluto_matrix_alloc(level, domain->ncols);
+  
+  char **iterators = (char **)malloc(sizeof(char *) * level);
+  for (unsigned i = 0; i < level; i++) {
+    char *tmpstr = (char *)malloc(5) ;
+    sprintf(tmpstr, "t%d", i + 1);
+    iterators[i] = tmpstr;
+  }
+
+  /* Create new stmt */
+  Stmt *newstmt =
+    pluto_create_stmt(level, domain, newtrans, iterators, text, type);
+
+  newstmt->ploop_id = ploop_num;
+
+  pluto_matrix_set(newstmt->trans, 0);
+  for (unsigned i = 0; i < newstmt->trans->nrows; i++) {
+    newstmt->trans->val[i][i] = 1;
+  }
+
+  for (unsigned i = 0; i < level; i++) {
+    free(iterators[i]);
+  }
+  free(iterators);
+  pluto_matrix_free(newtrans);
+
+  return newstmt;
+}
+
 Stmt *psa_create_helper_stmt(const Stmt *anchor_stmt, unsigned level, const char *text,
                              PlutoStmtType type, PSAStmtType psa_type, int ploop_num) {
   int npar;

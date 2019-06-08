@@ -51,5 +51,20 @@ void pluto_prog_df_transform(PlutoProg *prog, VSA *vsa,
                              int *dfc_engine_level, int *dfc_loader_level,
                              struct stmt_access_pair *acc_stmt,
                              int array_part_level, int space_level, int time_level);
-
+void psa_gen_df_loader_code(
+  Stmt *read_write_stmt,
+  Stmt *feed_collect_stmt,
+  unsigned level,
+  char *module_name,
+  char *acc_name, unsigned acc_nrows,
+  char *buf_size
+);
+void psa_gen_dc_loader_code(
+  Stmt *read_write_stmt,
+  Stmt *feed_collect_stmt,
+  unsigned level,
+  char *module_name,
+  char *acc_name, unsigned acc_nrows,
+  char *buf_size
+);
 #endif
