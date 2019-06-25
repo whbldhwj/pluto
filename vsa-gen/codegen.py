@@ -50,6 +50,52 @@ def generate_DF_loader(path, vsa, config):
     for codeline in code:
       f.write(codeline)
 
+def generate_DF_engine(path, vsa, config):
+  code = []
+  code.extend(tpl.disclaimer(vsa, config))
+  code.extend(tpl.header_include(vsa, config))
+
+  code.extend(tpl.df_engine(vsa, config))
+  
+  with open(path, 'w') as f:
+    for codeline in code:
+      f.write(codeline)
+
+def generate_DC_engine(path, vsa, config):
+  code = []
+  code.extend(tpl.disclaimer(vsa, config))
+  code.extend(tpl.header_include(vsa, config))
+
+  code.extend(tpl.dc_engine(vsa, config))
+
+  with open(path, 'w') as f:
+    for codeline in code:
+      f.write(codeline)
+
+def generate_DC_loader(path, vsa, config):
+  code = []
+  code.extend(tpl.disclaimer(vsa, config))
+  code.extend(tpl.header_include(vsa, config))
+
+  code.extend(tpl.dc_loader(vsa, config))
+
+  with open(path, 'w') as f:
+    for codeline in code:
+      f.write(codeline)
+
+def generate_PE(path, vsa, config):
+  code = []
+  code.extend(tpl.disclaimer(vsa, config))
+  code.extend(tpl.header_include(vsa, config))
+
+  code.extend(tpl.op_transfer(vsa, config))
+  code.extend(tpl.compute(vsa, config))
+  code.extend(tpl.res_transfer(vsa, config))
+
+  with open(path, 'w') as f:
+    for codeline in code:
+      f.write(codeline)
+
 def run(vsa_file, input_file, code_dir):
   config = {}
   config['CODE_DIR'] = code_dir  
@@ -77,20 +123,20 @@ def run(vsa_file, input_file, code_dir):
   # common_header.h
   generate_header(pwd_dir + '/output/common_header_U%s.h' %(vsa['KERNEL_ID']), vsa, config)
 
-  # # PE.cpp
-  # generate_PE(pwd_dir + 'output/PE_U%s.cpp' %(vsa['KERNEL_ID']), vsa, config)
+  # PE.cpp
+  generate_PE(pwd_dir + 'output/PE_U%s.cpp' %(vsa['KERNEL_ID']), vsa, config)
   
-  # # DF_engine.cpp
-  # generate_DF(pwd_dir + 'output/DF_U%s.cpp' %(vsa['KERNEL_ID']), vsa, config)
+  # DF_engine.cpp
+  generate_DF_engine(pwd_dir + '/output/DF_engine_U%s.cpp' %(vsa['KERNEL_ID']), vsa, config)
 
-  # # DC_engine.cpp
-  # generate_DC(pwd_dir + 'output/DC_U%s.cpp' %(vsa['KERNEL_ID']), vsa, config)
+  # DC_engine.cpp
+  generate_DC_engine(pwd_dir + '/output/DC_engine_U%s.cpp' %(vsa['KERNEL_ID']), vsa, config)
 
   # DF_loader.cpp
   generate_DF_loader(pwd_dir + '/output/DF_loader_U%s.cpp' %(vsa['KERNEL_ID']), vsa, config)
 
-  # # DC_loader.cpp
-  # generate_DC_loader(pwd_dir + 'output/DC_loader_U%s.cpp' %(vsa['KERNEL_ID']), vsa, config)
+  # DC_loader.cpp
+  generate_DC_loader(pwd_dir + '/output/DC_loader_U%s.cpp' %(vsa['KERNEL_ID']), vsa, config)
 
 if __name__ == "__main__":
 

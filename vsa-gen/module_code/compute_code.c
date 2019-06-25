@@ -1,10 +1,10 @@
-data_t_A l_buf_A[(+1*(1)*(1))];
-data_t_B l_buf_B[(+1*(1)*(1))];
-data_t_C l_buf_C[(+1*(16)*(16))];
-#define S1(zT6,zT7,zT8,zT5,zT4,zT3,i,j,k)	C[i][j] = beta*C[i][j] + alpha*A[i][k] * B[k][j];
-#define S2(t1,t2,t3,t4,t5,t6,t7,t8,t9)	l_buf_A[d10][d11] = fifo_A.read()
-#define S3(t1,t2,t3,t4,t5,t6,t7,t8,t9)	l_buf_B[d10][d11] = fifo_B.read()
-#define S4(t1,t2,t3,t4,t5,t6,t7,t8,t9)	fifo_C.write(l_buf_C[d10][d11])
+data_t_A l_buf_A[1][1];
+data_t_B l_buf_B[1][1];
+data_t_C l_buf_C[16][16];
+#define S1(zT6,zT7,zT8,zT5,zT4,zT3,i,j,k) C[i][j] = beta*C[i][j] + alpha*A[i][k] * B[k][j];
+#define S2(d1,d2,d3,d4,d5,d6,d7,d8,d9) l_buf_A[d10][d11] = fifo_A.read()
+#define S3(d1,d2,d3,d4,d5,d6,d7,d8,d9) l_buf_B[d10][d11] = fifo_B.read()
+#define S4(d1,d2,d3,d4,d5,d6,d7,d8,d9) fifo_C.write(l_buf_C[d10][d11])
 
 int t1, t2, t3, t4, t5, t6, t7, t8, t9, t10;
 

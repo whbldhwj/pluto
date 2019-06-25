@@ -151,7 +151,7 @@ static void gen_stmt_macro(const Stmt *stmt, FILE *outfp) {
       fprintf(outfp, ",");
     fprintf(outfp, "%s", stmt->iterators[j]);
   }
-  fprintf(outfp, ")\t");
+  fprintf(outfp, ") ");
 
   /* Generate pragmas for Bee/Cl@k */
   if (options->bee) {

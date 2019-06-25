@@ -145,14 +145,14 @@ void U1_top_kernel(
     fifo0_transfer_0
   );
 
-  %sDataFeed%dEngine0_wrapper(
+  U1_DataFeed0Engine0_wrapper(
     fifo0_transfer_0,
     fifo0_transfer_1,
     fifo0_feed_0_0,
     0
   );
 
-  %sDataFeed%dEngineLast(
+  U1_DataFeed0EngineLast(
     fifo0_transfer_1,
     fifo0_feed_1_0,
     1
@@ -163,14 +163,14 @@ void U1_top_kernel(
     fifo1_transfer_0
   );
 
-  %sDataFeed%dEngine0_wrapper(
+  U1_DataFeed1Engine0_wrapper(
     fifo1_transfer_0,
     fifo1_transfer_1,
     fifo1_feed_0_0,
     0
   );
 
-  %sDataFeed%dEngineLast(
+  U1_DataFeed1EngineLast(
     fifo1_transfer_1,
     fifo1_feed_0_1,
     1
@@ -267,7 +267,7 @@ void U1_top_kernel(
     1
   );
 
-  %sDataCollect%dEngineLast(
+  U1_DataCollect2EngineLast(
     fifo2_transfer_0,
     fifo2_collect_1_0,
     1

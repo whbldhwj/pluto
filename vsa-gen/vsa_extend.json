@@ -1,4 +1,5 @@
 {
+  "SPACE_BAND_WIDTH": 2, 
   "DATA_TYPE": [
     "float", 
     "float", 
@@ -7,6 +8,56 @@
   "KERNEL_ID": 1, 
   "APP_NAME": "mm", 
   "INIT_VALUE": 0, 
+  "ARRAY_PART_BAND_WIDTH": 3, 
+  "BUS_WIDTH": [
+    512, 
+    512, 
+    512
+  ], 
+  "FIXED_EN": 0, 
+  "ROW_IL_FACTOR": 16, 
+  "RES_REF": [
+    "C[I][J]"
+  ], 
+  "RES_ENGINE_NUM": [
+    2
+  ], 
+  "FC_SIMD_FACTOR": [
+    1, 
+    1, 
+    1
+  ], 
+  "PARAMETERS": {
+    "I": 64, 
+    "K": 64, 
+    "J": 64
+  }, 
+  "FC_SPLIT_FACTOR": [
+    1, 
+    1, 
+    1
+  ], 
+  "IL_ENABLE": 1, 
+  "SIMD_FACTOR": 1, 
+  "DATA_WIDTH": [
+    32, 
+    32, 
+    32
+  ], 
+  "RES_CHANNEL_NUM": 1, 
+  "FC_GROUP_FACTOR": [
+    1, 
+    1, 
+    1
+  ], 
+  "OP_CHANNEL_DIR": [
+    "R", 
+    "D"
+  ], 
+  "OP_ENGINE_NUM": [
+    2, 
+    2
+  ], 
   "SW_KERNEL_CODE": [
     "int i, j, k;", 
     "", 
@@ -67,54 +118,10 @@
     "if (err == 0) {", 
     "printf(\"test passed!\\n\");"
   ], 
-  "BUS_WIDTH": [
-    512, 
-    512, 
-    512
-  ], 
-  "FIXED_EN": 0, 
-  "ROW_IL_FACTOR": 16, 
-  "RES_REF": [
-    "C[I][J]"
-  ], 
-  "RES_ENGINE_NUM": [
-    2
-  ], 
-  "FC_SIMD_FACTOR": [
+  "ENGINE_BAND_WIDTH": [
     1, 
     1, 
     1
-  ], 
-  "PARAMETERS": {
-    "I": 64, 
-    "K": 64, 
-    "J": 64
-  }, 
-  "FC_SPLIT_FACTOR": [
-    1, 
-    1, 
-    1
-  ], 
-  "IL_ENABLE": 1, 
-  "SIMD_FACTOR": 1, 
-  "DATA_WIDTH": [
-    32, 
-    32, 
-    32
-  ], 
-  "RES_CHANNEL_NUM": 1, 
-  "FC_GROUP_FACTOR": [
-    1, 
-    1, 
-    1
-  ], 
-  "OP_CHANNEL_DIR": [
-    "R", 
-    "D"
-  ], 
-  "OP_ENGINE_NUM": [
-    2, 
-    2
   ], 
   "COL_IL_FACTOR": 16, 
   "RES_DIM": [

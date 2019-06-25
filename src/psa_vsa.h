@@ -157,7 +157,14 @@ struct psaVSA {
   /* TYPE */
   char *type;
 
-  /* ARRAY_PART, SPACE, TIME LOOP_LEVEL */
+  /* ARRAY_PART, SPACE LOOP NUM */
+  int array_part_band_width;
+  int space_band_width;
+
+  /* ENGINE LOOP NUM */
+  //int *op_engine_band_width;
+  //int *res_engine_band_width;
+  int *engine_band_width;
   
 };
 typedef struct psaVSA VSA;
@@ -165,7 +172,8 @@ typedef struct psaVSA VSA;
 void vsa_op_res_extract(PlutoProg *prog, VSA *vsa);
 void vsa_channel_dir_extract(PlutoProg *prog, VSA *vsa);
 void vsa_engine_num_extract(PlutoProg *prog, VSA *vsa);
-void vsa_type_extract(PlutoProg *prog, VSA *vsa);                                                    
+void vsa_type_extract(PlutoProg *prog, VSA *vsa);        
+void vsa_band_width_extract(PlutoProg *prog, VSA *vsa);
 void pluto_prog_to_vsa(PlutoProg *prog, VSA *vsa);
 VSA *vsa_alloc();
 void vsa_free(VSA *vsa);

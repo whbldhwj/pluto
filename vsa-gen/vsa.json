@@ -50,5 +50,12 @@
   "RES_ENGINE_NUM": [
     2
   ],
-  "TYPE": "local"
+  "TYPE": "local",
+  "ARRAY_PART_BAND_WIDTH": 3,
+  "SPACE_BAND_WIDTH": 2,
+  "ENGINE_BAND_WIDTH": [
+    1,
+    1,
+    1
+  ]
 }

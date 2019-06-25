@@ -3164,7 +3164,7 @@ Stmt *psa_create_helper_stmt_raw(
   char **iterators = (char **)malloc(sizeof(char *) * level);
   for (unsigned i = 0; i < level; i++) {
     char *tmpstr = (char *)malloc(5) ;
-    sprintf(tmpstr, "t%d", i + 1);
+    sprintf(tmpstr, "d%d", i + 1);
     iterators[i] = tmpstr;
   }
 
@@ -3207,7 +3207,7 @@ Stmt *psa_create_helper_stmt(const Stmt *anchor_stmt, unsigned level, const char
   char **iterators = (char **)malloc(sizeof(char *) * level);
   for (unsigned i = 0; i < level; i++) {
     char *tmpstr = (char *)malloc(5);
-    sprintf(tmpstr, "t%d", i + 1);
+    sprintf(tmpstr, "d%d", i + 1);
     iterators[i] = tmpstr;
   }
 
@@ -3853,6 +3853,30 @@ char *get_parametric_bounding_box(const PlutoConstraints *cst, int start,
     cst_tmp = cst_tmp->next;
   }
   sprintf(buf_size + strlen(buf_size), ")");
+
+  return buf_size;
+}
+
+char *get_parametric_bounding_box_decl(const PlutoConstraints *cst, int start,
+                                  int num, int npar, const char **params) {
+  int k;
+  char *buf_size;
+
+  buf_size = malloc(2048 * 8);
+  strcpy(buf_size, "");
+
+  const PlutoConstraints *cst_tmp = cst;
+  while (cst_tmp != NULL) {
+    // sprintf(buf_size + strlen(buf_size), "+1");
+    for (k = 0; k < num; k++) {
+      char *extent;
+      get_parametric_extent_const(cst_tmp, start + k, npar, params, &extent,
+                                  NULL);
+      sprintf(buf_size + strlen(buf_size), "[%s]", extent);
+      free(extent);
+    }
+    cst_tmp = cst_tmp->next;
+  }  
 
   return buf_size;
 }

@@ -1,5 +1,5 @@
-data_t_A l_buf_A[(+1*(16)*(32))];
-#define S1(d1,d2,d3,d4,d5,d6)	l_buf_A[d5][d6] = fifo_A.read()
+data_t_A l_buf_A[16][32];
+#define S1(d1,d2,d3,d4,d5,d6) l_buf_A[d5][d6] = fifo_A.read()
 
 int t1, t2, t3, t4, t5, t6;
 

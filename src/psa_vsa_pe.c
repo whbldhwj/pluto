@@ -126,6 +126,10 @@ Stmt **psa_gen_op_read_in_code(
   char *op_buf_size =
       get_parametric_bounding_box(read_in, copy_level, acc_nrows, 
                                   prog->npar, (const char **)prog->params);
+
+  char *op_buf_decl =
+      get_parametric_bounding_box_decl(read_in, copy_level, acc_nrows, 
+                                  prog->npar, (const char **)prog->params);                                  
   
   char *op_transfer_stmt_text = "";
   char *op_transfer_module_name = "op_transfer";
@@ -153,7 +157,8 @@ Stmt **psa_gen_op_read_in_code(
   generate_scanner_code(
     vsa, prog, read_in, copy_level,
     acc_name, acc_nrows,
-    op_buf_size,
+    // op_buf_size,
+    op_buf_decl,
     op_transfer_stmt_text,
     op_transfer_module_name
   );
@@ -188,6 +193,10 @@ Stmt **psa_gen_res_write_out_code(
       get_parametric_bounding_box(write_out, copy_level, acc_nrows, 
                                   prog->npar, (const char **)prog->params);
 
+  char *buf_decl = 
+      get_parametric_bounding_box_decl(write_out, copy_level, acc_nrows, 
+                                  prog->npar, (const char **)prog->params);                                  
+
   char *l_buf_name, *fifo_name;
   char *l_count_name;
 
@@ -207,7 +216,9 @@ Stmt **psa_gen_res_write_out_code(
   generate_scanner_code(
     vsa, prog, write_out, copy_level,
     acc_name, acc_nrows,
-    buf_size, res_transfer_stmt_text, res_transfer_module_name
+    // buf_size, 
+    buf_decl, 
+    res_transfer_stmt_text, res_transfer_module_name
   );
 
   Stmt *res_trans_stmt = NULL;
@@ -275,9 +286,13 @@ Stmt **psa_gen_compute_code(
 
     char *buf_size = 
       get_parametric_bounding_box(read_in, copy_level, acc_nrows, 
-                                  prog->npar, (const char **)prog->params);      
+                                  prog->npar, (const char **)prog->params);   
+
+    char *buf_decl = 
+      get_parametric_bounding_box_decl(read_in, copy_level, acc_nrows, 
+                                  prog->npar, (const char **)prog->params);                                       
                               
-    fprintf(fp, "data_t_%s l_buf_%s[%s];\n", acc_name, acc_name, buf_size);
+    fprintf(fp, "data_t_%s l_buf_%s%s;\n", acc_name, acc_name, buf_decl);
 
     char *stmt_text = "";
     char *l_buf_name, *fifo_name;
@@ -335,7 +350,11 @@ Stmt **psa_gen_compute_code(
       get_parametric_bounding_box(write_out, copy_level, acc_nrows, 
                                   prog->npar, (const char **)prog->params);      
 
-    fprintf(fp, "data_t_%s l_buf_%s[%s];\n", acc_name, acc_name, buf_size);
+    char *buf_decl = 
+      get_parametric_bounding_box_decl(write_out, copy_level, acc_nrows, 
+                                  prog->npar, (const char **)prog->params);  
+
+    fprintf(fp, "data_t_%s l_buf_%s%s;\n", acc_name, acc_name, buf_decl);
 
 // #ifdef JIE_DEBUG
 //     pluto_constraints_pretty_print(stdout, write_out);
