@@ -594,6 +594,30 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
   /* Jie Added - Start */
   /* Dependence Checker for Systolic Array */
   // TODO: Move this part to post-auto-transform phase
+#ifdef PRINT_DEPS
+  fprintf(stdout, "[PSA] Print out the dependences.\n");
+  fprintf(stdout, "[PSA] Total number of dependences: %d\n", prog->ndeps);
+  for (i = 0; i < prog->ndeps; i++) {
+    Dep *dep = prog->deps[i];
+    fprintf(stdout, "***********************\n")
+    fprintf(stdout, "[PSA] Dependences ID: %d\n", i);
+    fprintf(stdout, "[PSA] Src stmt ID: %d\n", dep->src);
+    fprintf(stdout, "[PSA] Dest stmt ID: %d\n", dep->dest);
+    if (IS_WAR(dep->type)) {
+      fprintf(stdout, "[PSA] Dep type: WAR\n");
+    } else if (IS_WAW(dep->type)) {
+      fprintf(stdout, "[PSA] Dep type: WAW\n");
+    } else if (IS_RAW(dep->type)) {
+      fprintf(stdout, "[PSA] Dep type: RAW\n");
+    } else if (IS_RAR(dep->type)) {
+      fprintf(stdout, "[PSA] Dep type: RAR\n");
+    }
+    PlutoConstraints* dpolytope = dep->dpolytope;
+    pluto_constraints_pretty_print(stdout, dpolytope);
+    fprintf(stdout, "***********************\n")
+  }
+#endif
+
   fprintf(stdout, "[PSA] Check uniformity of the design.\n");
   bool is_uniform = systolic_array_dep_checker(prog);
   if (!is_uniform) {

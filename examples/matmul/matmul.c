@@ -68,7 +68,7 @@ double t_start, t_end;
 
 int main()
 {
-    int i, j, k;
+//    int i, j, k;
 
     init_array();
 
@@ -83,9 +83,9 @@ int main()
 //        for(j=0; j<N; j++)  
 //            for(k=0; k<K; k++)
 //                C[i][j] = beta*C[i][j] + alpha*A[i][k] * B[k][j];
-    for(i=0; i<1024; i++)
-        for(j=0; j<1024; j++)  
-            for(k=0; k<1024; k++)
+    for(int i=0; i<1024; i++)
+        for(int j=0; j<1024; j++)  
+            for(int k=0; k<1024; k++)
                 C[i][j] = beta*C[i][j] + alpha*A[i][k] * B[k][j];
 #pragma endscop
 
