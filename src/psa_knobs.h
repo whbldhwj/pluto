@@ -15,7 +15,29 @@
 #include "pet.h"
 #include "osl/scop.h"
 
+/*
+ * Stage: Array Generation
+ */
 // print out detailed information of each dependences
 #define PRINT_DEPS
+// print out the transformed code after Pluto's auto-transformation
+#define PRINT_PLUTO_TRANS_PROGRAM
+// perform space-time remapping
+#define SPACE_TIME_MAPPING
+
+/*
+ * Stage: PE Optimization
+ */ 
+// 
+#define LATENCY_HIDING
+#define ARRAY_PARTITIONING
+
+/*
+ * Stage: Data Transfor Optimization
+ */ 
+
+/*
+ * Stage: Code Generation
+ */
 
 #endif

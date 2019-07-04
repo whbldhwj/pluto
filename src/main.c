@@ -50,6 +50,7 @@
 #include "psa_pe_opt.h"
 #include "psa_vsa_dfc.h"
 #include "psa_vsa_pe.h"
+#include "psa_knobs.h"
 
 #include "clan/clan.h"
 #include "candl/candl.h"
@@ -591,48 +592,11 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
   }
   IF_MORE_DEBUG(pluto_prog_print(stdout, prog));
 
-  /* Jie Added - Start */
-  /* Dependence Checker for Systolic Array */
-  // TODO: Move this part to post-auto-transform phase
-#ifdef PRINT_DEPS
-  fprintf(stdout, "[PSA] Print out the dependences.\n");
-  fprintf(stdout, "[PSA] Total number of dependences: %d\n", prog->ndeps);
-  for (i = 0; i < prog->ndeps; i++) {
-    Dep *dep = prog->deps[i];
-    fprintf(stdout, "***********************\n")
-    fprintf(stdout, "[PSA] Dependences ID: %d\n", i);
-    fprintf(stdout, "[PSA] Src stmt ID: %d\n", dep->src);
-    fprintf(stdout, "[PSA] Dest stmt ID: %d\n", dep->dest);
-    if (IS_WAR(dep->type)) {
-      fprintf(stdout, "[PSA] Dep type: WAR\n");
-    } else if (IS_WAW(dep->type)) {
-      fprintf(stdout, "[PSA] Dep type: WAW\n");
-    } else if (IS_RAW(dep->type)) {
-      fprintf(stdout, "[PSA] Dep type: RAW\n");
-    } else if (IS_RAR(dep->type)) {
-      fprintf(stdout, "[PSA] Dep type: RAR\n");
-    }
-    PlutoConstraints* dpolytope = dep->dpolytope;
-    pluto_constraints_pretty_print(stdout, dpolytope);
-    fprintf(stdout, "***********************\n")
-  }
-#endif
-
-  fprintf(stdout, "[PSA] Check uniformity of the design.\n");
-  bool is_uniform = systolic_array_dep_checker(prog);
-  if (!is_uniform) {
-    fprintf(stdout, "[PSA] Non-uniform dependence detected.\n");
-    return 1;
-  }
-//#ifdef JIE_DEBUG
-  fprintf(stdout, "[PSA] Uniformity: %d\n", is_uniform);
-//#endif
-
+/* Jie Added - Start */  
   fprintf(stdout, "[PSA] Filter out redundant dependences.\n");
   /* Filter out RAR dependences on scalar variables */
   rar_scalar_filter(prog);
-
-  /* Jie Added - End */
+/* Jie Added - End */  
 
   int dim_sum = 0;
   for (i = 0; i < prog->nstmts; i++) {
@@ -703,7 +667,14 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
     pluto_iss_dep(prog);
   }
 
+/*
+ * *******************************************
+ * Stage: Array Generation
+ * Step: Pluto Transformation
+ * *******************************************
+ */
   t_start = rtclock();
+  fprintf(stdout, "[PSA] Run Pluto's Algorithm.\n");
   /* Auto transformation */
   if (!options->identity) {
     pluto_auto_transform(prog);
@@ -722,6 +693,116 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
   }
 
   /* Jie Added - Start */
+#ifdef PRINT_PLUTO_TRANS_PROGRAM
+  fprintf(stdout, "[PSA] Dump out the transformed program after Pluto's algorithm.\n");
+  /* Get basename */
+  char *basec, *bname;
+  basec = strdup(srcFileName);
+  bname = basename(basec);
+
+  char *dumpFileName;
+  dumpFileName = malloc(strlen(bname) - 2 + strlen(".pluto_transform.c") + 1);
+  strncpy(dumpFileName, bname, strlen(bname) - 2);
+  dumpFileName[strlen(bname) - 2] = '\0';
+  strcat(dumpFileName, ".pluto_transform.c");
+
+  char *cloogFileName;
+  cloogFileName = malloc(strlen(bname) - 2 + strlen(".pluto_transform.cloog") + 1);
+  strncpy(cloogFileName, bname, strlen(bname) - 2);
+  cloogFileName[strlen(bname) - 2] = '\0';
+  strcat(cloogFileName, ".pluto_transform.cloog");
+  free(basec);
+
+  // Write Cloog File
+  // FILE *cloogfp, *outfp;
+  cloogfp = fopen(cloogFileName, "w+");
+  if (!cloogfp) {
+    fprintf(stderr, "[PSA] Can't open .cloog file: '%s'\n", cloogFileName);
+    free(cloogFileName);
+    pluto_options_free(options);
+    pluto_prog_free(prog);
+    return 9;
+  }
+  free(cloogFileName);
+
+  outfp = fopen(dumpFileName, "w");
+  if (!outfp) {
+    fprintf(stderr, "[PSA] Can't open file '%s' for writing", dumpFileName);
+    free(dumpFileName);
+    pluto_options_free(options);
+    pluto_prog_free(prog);
+    fclose(outfp);
+    return 10;
+  }
+
+  pluto_gen_cloog_file(cloogfp, prog);
+  /* Add the <irregular> tag from clan, if any */
+  if (!options->pet) {
+    if (irroption) {
+      fprintf(cloogfp, "<irregular>\n%s\n</irregular>\n\n", irroption);
+      free(irroption);
+    }
+  }
+  rewind(cloogfp);
+
+  /* Generate code using Cloog */
+  psa_generate_declarations(prog, outfp);
+  pluto_gen_cloog_code(prog, 1, prog->num_hyperplanes, cloogfp, outfp);
+
+  free(dumpFileName);
+  fclose(cloogfp);
+  fclose(outfp);
+#endif
+  /* Jie Added - End */
+
+  /* Jie Added - Start */
+  /* Dependence Checker for Systolic Array */
+  // TODO: Move this part to post-auto-transform phase
+#ifdef PRINT_DEPS
+  fprintf(stdout, "[PSA] Print out the dependences.\n");
+  fprintf(stdout, "[PSA] Total number of dependences: %d\n", prog->ndeps);
+  for (i = 0; i < prog->ndeps; i++) {
+    Dep *dep = prog->deps[i];
+    fprintf(stdout, "***********************\n");
+    fprintf(stdout, "[PSA] Dependences ID: %d\n", i);
+    fprintf(stdout, "[PSA] Src stmt ID: %d\n", dep->src);
+    fprintf(stdout, "[PSA] Dest stmt ID: %d\n", dep->dest);
+    if (IS_WAR(dep->type)) {
+      fprintf(stdout, "[PSA] Dep type: WAR\n");
+    } else if (IS_WAW(dep->type)) {
+      fprintf(stdout, "[PSA] Dep type: WAW\n");
+    } else if (IS_RAW(dep->type)) {
+      fprintf(stdout, "[PSA] Dep type: RAW\n");
+    } else if (IS_RAR(dep->type)) {
+      fprintf(stdout, "[PSA] Dep type: RAR\n");
+    }
+    PlutoConstraints* dpolytope = dep->dpolytope;
+    pluto_constraints_pretty_print(stdout, dpolytope);
+    fprintf(stdout, "***********************\n");
+  }
+#endif
+
+  fprintf(stdout, "[PSA] Check uniformity of the design.\n");
+  bool is_uniform = systolic_array_dep_checker(prog);
+  if (!is_uniform) {
+    fprintf(stdout, "[PSA] Non-uniform dependence detected.\n");
+    return 1;
+  }
+//#ifdef JIE_DEBUG
+  fprintf(stdout, "[PSA] Uniformity: %d\n", is_uniform);
+//#endif
+
+  /* Jie Added - End */
+
+/*
+ * *******************************************
+ * Stage: Array Generation
+ * Step: Space-time Remapping
+ * *******************************************
+ */
+
+  /* Jie Added - Start */
+#ifdef SPACE_TIME_MAPPING  
   fprintf(stdout, "[PSA] Explore different systolic array candidates.\n");
   PlutoProg** progs;
   int nprogs;
@@ -733,7 +814,7 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
 //   }
 // #endif  
   //prog = progs[0];
-
+#endif
   /* Jie Added - End */
 
   unsigned prog_id;
@@ -763,18 +844,35 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
      * then, array tiling.
      */
 
+/*
+ * *******************************************
+ * Stage: PE Optimization
+ * Step: Latency Hiding
+ * *******************************************
+ */
     /* Jie Added - Start */
+#ifdef LATENCY_HIDING     
     if (options->tile) {
       fprintf(stdout, "[PSA] Apply PE Optimization.\n");
       psa_pe_optimize(prog, psa_vsa);      
     }
+#endif    
     /* Jie Added - End */
 
+/*
+ * *******************************************
+ * Stage: PE Optimization
+ * Step: Array Partitioning
+ * *******************************************
+ */
+
     /* Jie Added - Start */
+#ifdef ARRAY_PARTITIONING    
     if (options->tile) {
       fprintf(stdout, "[PSA] Apply array partitioning.\n");
       psa_array_partition(prog);
     }
+#endif    
     
 // #ifdef JIE_DEBUG
 //     fprintf(stdout, "[Debug2] prog ntransdeps: %d\n", prog->ntransdeps);
