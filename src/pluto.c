@@ -1761,6 +1761,10 @@ int pluto_auto_transform(PlutoProg *prog) {
 
   depth = 0;
 
+#ifdef PLUTO_TRANSFORM_DEBUG
+  fprintf(stdout, "[PSA-Debug] Fuse mode: %d\n", options->fuse);
+#endif
+
   if (precut(prog, ddg, depth)) {
     /* Distributed based on .fst or .precut file (customized user-supplied
      * fusion structure */
@@ -1774,6 +1778,9 @@ int pluto_auto_transform(PlutoProg *prog) {
       cut_scc_dim_based(prog, ddg);
     }
   }
+#ifdef PLUTO_TRANSFORM_DEBUG
+      fprintf(stdout, "[PSA-Debug] num hyperplanes: %d\n", prog->num_hyperplanes);
+#endif
 
   /* For diamond tiling */
   conc_start_found = 0;
@@ -1877,8 +1884,19 @@ int pluto_auto_transform(PlutoProg *prog) {
       assert(hyp_search_mode == LAZY ||
              num_sols_left == num_ind_sols_req - num_ind_sols_found);
 
+#ifdef PLUTO_TRANSFORM_DEBUG
+      fprintf(stdout, "[PSA-Debug] num hyperplanes: %d\n", prog->num_hyperplanes);
+#endif
+
       nsols = find_permutable_hyperplanes(prog, hyp_search_mode, num_sols_left,
                                           depth);
+
+#ifdef PLUTO_TRANSFORM_DEBUG
+      fprintf(stdout, "[PSA-Debug] pluto_auto_transform: depth: %d; "
+                      "%d hyperplanes found\n", 
+                      depth, nsols);
+      pluto_transformations_pretty_print(prog);
+#endif
 
       IF_DEBUG(fprintf(stdout, "[pluto] pluto_auto_transform: band level %d; "
                                "%d hyperplane(s) found\n",
@@ -1892,6 +1910,10 @@ int pluto_auto_transform(PlutoProg *prog) {
         if (options->diamondtile && nsols >= 2 && !conc_start_found) {
           conc_start_found = pluto_diamond_tile(prog);
         }
+#ifdef PLUTO_TRANSFORM_DEBUG
+        fprintf(stdout, "[PSA-debug] after diamond tiling\n");
+        pluto_transformations_pretty_print(prog);
+#endif
 
         for (j = 0; j < nsols; j++) {
           /* Mark dependences satisfied by this solution */
@@ -1967,6 +1989,11 @@ int pluto_auto_transform(PlutoProg *prog) {
       if (hyp_search_mode == LAZY)
         pluto_compute_dep_satisfaction_precise(prog);
       depth++;
+#ifdef PLUTO_TRANSFORM_DEBUG
+      fprintf(stdout, "[PSA-Debug] %d %d\n",
+                      pluto_transformations_full_ranked(prog),
+                      deps_satisfaction_check(prog));
+#endif
     } while (!pluto_transformations_full_ranked(prog) ||
              !deps_satisfaction_check(prog));
   }
@@ -1996,6 +2023,10 @@ int pluto_auto_transform(PlutoProg *prog) {
   free(orig_hProps);
 
   IF_DEBUG(printf("[pluto] pluto_auto_transform: successful, done\n"););
+
+#ifdef PLUTO_TRANSFORM_DEBUG
+  pluto_transformations_pretty_print(prog);
+#endif
 
   return 0;
 }

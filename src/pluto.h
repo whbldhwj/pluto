@@ -92,6 +92,10 @@
 #define EAGER 0
 #define LAZY 1
 
+/* Jie Added - Start */
+//#define PLUTO_TRANSFORM_DEBUG
+/* Jie Added - End */
+
 typedef enum dirvec_type {
   DEP_MINUS = '-',
   DEP_ZERO = '0',

@@ -611,57 +611,86 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
     fprintf(stdout, "[pluto] Number of parameters: %d\n", prog->npar);
   }
 
-#ifdef JIE_DEBUG
-  fprintf(stdout, "print out the dependences\n");
+/* Jie Added - Start */
+#ifdef PRINT_DEPS_PREV_TRANSFORM
+  fprintf(stdout, "[PSA] Print out the dependences.\n");
+  fprintf(stdout, "[PSA] Total number of dependences: %d\n", prog->ndeps);
   for (i = 0; i < prog->ndeps; i++) {
     Dep *dep = prog->deps[i];
-    fprintf(stdout, "[Debug] Dependence ID: %d\n", i);
-    fprintf(stdout, "[Debug] src ID: %d\n", dep->src);
-    fprintf(stdout, "[Debug] dest ID: %d\n", dep->dest);
-    PlutoConstraints* dpolytope = dep->dpolytope;
-    pluto_constraints_pretty_print(stdout, dpolytope);
-   //fprintf(stdout, "[Debug] type: %d\n", dep->type);
+    fprintf(stdout, "***********************\n");
+    fprintf(stdout, "[PSA] Dependences ID: %d\n", i);
+    fprintf(stdout, "[PSA] Src stmt ID: %d\n", dep->src);
+    fprintf(stdout, "[PSA] Dest stmt ID: %d\n", dep->dest);
     if (IS_WAR(dep->type)) {
-      fprintf(stdout, "[Debug] type: WAR\n");
+      fprintf(stdout, "[PSA] Dep type: WAR\n");
     } else if (IS_WAW(dep->type)) {
-      fprintf(stdout, "[Debug] type: WAW\n");
+      fprintf(stdout, "[PSA] Dep type: WAW\n");
     } else if (IS_RAW(dep->type)) {
-      fprintf(stdout, "[Debug] type: RAW\n");
+      fprintf(stdout, "[PSA] Dep type: RAW\n");
     } else if (IS_RAR(dep->type)) {
-      fprintf(stdout, "[Debug] type: RAR\n");
+      fprintf(stdout, "[PSA] Dep type: RAR\n");
     }
     PlutoAccess *acc = dep->src_acc;
-    fprintf(stdout, "[Debug] name: %s\n", acc->name);
-  //  if (IS_RAR(dep->type)) {
-  //    // print out access functions of RAR deps
-  //    PlutoAccess *acc = dep->src_acc;
-  //    fprintf(stdout, "[Debug] name: %s\n", acc->name);
-  //    pluto_matrix_print(stdout, acc->mat);
-  //  }
-  }
+    fprintf(stdout, "[PSA] Arr name: %s\n", acc->name);    
 
-  fprintf(stdout, "print out the trans dependences\n");
-  for (i = 0; i < prog->ntransdeps; i++) {
-    Dep *dep = prog->transdeps[i];
-    fprintf(stdout, "[Debug] Dependence ID: %d\n", i);
-    fprintf(stdout, "[Debug] src ID: %d\n", dep->src);
-    fprintf(stdout, "[Debug] dest ID: %d\n", dep->dest);
     PlutoConstraints* dpolytope = dep->dpolytope;
     pluto_constraints_pretty_print(stdout, dpolytope);
-   //fprintf(stdout, "[Debug] type: %d\n", dep->type);
-    if (IS_WAR(dep->type)) {
-      fprintf(stdout, "[Debug] type: WAR\n");
-    } else if (IS_WAW(dep->type)) {
-      fprintf(stdout, "[Debug] type: WAW\n");
-    } else if (IS_RAW(dep->type)) {
-      fprintf(stdout, "[Debug] type: RAW\n");
-    } else if (IS_RAR(dep->type)) {
-      fprintf(stdout, "[Debug] type: RAR\n");
-    }
-    PlutoAccess *acc = dep->src_acc;
-    fprintf(stdout, "[Debug] name: %s\n", acc->name);    
+    fprintf(stdout, "***********************\n");
   }
 #endif
+/* Jie Added - End */
+
+//#ifdef JIE_DEBUG
+//  fprintf(stdout, "print out the dependences\n");
+//  for (i = 0; i < prog->ndeps; i++) {
+//    Dep *dep = prog->deps[i];
+//    fprintf(stdout, "[Debug] Dependence ID: %d\n", i);
+//    fprintf(stdout, "[Debug] src ID: %d\n", dep->src);
+//    fprintf(stdout, "[Debug] dest ID: %d\n", dep->dest);
+//    PlutoConstraints* dpolytope = dep->dpolytope;
+//    pluto_constraints_pretty_print(stdout, dpolytope);
+//   //fprintf(stdout, "[Debug] type: %d\n", dep->type);
+//    if (IS_WAR(dep->type)) {
+//      fprintf(stdout, "[Debug] type: WAR\n");
+//    } else if (IS_WAW(dep->type)) {
+//      fprintf(stdout, "[Debug] type: WAW\n");
+//    } else if (IS_RAW(dep->type)) {
+//      fprintf(stdout, "[Debug] type: RAW\n");
+//    } else if (IS_RAR(dep->type)) {
+//      fprintf(stdout, "[Debug] type: RAR\n");
+//    }
+//    PlutoAccess *acc = dep->src_acc;
+//    fprintf(stdout, "[Debug] name: %s\n", acc->name);
+//  //  if (IS_RAR(dep->type)) {
+//  //    // print out access functions of RAR deps
+//  //    PlutoAccess *acc = dep->src_acc;
+//  //    fprintf(stdout, "[Debug] name: %s\n", acc->name);
+//  //    pluto_matrix_print(stdout, acc->mat);
+//  //  }
+//  }
+//
+//  fprintf(stdout, "print out the trans dependences\n");
+//  for (i = 0; i < prog->ntransdeps; i++) {
+//    Dep *dep = prog->transdeps[i];
+//    fprintf(stdout, "[Debug] Dependence ID: %d\n", i);
+//    fprintf(stdout, "[Debug] src ID: %d\n", dep->src);
+//    fprintf(stdout, "[Debug] dest ID: %d\n", dep->dest);
+//    PlutoConstraints* dpolytope = dep->dpolytope;
+//    pluto_constraints_pretty_print(stdout, dpolytope);
+//   //fprintf(stdout, "[Debug] type: %d\n", dep->type);
+//    if (IS_WAR(dep->type)) {
+//      fprintf(stdout, "[Debug] type: WAR\n");
+//    } else if (IS_WAW(dep->type)) {
+//      fprintf(stdout, "[Debug] type: WAW\n");
+//    } else if (IS_RAW(dep->type)) {
+//      fprintf(stdout, "[Debug] type: RAW\n");
+//    } else if (IS_RAR(dep->type)) {
+//      fprintf(stdout, "[Debug] type: RAR\n");
+//    }
+//    PlutoAccess *acc = dep->src_acc;
+//    fprintf(stdout, "[Debug] name: %s\n", acc->name);    
+//  }
+//#endif
 
   if (options->iss) {
     pluto_iss_dep(prog);
@@ -673,6 +702,14 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
  * Step: Pluto Transformation
  * *******************************************
  */
+  if (!options->silent) {
+    fprintf(
+        stdout,
+        "[pluto] Original scheduling [<iter coeff's> <param> <const>]\n\n");
+    /* Print out transformations */
+    pluto_transformations_pretty_print(prog);
+  }
+
   t_start = rtclock();
   fprintf(stdout, "[PSA] Run Pluto's Algorithm.\n");
   /* Auto transformation */
@@ -747,7 +784,8 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
 
   /* Generate code using Cloog */
   psa_generate_declarations(prog, outfp);
-  pluto_gen_cloog_code(prog, 1, prog->num_hyperplanes, cloogfp, outfp);
+  fprintf(stdout, "[Debug] number of hyps: %d\n", prog->num_hyperplanes);
+  pluto_gen_cloog_code(prog, prog->num_hyperplanes, 1, cloogfp, outfp);
 
   free(dumpFileName);
   fclose(cloogfp);
@@ -758,7 +796,7 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
   /* Jie Added - Start */
   /* Dependence Checker for Systolic Array */
   // TODO: Move this part to post-auto-transform phase
-#ifdef PRINT_DEPS
+#ifdef PRINT_DEPS_POST_TRANSFORM
   fprintf(stdout, "[PSA] Print out the dependences.\n");
   fprintf(stdout, "[PSA] Total number of dependences: %d\n", prog->ndeps);
   for (i = 0; i < prog->ndeps; i++) {

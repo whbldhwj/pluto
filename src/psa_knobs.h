@@ -18,8 +18,10 @@
 /*
  * Stage: Array Generation
  */
-// print out detailed information of each dependences
-#define PRINT_DEPS
+// print out detailed information of each dependence before the Pluto transformation
+#define PRINT_DEPS_PREV_TRANSFORM
+// print out detailed information of each dependence after the Pluto transformation
+//#define PRINT_DEPS_POST_TRANSFORM
 // print out the transformed code after Pluto's auto-transformation
 #define PRINT_PLUTO_TRANS_PROGRAM
 // perform space-time remapping
