@@ -69,8 +69,8 @@ Dep *pluto_dep_prog_dup(Dep *d, int num_hyperplanes) {
   dep->id = d->id;
   dep->src = d->src;
   dep->dest = d->dest;
-  dep->src_acc = d->src_acc;
-  dep->dest_acc = d->dest_acc;
+  dep->src_acc = pluto_access_dup(d->src_acc);
+  dep->dest_acc = pluto_access_dup(d->dest_acc);
   dep->dpolytope = pluto_constraints_dup(d->dpolytope);
   dep->bounding_poly = pluto_constraints_dup(d->bounding_poly);
 
@@ -401,12 +401,14 @@ PlutoProg *pluto_prog_dup(const PlutoProg *prog) {
 //   fprintf(stdout, "[Debug] Stop 8.\n");
 // #endif
   /* Codegen context */
-  new_prog->codegen_context = pluto_constraints_dup(prog->codegen_context);
+  if (prog->codegen_context != NULL)
+    new_prog->codegen_context = pluto_constraints_dup(prog->codegen_context);
 // #ifdef JIE_DEBUG
 //   fprintf(stdout, "[Debug] Stop 9.\n");
 // #endif
   /* Temp autotransform data*/
-  new_prog->globcst = pluto_constraints_dup(prog->globcst);
+  if (prog->globcst != NULL)
+    new_prog->globcst = pluto_constraints_dup(prog->globcst);
 // #ifdef JIE_DEBUG
 //   fprintf(stdout, "[Debug] Stop 10.\n");
 // #endif

@@ -592,10 +592,22 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
   }
   IF_MORE_DEBUG(pluto_prog_print(stdout, prog));
 
+/*
+ * *******************************************
+ * Stage: Array Generation
+ * Step: Dependence Analysis
+ * *******************************************
+ */
+
 /* Jie Added - Start */  
   fprintf(stdout, "[PSA] Filter out redundant dependences.\n");
   /* Filter out RAR dependences on scalar variables */
   rar_scalar_filter(prog);
+  /* Delete the detected RAR dependences by ISL, RAR deps will be added back later */
+  if (options->rar) {
+    fprintf(stdout, "[PSA] Filter out RAR dependences.\n");
+    rar_filter(prog);
+  }
 /* Jie Added - End */  
 
   int dim_sum = 0;
@@ -640,490 +652,461 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
 #endif
 /* Jie Added - End */
 
-//#ifdef JIE_DEBUG
-//  fprintf(stdout, "print out the dependences\n");
-//  for (i = 0; i < prog->ndeps; i++) {
-//    Dep *dep = prog->deps[i];
-//    fprintf(stdout, "[Debug] Dependence ID: %d\n", i);
-//    fprintf(stdout, "[Debug] src ID: %d\n", dep->src);
-//    fprintf(stdout, "[Debug] dest ID: %d\n", dep->dest);
-//    PlutoConstraints* dpolytope = dep->dpolytope;
-//    pluto_constraints_pretty_print(stdout, dpolytope);
-//   //fprintf(stdout, "[Debug] type: %d\n", dep->type);
-//    if (IS_WAR(dep->type)) {
-//      fprintf(stdout, "[Debug] type: WAR\n");
-//    } else if (IS_WAW(dep->type)) {
-//      fprintf(stdout, "[Debug] type: WAW\n");
-//    } else if (IS_RAW(dep->type)) {
-//      fprintf(stdout, "[Debug] type: RAW\n");
-//    } else if (IS_RAR(dep->type)) {
-//      fprintf(stdout, "[Debug] type: RAR\n");
-//    }
-//    PlutoAccess *acc = dep->src_acc;
-//    fprintf(stdout, "[Debug] name: %s\n", acc->name);
-//  //  if (IS_RAR(dep->type)) {
-//  //    // print out access functions of RAR deps
-//  //    PlutoAccess *acc = dep->src_acc;
-//  //    fprintf(stdout, "[Debug] name: %s\n", acc->name);
-//  //    pluto_matrix_print(stdout, acc->mat);
-//  //  }
-//  }
-//
-//  fprintf(stdout, "print out the trans dependences\n");
-//  for (i = 0; i < prog->ntransdeps; i++) {
-//    Dep *dep = prog->transdeps[i];
-//    fprintf(stdout, "[Debug] Dependence ID: %d\n", i);
-//    fprintf(stdout, "[Debug] src ID: %d\n", dep->src);
-//    fprintf(stdout, "[Debug] dest ID: %d\n", dep->dest);
-//    PlutoConstraints* dpolytope = dep->dpolytope;
-//    pluto_constraints_pretty_print(stdout, dpolytope);
-//   //fprintf(stdout, "[Debug] type: %d\n", dep->type);
-//    if (IS_WAR(dep->type)) {
-//      fprintf(stdout, "[Debug] type: WAR\n");
-//    } else if (IS_WAW(dep->type)) {
-//      fprintf(stdout, "[Debug] type: WAW\n");
-//    } else if (IS_RAW(dep->type)) {
-//      fprintf(stdout, "[Debug] type: RAW\n");
-//    } else if (IS_RAR(dep->type)) {
-//      fprintf(stdout, "[Debug] type: RAR\n");
-//    }
-//    PlutoAccess *acc = dep->src_acc;
-//    fprintf(stdout, "[Debug] name: %s\n", acc->name);    
-//  }
-//#endif
-
   if (options->iss) {
     pluto_iss_dep(prog);
   }
 
-/*
- * *******************************************
- * Stage: Array Generation
- * Step: Pluto Transformation
- * *******************************************
- */
-  if (!options->silent) {
-    fprintf(
-        stdout,
-        "[pluto] Original scheduling [<iter coeff's> <param> <const>]\n\n");
-    /* Print out transformations */
-    pluto_transformations_pretty_print(prog);
-  }
-
-  t_start = rtclock();
-  fprintf(stdout, "[PSA] Run Pluto's Algorithm.\n");
-  /* Auto transformation */
-  if (!options->identity) {
-    pluto_auto_transform(prog);
-  }
-  t_t = rtclock() - t_start;
-
-  pluto_compute_dep_directions(prog);
-  pluto_compute_dep_satisfaction(prog);
-
-  if (!options->silent) {
-    fprintf(
-        stdout,
-        "[pluto] Affine transformations [<iter coeff's> <param> <const>]\n\n");
-    /* Print out transformations */
-    pluto_transformations_pretty_print(prog);
-  }
-
   /* Jie Added - Start */
-#ifdef PRINT_PLUTO_TRANS_PROGRAM
-  fprintf(stdout, "[PSA] Dump out the transformed program after Pluto's algorithm.\n");
-  /* Get basename */
-  char *basec, *bname;
-  basec = strdup(srcFileName);
-  bname = basename(basec);
-
-  char *dumpFileName;
-  dumpFileName = malloc(strlen(bname) - 2 + strlen(".pluto_transform.c") + 1);
-  strncpy(dumpFileName, bname, strlen(bname) - 2);
-  dumpFileName[strlen(bname) - 2] = '\0';
-  strcat(dumpFileName, ".pluto_transform.c");
-
-  char *cloogFileName;
-  cloogFileName = malloc(strlen(bname) - 2 + strlen(".pluto_transform.cloog") + 1);
-  strncpy(cloogFileName, bname, strlen(bname) - 2);
-  cloogFileName[strlen(bname) - 2] = '\0';
-  strcat(cloogFileName, ".pluto_transform.cloog");
-  free(basec);
-
-  // Write Cloog File
-  // FILE *cloogfp, *outfp;
-  cloogfp = fopen(cloogFileName, "w+");
-  if (!cloogfp) {
-    fprintf(stderr, "[PSA] Can't open .cloog file: '%s'\n", cloogFileName);
-    free(cloogFileName);
-    pluto_options_free(options);
-    pluto_prog_free(prog);
-    return 9;
-  }
-  free(cloogFileName);
-
-  outfp = fopen(dumpFileName, "w");
-  if (!outfp) {
-    fprintf(stderr, "[PSA] Can't open file '%s' for writing", dumpFileName);
-    free(dumpFileName);
-    pluto_options_free(options);
-    pluto_prog_free(prog);
-    fclose(outfp);
-    return 10;
-  }
-
-  pluto_gen_cloog_file(cloogfp, prog);
-  /* Add the <irregular> tag from clan, if any */
-  if (!options->pet) {
-    if (irroption) {
-      fprintf(cloogfp, "<irregular>\n%s\n</irregular>\n\n", irroption);
-      free(irroption);
-    }
-  }
-  rewind(cloogfp);
-
-  /* Generate code using Cloog */
-  psa_generate_declarations(prog, outfp);
-  fprintf(stdout, "[Debug] number of hyps: %d\n", prog->num_hyperplanes);
-  pluto_gen_cloog_code(prog, prog->num_hyperplanes, 1, cloogfp, outfp);
-
-  free(dumpFileName);
-  fclose(cloogfp);
-  fclose(outfp);
-#endif
+  /* Analyze the data reuse and add RAR dependences */
+  PlutoProg **reuse_progs;
+  int num_reuse_progs;
+  reuse_progs = psa_reuse_analysis(prog, &num_reuse_progs);
+  fprintf(stdout, "[PSA] %d programs generated after reuse analysis.\n", num_reuse_progs);
+//  if (pluto_prog_cmp(prog, reuse_progs[0])) {
+//    fprintf(stdout, "[PSA-Debug] new prog is different!\n");
+//  }
+  //prog = reuse_progs[0];
   /* Jie Added - End */
-
-  /* Jie Added - Start */
-  /* Dependence Checker for Systolic Array */
-  // TODO: Move this part to post-auto-transform phase
-#ifdef PRINT_DEPS_POST_TRANSFORM
-  fprintf(stdout, "[PSA] Print out the dependences.\n");
-  fprintf(stdout, "[PSA] Total number of dependences: %d\n", prog->ndeps);
-  for (i = 0; i < prog->ndeps; i++) {
-    Dep *dep = prog->deps[i];
-    fprintf(stdout, "***********************\n");
-    fprintf(stdout, "[PSA] Dependences ID: %d\n", i);
-    fprintf(stdout, "[PSA] Src stmt ID: %d\n", dep->src);
-    fprintf(stdout, "[PSA] Dest stmt ID: %d\n", dep->dest);
-    if (IS_WAR(dep->type)) {
-      fprintf(stdout, "[PSA] Dep type: WAR\n");
-    } else if (IS_WAW(dep->type)) {
-      fprintf(stdout, "[PSA] Dep type: WAW\n");
-    } else if (IS_RAW(dep->type)) {
-      fprintf(stdout, "[PSA] Dep type: RAW\n");
-    } else if (IS_RAR(dep->type)) {
-      fprintf(stdout, "[PSA] Dep type: RAR\n");
+  
+//  for (int reuse_prog_id = 0; reuse_prog_id < num_reuse_progs; reuse_prog_id++) {
+  for (int reuse_prog_id = 0; reuse_prog_id < 1; reuse_prog_id++) {
+    prog = reuse_progs[reuse_prog_id];
+  /*
+   * *******************************************
+   * Stage: Array Generation
+   * Step: Pluto Transformation
+   * *******************************************
+   */
+    if (!options->silent) {
+      fprintf(
+          stdout,
+          "[pluto] Original scheduling [<iter coeff's> <param> <const>]\n\n");
+      /* Print out transformations */
+      pluto_transformations_pretty_print(prog);
     }
-    PlutoConstraints* dpolytope = dep->dpolytope;
-    pluto_constraints_pretty_print(stdout, dpolytope);
-    fprintf(stdout, "***********************\n");
-  }
-#endif
-
-  fprintf(stdout, "[PSA] Check uniformity of the design.\n");
-  bool is_uniform = systolic_array_dep_checker(prog);
-  if (!is_uniform) {
-    fprintf(stdout, "[PSA] Non-uniform dependence detected.\n");
-    return 1;
-  }
-//#ifdef JIE_DEBUG
-  fprintf(stdout, "[PSA] Uniformity: %d\n", is_uniform);
-//#endif
-
-  /* Jie Added - End */
-
-/*
- * *******************************************
- * Stage: Array Generation
- * Step: Space-time Remapping
- * *******************************************
- */
-
-  /* Jie Added - Start */
-#ifdef SPACE_TIME_MAPPING  
-  fprintf(stdout, "[PSA] Explore different systolic array candidates.\n");
-  PlutoProg** progs;
-  int nprogs;
-  progs = sa_candidates_generation(prog, &nprogs);
-  fprintf(stdout, "[PSA] Number of array candidates: %d\n", nprogs);
-// #ifdef JIE_DEBUG  
-//   if (progs[0] == NULL) {
-//     fprintf(stdout, "[Debug] progs pointer NULL!\n");
-//   }
-// #endif  
-  //prog = progs[0];
-#endif
-  /* Jie Added - End */
-
-  unsigned prog_id;
-  //for (prog_id = 0; prog_id < nprogs; prog_id++) {
-  for (prog_id = 3; prog_id < 4; prog_id++) {    
-    VSA *psa_vsa = vsa_alloc();    
-
-    prog = progs[prog_id];
-
-    /* OP_NUM, RES_NUM, OP_DIM, RES_DIM, OP_NAME, RES_NAME */      
-    vsa_op_res_extract(prog, psa_vsa);
-    /* Extract OP_CHANNEL_DIR and RES_CHANNEL_DIR */    
-    vsa_channel_dir_extract(prog, psa_vsa);    
-    /* TYPE */
-    vsa_type_extract(prog, psa_vsa);
-    /* Jie Added - End */
-
-// #ifdef JIE_DEBUG
-//     fprintf(stdout, "[Debug1] prog ntransdeps: %d\n", prog->ntransdeps);
-//     fprintf(stdout, "[Debug1] prog transdep[2] nrows: %d\n", prog->transdeps[2]->dpolytope->nrows);
-//     fprintf(stdout, "[Debug1] prog transdep[2] ncols: %d\n", prog->transdeps[2]->dpolytope->ncols);
-//     pluto_constraints_pretty_print(stdout, prog->transdeps[2]->dpolytope);
-// #endif    
-
-    /* NOTE: Due to the supernode tiling, we will tile from the lower level to 
-     * upper level. Therefore, we will perform the intra-PE optimization first,
-     * then, array tiling.
-     */
-
-/*
- * *******************************************
- * Stage: PE Optimization
- * Step: Latency Hiding
- * *******************************************
- */
+  
+    t_start = rtclock();
+    fprintf(stdout, "[PSA] Run Pluto's Algorithm.\n");
+    /* Auto transformation */
+    if (!options->identity) {
+      pluto_auto_transform(prog);
+    }
+    t_t = rtclock() - t_start;
+  
+    pluto_compute_dep_directions(prog);
+    pluto_compute_dep_satisfaction(prog);
+  
+    if (!options->silent) {
+      fprintf(
+          stdout,
+          "[pluto] Affine transformations [<iter coeff's> <param> <const>]\n\n");
+      /* Print out transformations */
+      pluto_transformations_pretty_print(prog);
+    }
+  
     /* Jie Added - Start */
-#ifdef LATENCY_HIDING     
-    if (options->tile) {
-      fprintf(stdout, "[PSA] Apply PE Optimization.\n");
-      psa_pe_optimize(prog, psa_vsa);      
-    }
-#endif    
-    /* Jie Added - End */
-
-/*
- * *******************************************
- * Stage: PE Optimization
- * Step: Array Partitioning
- * *******************************************
- */
-
-    /* Jie Added - Start */
-#ifdef ARRAY_PARTITIONING    
-    if (options->tile) {
-      fprintf(stdout, "[PSA] Apply array partitioning.\n");
-      psa_array_partition(prog);
-    }
-#endif    
-    
-// #ifdef JIE_DEBUG
-//     fprintf(stdout, "[Debug2] prog ntransdeps: %d\n", prog->ntransdeps);
-//     fprintf(stdout, "[Debug2] prog transdep[2] nrows: %d\n", prog->transdeps[2]->dpolytope->nrows);
-//     fprintf(stdout, "[Debug2] prog transdep[2] ncols: %d\n", prog->transdeps[2]->dpolytope->ncols);
-//     pluto_constraints_pretty_print(stdout, prog->transdeps[2]->dpolytope);
-// #endif    
-
-// #ifdef JIE_DEBUG
-//     fprintf(stdout, "[Debug3] prog ntransdeps: %d\n", prog->ntransdeps);
-//     fprintf(stdout, "[Debug3] prog transdep[2] nrows: %d\n", prog->transdeps[2]->dpolytope->nrows);
-//     fprintf(stdout, "[Debug3] prog transdep[2] ncols: %d\n", prog->transdeps[2]->dpolytope->ncols);
-// #endif
-
-// #ifdef JIE_DEBUG
-//     fprintf(stdout, "[Debug4] prog ntransdeps: %d\n", prog->ntransdeps);
-//     fprintf(stdout, "[Debug4] prog transdep[2] nrows: %d\n", prog->transdeps[2]->dpolytope->nrows);
-//     fprintf(stdout, "[Debug4] prog transdep[2] ncols: %d\n", prog->transdeps[2]->dpolytope->ncols);
-// #endif    
-    /* Jie Added - Start */
-    fprintf(stdout, "[PSA] Generate Virtual Systolic Array (VSA).\n");    
-    /* Complete the rest of VSA fields */
-    pluto_prog_to_vsa(prog, psa_vsa);
-    FILE *vsa_fp = fopen("vsa.json", "w");
-    if (vsa_fp) {
-      psa_vsa_pretty_print(vsa_fp, psa_vsa);
-    } else {
-      fprintf(stdout, "[PSA] ERROR! File %s can't be opened!\n", "vsa.json");
-      return 1;
-    }
-    fclose(vsa_fp);
-
-    /* Jie Added - End */
-
-    // if (options->tile) {
-    //   pluto_tile(prog);
-    // } else {
-    //   if (options->intratileopt) {
-    //     pluto_intra_tile_optimize(prog, 0);
-    //   }
-    // }
+  #ifdef PRINT_PLUTO_TRANS_PROGRAM
+    fprintf(stdout, "[PSA] Dump out the transformed program after Pluto's algorithm.\n");
+    /* Get basename */
+    char *basec, *bname;
+    basec = strdup(srcFileName);
+    bname = basename(basec);
   
-    // if (options->parallel && !options->tile && !options->identity) {
-    //   /* Obtain wavefront/pipelined parallelization by skewing if
-    //    * necessary */
-    //   unsigned nbands;
-    //   Band **bands;
-    //   pluto_compute_dep_satisfaction(prog);
-    //   bands = pluto_get_outermost_permutable_bands(prog, &nbands);
-    //   bool retval = pluto_create_tile_schedule(prog, bands, nbands);
-    //   pluto_bands_free(bands, nbands);
+    char *dumpFileName;
+    dumpFileName = malloc(strlen(bname) - 2 + strlen(".pluto_transform.c") + 1);
+    strncpy(dumpFileName, bname, strlen(bname) - 2);
+    dumpFileName[strlen(bname) - 2] = '\0';
+    strcat(dumpFileName, ".pluto_transform.c");
   
-    //   /* If the user hasn't supplied --tile and there is only pipelined
-    //    * parallelism, we will warn the user */
-    //   if (retval) {
-    //     printf("[pluto] WARNING: pipelined parallelism exists and --tile is not "
-    //            "used.\n");
-    //     printf("\tUse --tile for better parallelization \n");
-    //     fprintf(stdout, "[pluto] After skewing:\n");
-    //     pluto_transformations_pretty_print(prog);
-    //   }
-    // }
+    char *cloogFileName;
+    cloogFileName = malloc(strlen(bname) - 2 + strlen(".pluto_transform.cloog") + 1);
+    strncpy(cloogFileName, bname, strlen(bname) - 2);
+    cloogFileName[strlen(bname) - 2] = '\0';
+    strcat(cloogFileName, ".pluto_transform.cloog");
+    free(basec);
   
-    // if (options->unroll) {
-    //   /* Will generate a .unroll file */
-    //   /* plann/plorc needs a .params */
-    //   FILE *paramsFP = fopen(".params", "w");
-    //   if (paramsFP) {
-    //     int i;
-    //     for (i = 0; i < prog->npar; i++) {
-    //       fprintf(paramsFP, "%s\n", prog->params[i]);
-    //     }
-    //     fclose(paramsFP);
-    //   }
-    //   pluto_detect_mark_unrollable_loops(prog);
-    // }
-  
-    if (!options->pet && !strcmp(srcFileName, "stdin")) {
-      // input stdin == output stdout
-      pluto_populate_scop(scop, prog, options);
-      osl_scop_print(stdout, scop);
-    } else { // do the usual Pluto stuff
-  
-      /* NO MORE TRANSFORMATIONS BEYOND THIS POINT */
-      /* Since meta info about loops is printed to be processed by scripts - if
-       * transformations are performed, changed loop order/iterator names will
-       * be missed. */
-      gen_unroll_file(prog);
-  
-      char *basec, *bname;
-      char *outFileName;
-      if (options->out_file == NULL) {
-        /* Get basename, remove .c extension and append a new one */
-        basec = strdup(srcFileName);
-        bname = basename(basec);
-  
-        /* max size when tiled.* */
-        outFileName = malloc(strlen(bname) + strlen(".pluto.c") + 1);
-  
-        if (strlen(bname) >= 2 && !strcmp(bname + strlen(bname) - 2, ".c")) {
-          memcpy(outFileName, bname, strlen(bname) - 2);
-          outFileName[strlen(bname) - 2] = '\0';
-        } else {
-          outFileName = malloc(strlen(bname) + strlen(".pluto.c") + 1);
-          strcpy(outFileName, bname);
-        }
-        strcat(outFileName, ".pluto.c");
-      } else {
-        basec = strdup(options->out_file);
-        bname = basename(basec);
-  
-        outFileName = malloc(strlen(options->out_file) + 1);
-        strcpy(outFileName, options->out_file);
-      }
-  
-      char *cloogFileName;
-      if (strlen(bname) >= 2 && !strcmp(bname + strlen(bname) - 2, ".c")) {
-        cloogFileName = malloc(strlen(bname) - 2 + strlen(".pluto.cloog") + 1);
-        strncpy(cloogFileName, bname, strlen(bname) - 2);
-        cloogFileName[strlen(bname) - 2] = '\0';
-      } else {
-        cloogFileName = malloc(strlen(bname) + strlen(".pluto.cloog") + 1);
-        strcpy(cloogFileName, bname);
-      }
-      strcat(cloogFileName, ".pluto.cloog");
-      free(basec);
-  
-      cloogfp = fopen(cloogFileName, "w+");
-      if (!cloogfp) {
-        fprintf(stderr, "[Pluto] Can't open .cloog file: '%s'\n", cloogFileName);
-        free(cloogFileName);
-        pluto_options_free(options);
-        pluto_prog_free(prog);
-        return 9;
-      }
+    // Write Cloog File
+    // FILE *cloogfp, *outfp;
+    cloogfp = fopen(cloogFileName, "w+");
+    if (!cloogfp) {
+      fprintf(stderr, "[PSA] Can't open .cloog file: '%s'\n", cloogFileName);
       free(cloogFileName);
+      pluto_options_free(options);
+      pluto_prog_free(prog);
+      return 9;
+    }
+    free(cloogFileName);
   
-      outfp = fopen(outFileName, "w");
-      if (!outfp) {
-        fprintf(stderr, "[Pluto] Can't open file '%s' for writing\n",
-                outFileName);
-        free(outFileName);
-        pluto_options_free(options);
-        pluto_prog_free(prog);
-        fclose(cloogfp);
-        return 10;
+    outfp = fopen(dumpFileName, "w");
+    if (!outfp) {
+      fprintf(stderr, "[PSA] Can't open file '%s' for writing", dumpFileName);
+      free(dumpFileName);
+      pluto_options_free(options);
+      pluto_prog_free(prog);
+      fclose(outfp);
+      return 10;
+    }
+  
+    pluto_gen_cloog_file(cloogfp, prog);
+    /* Add the <irregular> tag from clan, if any */
+    if (!options->pet) {
+      if (irroption) {
+        fprintf(cloogfp, "<irregular>\n%s\n</irregular>\n\n", irroption);
+        free(irroption);
       }
+    }
+    rewind(cloogfp);
   
-      if (options->moredebug) {
-        printf("After scalar dimension detection (final transformations)\n");
-        pluto_transformations_pretty_print(prog);
+    /* Generate code using Cloog */
+    psa_generate_declarations(prog, outfp);
+    fprintf(stdout, "[Debug] number of hyps: %d\n", prog->num_hyperplanes);
+    pluto_gen_cloog_code(prog, prog->num_hyperplanes, 1, cloogfp, outfp);
+  
+    free(dumpFileName);
+    fclose(cloogfp);
+    fclose(outfp);
+  #endif
+    /* Jie Added - End */
+  
+    /* Jie Added - Start */
+    /* Dependence Checker for Systolic Array */
+    // TODO: Move this part to post-auto-transform phase
+  #ifdef PRINT_DEPS_POST_TRANSFORM
+    fprintf(stdout, "[PSA] Print out the dependences.\n");
+    fprintf(stdout, "[PSA] Total number of dependences: %d\n", prog->ndeps);
+    for (i = 0; i < prog->ndeps; i++) {
+      Dep *dep = prog->deps[i];
+      fprintf(stdout, "***********************\n");
+      fprintf(stdout, "[PSA] Dependences ID: %d\n", i);
+      fprintf(stdout, "[PSA] Src stmt ID: %d\n", dep->src);
+      fprintf(stdout, "[PSA] Dest stmt ID: %d\n", dep->dest);
+      if (IS_WAR(dep->type)) {
+        fprintf(stdout, "[PSA] Dep type: WAR\n");
+      } else if (IS_WAW(dep->type)) {
+        fprintf(stdout, "[PSA] Dep type: WAW\n");
+      } else if (IS_RAW(dep->type)) {
+        fprintf(stdout, "[PSA] Dep type: RAW\n");
+      } else if (IS_RAR(dep->type)) {
+        fprintf(stdout, "[PSA] Dep type: RAR\n");
       }
+      PlutoConstraints* dpolytope = dep->dpolytope;
+      pluto_constraints_pretty_print(stdout, dpolytope);
+      fprintf(stdout, "***********************\n");
+    }
+  #endif
+ 
+  /*
+   * *******************************************
+   * Stage: Array Generation
+   * Step: Uniform Dependence Checker
+   * *******************************************
+   */ 
+    fprintf(stdout, "[PSA] Check uniformity of the design.\n");
+    bool is_uniform = systolic_array_dep_checker(prog);
+    if (!is_uniform) {
+      fprintf(stdout, "[PSA] Non-uniform dependence detected.\n");
+      // return 1;
+      continue;
+    }
+  //#ifdef JIE_DEBUG
+    fprintf(stdout, "[PSA] Uniformity: %d\n", is_uniform);
+  //#endif
   
-      /* Generate .cloog file */
-      pluto_gen_cloog_file(cloogfp, prog);
-      /* Add the <irregular> tag from clan, if any */
-      if (!options->pet) {
-        if (irroption) {
-          fprintf(cloogfp, "<irregular>\n%s\n</irregular>\n\n", irroption);
-          free(irroption);
-        }
-      }
-      rewind(cloogfp);
+    /* Jie Added - End */
   
-      /* Very important: Dont change the order of calls to print_dynsched_file
-       * between pluto_gen_cloog_file() and pluto_*_codegen()
+  /*
+   * *******************************************
+   * Stage: Array Generation
+   * Step: Space-time Remapping
+   * *******************************************
+   */
+  
+    /* Jie Added - Start */
+  #ifdef SPACE_TIME_MAPPING  
+    fprintf(stdout, "[PSA] Explore different systolic array candidates.\n");
+    PlutoProg** progs;
+    int nprogs;
+    progs = sa_candidates_generation(prog, &nprogs);
+    fprintf(stdout, "[PSA] Number of array candidates: %d\n", nprogs);
+  // #ifdef JIE_DEBUG  
+  //   if (progs[0] == NULL) {
+  //     fprintf(stdout, "[Debug] progs pointer NULL!\n");
+  //   }
+  // #endif  
+    //prog = progs[0];
+  #endif
+    /* Jie Added - End */
+  
+    unsigned prog_id;
+    //for (prog_id = 0; prog_id < nprogs; prog_id++) {
+    for (prog_id = 0; prog_id < 1; prog_id++) {    
+      VSA *psa_vsa = vsa_alloc();    
+  
+      prog = progs[prog_id];
+  
+      /* OP_NUM, RES_NUM, OP_DIM, RES_DIM, OP_NAME, RES_NAME */      
+      vsa_op_res_extract(prog, psa_vsa);
+      /* Extract OP_CHANNEL_DIR and RES_CHANNEL_DIR */    
+      vsa_channel_dir_extract(prog, psa_vsa);    
+      /* TYPE */
+      vsa_type_extract(prog, psa_vsa);
+      /* Jie Added - End */
+  
+  // #ifdef JIE_DEBUG
+  //     fprintf(stdout, "[Debug1] prog ntransdeps: %d\n", prog->ntransdeps);
+  //     fprintf(stdout, "[Debug1] prog transdep[2] nrows: %d\n", prog->transdeps[2]->dpolytope->nrows);
+  //     fprintf(stdout, "[Debug1] prog transdep[2] ncols: %d\n", prog->transdeps[2]->dpolytope->ncols);
+  //     pluto_constraints_pretty_print(stdout, prog->transdeps[2]->dpolytope);
+  // #endif    
+  
+      /* NOTE: Due to the supernode tiling, we will tile from the lower level to 
+       * upper level. Therefore, we will perform the intra-PE optimization first,
+       * then, array tiling.
        */
   
-      /* Generate code using Cloog and add necessary stuff before/after code */
-      t_start = rtclock();
-      pluto_multicore_codegen(cloogfp, outfp, prog);
-      t_c = rtclock() - t_start;
-  
-      FILE *tmpfp = fopen(".outfilename", "w");
-      if (tmpfp) {
-        fprintf(tmpfp, "%s\n", outFileName);
-        fclose(tmpfp);
-        PLUTO_MESSAGE(printf("[Pluto] Output written to %s\n", outFileName););
+  /*
+   * *******************************************
+   * Stage: PE Optimization
+   * Step: Latency Hiding
+   * *******************************************
+   */
+      /* Jie Added - Start */
+  #ifdef LATENCY_HIDING     
+      if (options->tile) {
+        fprintf(stdout, "[PSA] Apply PE Optimization.\n");
+        psa_pe_optimize(prog, psa_vsa);      
       }
-      free(outFileName);
+  #endif    
+      /* Jie Added - End */
   
-      fclose(cloogfp);
-      fclose(outfp);
-    }
+  /*
+   * *******************************************
+   * Stage: PE Optimization
+   * Step: Array Partitioning
+   * *******************************************
+   */
   
-    t_all = rtclock() - t_start_all;
-  
-    if (options->time && !options->silent) {
-      printf("\n[pluto] Timing statistics\n[pluto] SCoP extraction + dependence "
-             "analysis time: %0.6lfs\n",
-             t_d);
-      printf("[pluto] Auto-transformation time: %0.6lfs\n", t_t);
-      if (options->dfp) {
-        printf("[pluto] \t\tTotal FCG Construction Time: %0.6lfs\n",
-               prog->fcg_const_time);
-        printf("[pluto] \t\tTotal FCG Colouring Time: %0.6lfs\n",
-               prog->fcg_colour_time);
-        printf("[pluto] \t\tTotal Scaling + Shifting time: %0.6lfs\n",
-               prog->fcg_dims_scale_time);
-        printf("[pluto] \t\tTotal Skewing time: %0.6lfs\n", prog->skew_time);
+      /* Jie Added - Start */
+  #ifdef ARRAY_PARTITIONING    
+      if (options->tile) {
+        fprintf(stdout, "[PSA] Apply array partitioning.\n");
+        psa_array_partition(prog);
       }
-      printf("[pluto] \t\tTotal constraint solving time (LP/MIP/ILP) time: "
-             "%0.6lfs\n",
-             prog->mipTime);
-      printf("[pluto] Code generation time: %0.6lfs\n", t_c);
-      printf("[pluto] Other/Misc time: %0.6lfs\n", t_all - t_c - t_t - t_d);
-      printf("[pluto] Total time: %0.6lfs\n", t_all);
-      printf("[pluto] All times: %0.6lf %0.6lf %.6lf %.6lf\n", t_d, t_t, t_c,
-             t_all - t_c - t_t - t_d);
-    }
+  #endif    
+      
+  // #ifdef JIE_DEBUG
+  //     fprintf(stdout, "[Debug2] prog ntransdeps: %d\n", prog->ntransdeps);
+  //     fprintf(stdout, "[Debug2] prog transdep[2] nrows: %d\n", prog->transdeps[2]->dpolytope->nrows);
+  //     fprintf(stdout, "[Debug2] prog transdep[2] ncols: %d\n", prog->transdeps[2]->dpolytope->ncols);
+  //     pluto_constraints_pretty_print(stdout, prog->transdeps[2]->dpolytope);
+  // #endif    
   
-    pluto_prog_free(prog);
-
+  // #ifdef JIE_DEBUG
+  //     fprintf(stdout, "[Debug3] prog ntransdeps: %d\n", prog->ntransdeps);
+  //     fprintf(stdout, "[Debug3] prog transdep[2] nrows: %d\n", prog->transdeps[2]->dpolytope->nrows);
+  //     fprintf(stdout, "[Debug3] prog transdep[2] ncols: %d\n", prog->transdeps[2]->dpolytope->ncols);
+  // #endif
+  
+  // #ifdef JIE_DEBUG
+  //     fprintf(stdout, "[Debug4] prog ntransdeps: %d\n", prog->ntransdeps);
+  //     fprintf(stdout, "[Debug4] prog transdep[2] nrows: %d\n", prog->transdeps[2]->dpolytope->nrows);
+  //     fprintf(stdout, "[Debug4] prog transdep[2] ncols: %d\n", prog->transdeps[2]->dpolytope->ncols);
+  // #endif    
+      /* Jie Added - Start */
+      fprintf(stdout, "[PSA] Generate Virtual Systolic Array (VSA).\n");    
+      /* Complete the rest of VSA fields */
+      pluto_prog_to_vsa(prog, psa_vsa);
+      FILE *vsa_fp = fopen("vsa.json", "w");
+      if (vsa_fp) {
+        psa_vsa_pretty_print(vsa_fp, psa_vsa);
+      } else {
+        fprintf(stdout, "[PSA] ERROR! File %s can't be opened!\n", "vsa.json");
+        return 1;
+      }
+      fclose(vsa_fp);
+  
+      /* Jie Added - End */
+  
+      // if (options->tile) {
+      //   pluto_tile(prog);
+      // } else {
+      //   if (options->intratileopt) {
+      //     pluto_intra_tile_optimize(prog, 0);
+      //   }
+      // }
+    
+      // if (options->parallel && !options->tile && !options->identity) {
+      //   /* Obtain wavefront/pipelined parallelization by skewing if
+      //    * necessary */
+      //   unsigned nbands;
+      //   Band **bands;
+      //   pluto_compute_dep_satisfaction(prog);
+      //   bands = pluto_get_outermost_permutable_bands(prog, &nbands);
+      //   bool retval = pluto_create_tile_schedule(prog, bands, nbands);
+      //   pluto_bands_free(bands, nbands);
+    
+      //   /* If the user hasn't supplied --tile and there is only pipelined
+      //    * parallelism, we will warn the user */
+      //   if (retval) {
+      //     printf("[pluto] WARNING: pipelined parallelism exists and --tile is not "
+      //            "used.\n");
+      //     printf("\tUse --tile for better parallelization \n");
+      //     fprintf(stdout, "[pluto] After skewing:\n");
+      //     pluto_transformations_pretty_print(prog);
+      //   }
+      // }
+    
+      // if (options->unroll) {
+      //   /* Will generate a .unroll file */
+      //   /* plann/plorc needs a .params */
+      //   FILE *paramsFP = fopen(".params", "w");
+      //   if (paramsFP) {
+      //     int i;
+      //     for (i = 0; i < prog->npar; i++) {
+      //       fprintf(paramsFP, "%s\n", prog->params[i]);
+      //     }
+      //     fclose(paramsFP);
+      //   }
+      //   pluto_detect_mark_unrollable_loops(prog);
+      // }
+    
+      if (!options->pet && !strcmp(srcFileName, "stdin")) {
+        // input stdin == output stdout
+        pluto_populate_scop(scop, prog, options);
+        osl_scop_print(stdout, scop);
+      } else { // do the usual Pluto stuff
+    
+        /* NO MORE TRANSFORMATIONS BEYOND THIS POINT */
+        /* Since meta info about loops is printed to be processed by scripts - if
+         * transformations are performed, changed loop order/iterator names will
+         * be missed. */
+        gen_unroll_file(prog);
+    
+        char *basec, *bname;
+        char *outFileName;
+        if (options->out_file == NULL) {
+          /* Get basename, remove .c extension and append a new one */
+          basec = strdup(srcFileName);
+          bname = basename(basec);
+    
+          /* max size when tiled.* */
+          outFileName = malloc(strlen(bname) + strlen(".pluto.c") + 1);
+    
+          if (strlen(bname) >= 2 && !strcmp(bname + strlen(bname) - 2, ".c")) {
+            memcpy(outFileName, bname, strlen(bname) - 2);
+            outFileName[strlen(bname) - 2] = '\0';
+          } else {
+            outFileName = malloc(strlen(bname) + strlen(".pluto.c") + 1);
+            strcpy(outFileName, bname);
+          }
+          strcat(outFileName, ".pluto.c");
+        } else {
+          basec = strdup(options->out_file);
+          bname = basename(basec);
+    
+          outFileName = malloc(strlen(options->out_file) + 1);
+          strcpy(outFileName, options->out_file);
+        }
+    
+        char *cloogFileName;
+        if (strlen(bname) >= 2 && !strcmp(bname + strlen(bname) - 2, ".c")) {
+          cloogFileName = malloc(strlen(bname) - 2 + strlen(".pluto.cloog") + 1);
+          strncpy(cloogFileName, bname, strlen(bname) - 2);
+          cloogFileName[strlen(bname) - 2] = '\0';
+        } else {
+          cloogFileName = malloc(strlen(bname) + strlen(".pluto.cloog") + 1);
+          strcpy(cloogFileName, bname);
+        }
+        strcat(cloogFileName, ".pluto.cloog");
+        free(basec);
+    
+        cloogfp = fopen(cloogFileName, "w+");
+        if (!cloogfp) {
+          fprintf(stderr, "[Pluto] Can't open .cloog file: '%s'\n", cloogFileName);
+          free(cloogFileName);
+          pluto_options_free(options);
+          pluto_prog_free(prog);
+          return 9;
+        }
+        free(cloogFileName);
+    
+        outfp = fopen(outFileName, "w");
+        if (!outfp) {
+          fprintf(stderr, "[Pluto] Can't open file '%s' for writing\n",
+                  outFileName);
+          free(outFileName);
+          pluto_options_free(options);
+          pluto_prog_free(prog);
+          fclose(cloogfp);
+          return 10;
+        }
+    
+        if (options->moredebug) {
+          printf("After scalar dimension detection (final transformations)\n");
+          pluto_transformations_pretty_print(prog);
+        }
+    
+        /* Generate .cloog file */
+        pluto_gen_cloog_file(cloogfp, prog);
+        /* Add the <irregular> tag from clan, if any */
+        if (!options->pet) {
+          if (irroption) {
+            fprintf(cloogfp, "<irregular>\n%s\n</irregular>\n\n", irroption);
+            free(irroption);
+          }
+        }
+        rewind(cloogfp);
+    
+        /* Very important: Dont change the order of calls to print_dynsched_file
+         * between pluto_gen_cloog_file() and pluto_*_codegen()
+         */
+    
+        /* Generate code using Cloog and add necessary stuff before/after code */
+        t_start = rtclock();
+        pluto_multicore_codegen(cloogfp, outfp, prog);
+        t_c = rtclock() - t_start;
+    
+        FILE *tmpfp = fopen(".outfilename", "w");
+        if (tmpfp) {
+          fprintf(tmpfp, "%s\n", outFileName);
+          fclose(tmpfp);
+          PLUTO_MESSAGE(printf("[Pluto] Output written to %s\n", outFileName););
+        }
+        free(outFileName);
+    
+        fclose(cloogfp);
+        fclose(outfp);
+      }
+    
+      t_all = rtclock() - t_start_all;
+    
+      if (options->time && !options->silent) {
+        printf("\n[pluto] Timing statistics\n[pluto] SCoP extraction + dependence "
+               "analysis time: %0.6lfs\n",
+               t_d);
+        printf("[pluto] Auto-transformation time: %0.6lfs\n", t_t);
+        if (options->dfp) {
+          printf("[pluto] \t\tTotal FCG Construction Time: %0.6lfs\n",
+                 prog->fcg_const_time);
+          printf("[pluto] \t\tTotal FCG Colouring Time: %0.6lfs\n",
+                 prog->fcg_colour_time);
+          printf("[pluto] \t\tTotal Scaling + Shifting time: %0.6lfs\n",
+                 prog->fcg_dims_scale_time);
+          printf("[pluto] \t\tTotal Skewing time: %0.6lfs\n", prog->skew_time);
+        }
+        printf("[pluto] \t\tTotal constraint solving time (LP/MIP/ILP) time: "
+               "%0.6lfs\n",
+               prog->mipTime);
+        printf("[pluto] Code generation time: %0.6lfs\n", t_c);
+        printf("[pluto] Other/Misc time: %0.6lfs\n", t_all - t_c - t_t - t_d);
+        printf("[pluto] Total time: %0.6lfs\n", t_all);
+        printf("[pluto] All times: %0.6lf %0.6lf %.6lf %.6lf\n", t_d, t_t, t_c,
+               t_all - t_c - t_t - t_d);
+      }
+    
+      pluto_prog_free(prog);
+      prog = NULL;
+    }
   }
   pluto_options_free(options);
 

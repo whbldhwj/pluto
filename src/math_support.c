@@ -261,6 +261,20 @@ PlutoMatrix *pluto_matrix_dup(const PlutoMatrix *src) {
   return dup;
 }
 
+/* Compare two matrices */
+int pluto_matrix_cmp(const PlutoMatrix *mat1, const PlutoMatrix *mat2) {
+  if (mat1->nrows != mat2->nrows)
+    return 1;
+  if (mat1->ncols != mat2->ncols)
+    return 1;
+  for (int i = 0; i < mat1->nrows; i++)
+    for (int j = 0; j < mat2->ncols; j++) {
+      if (mat1->val[i][j] != mat2->val[i][j])
+        return 1;
+    }
+  return 0;
+}
+
 /* Initialize matrix with val */
 void pluto_matrix_set(PlutoMatrix *mat, int val) {
   int i, j;
@@ -561,6 +575,26 @@ PlutoMatrix *pluto_matrix_from_isl_mat(__isl_keep isl_mat *mat) {
 
   return pluto;
 }
+
+/* Jie Added - Start */
+/* 
+ * Construct a isl_mat with the same content as the given PlutoMatrix
+ */ 
+__isl_keep isl_mat *pluto_matrix_to_isl_mat(PlutoMatrix *pluto_mat) {
+  isl_ctx *ctx = isl_ctx_alloc();
+  int nrows = pluto_mat->nrows;
+  int ncols = pluto_mat->ncols;
+  isl_mat *mat = isl_mat_alloc(ctx, pluto_mat->nrows, pluto_mat->ncols);
+
+  for (int i = 0; i < nrows; i++)
+    for (int j = 0; j < ncols; j++) {
+      isl_mat_set_element_si(mat, i, j, pluto_mat->val[i][j]);
+    }
+
+  isl_ctx_free(ctx);
+  return mat;
+}
+/* Jie Added - End */
 
 /*
  * Pretty prints a one-dimensional affine function

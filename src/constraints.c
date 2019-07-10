@@ -95,6 +95,23 @@ PlutoConstraints *pluto_constraints_alloc(int max_rows, int max_cols) {
   return cst;
 }
 
+int pluto_constraints_cmp(const PlutoConstraints *cst1, const PlutoConstraints *cst2) {
+  int diff = 0;
+  if (cst1->nrows != cst2->nrows)
+    diff = 1;
+  if (cst1->ncols != cst2->ncols)
+    diff = 2;
+  for (int i = 0; i < cst1->nrows; i++)
+    for (int j = 0; j < cst2->ncols; j++) {
+      if (cst1->val[i][j] != cst2->val[i][j]) {
+        diff = 3;
+        break;
+      }
+    }
+
+  return diff;
+}
+
 /* Initialize entire *allocated* constraints to zero; everything is also
  * initialized to inequality >= 0 */
 void pluto_constraints_zero(PlutoConstraints *cst) {

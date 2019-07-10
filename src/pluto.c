@@ -1851,6 +1851,8 @@ int pluto_auto_transform(PlutoProg *prog) {
 
     free(prog->total_coloured_stmts);
     free(prog->scaled_dims);
+    prog->total_coloured_stmts = NULL;
+    prog->scaled_dims = NULL;
 #endif
   } else {
 

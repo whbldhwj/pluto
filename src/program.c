@@ -1167,6 +1167,10 @@ static Stmt **osl_to_pluto_stmts(const osl_scop_p scop) {
   if (nstmts == 0)
     return NULL;
 
+  /* Jie Added - Start */
+  int acc_sym_id = 0;
+  /* Jie Added - End */
+
   /* Max dom dimensionality */
   nvar = -1;
   max_sched_rows = 0;
@@ -1260,6 +1264,11 @@ static Stmt **osl_to_pluto_stmts(const osl_scop_p scop) {
       PlutoMatrix *wmat = osl_access_relation_to_pluto_matrix(wlist->elt);
       stmt->writes[count] = (PlutoAccess *)malloc(sizeof(PlutoAccess));
       stmt->writes[count]->mat = wmat;
+      
+      /* Jie Added - Start */
+      stmt->writes[count]->sym_id = acc_sym_id;
+      acc_sym_id++;
+      /* Jie Added - End */
 
       // stmt->writes[count]->symbol = NULL;
       if (arrays) {
@@ -1279,6 +1288,11 @@ static Stmt **osl_to_pluto_stmts(const osl_scop_p scop) {
       PlutoMatrix *rmat = osl_access_relation_to_pluto_matrix(rlist->elt);
       stmt->reads[count] = (PlutoAccess *)malloc(sizeof(PlutoAccess));
       stmt->reads[count]->mat = rmat;
+
+      /* Jie Added - Start */
+      stmt->reads[count]->sym_id = acc_sym_id;
+      acc_sym_id++;
+      /* Jie Added - End */
 
       // stmt->reads[count]->symbol = NULL;
       if (arrays) {
@@ -2721,6 +2735,14 @@ PlutoProg *pluto_prog_alloc() {
   prog->num_parameterized_loops = -1;
 
   /* Jie Added - Start */
+  prog->options = NULL;
+  prog->evicted_hyp_pos = 0;
+  prog->scop = NULL;
+  prog->num_stmts_to_be_coloured = 0;
+  prog->scaled_dims = NULL;
+  prog->total_coloured_stmts = NULL;
+  prog->coloured_dims = 0;
+
   prog->array_dim = 0;
   prog->array_part_dim = 0;
   prog->array_nrow = 0;
@@ -2732,6 +2754,118 @@ PlutoProg *pluto_prog_alloc() {
   /* Jie Added - End */
 
   return prog;
+}
+
+int pluto_stmt_cmp(const Stmt *stmt1, const Stmt *stmt2) {
+  int diff = 0;
+  if (stmt1->id != stmt2->id)
+    diff = 1;
+  if (pluto_constraints_cmp(stmt1->domain, stmt2->domain))
+    diff = 2;
+  if (pluto_matrix_cmp(stmt1->trans, stmt2->trans))
+    diff = 3;
+  if (stmt1->nreads != stmt2->nreads) {
+    diff = 4;
+  } else {
+    for (int i = 0; i < stmt1->nreads; i++) {
+      if (pluto_access_cmp(stmt1->reads[i], stmt2->reads[i])) {
+        diff = 5;
+        break;
+      }
+    }
+  }
+  if (stmt1->nwrites != stmt2->nwrites) {
+    diff = 6;
+  } else {
+    for (int i = 0; i < stmt2->nwrites; i++) {
+      if (pluto_access_cmp(stmt1->writes[i], stmt2->writes[i])) {
+        diff = 7;
+        break;
+      }
+    }
+  }
+
+  return diff;
+}
+
+int pluto_dep_cmp(const Dep *dep1, const Dep *dep2) {
+  int diff = 0;
+  if (dep1->id != dep2->id)
+    diff = 1;
+  if (dep1->src != dep2->src)
+    diff = 2;
+  if (dep1->dest != dep2->dest)
+    diff = 3;
+  if (pluto_access_cmp(dep1->src_acc, dep2->src_acc))
+    diff = 4;
+  if (pluto_access_cmp(dep1->dest_acc, dep2->dest_acc))
+    diff = 5;
+  if (pluto_constraints_cmp(dep1->dpolytope, dep2->dpolytope))
+    diff = 6;
+  if (pluto_constraints_cmp(dep1->bounding_poly, dep2->bounding_poly))
+    diff = 7;
+
+  return diff;
+}
+
+int pluto_prog_cmp(const PlutoProg *prog1, const PlutoProg *prog2) {
+  int diff = 0;
+  printf("comparing two Pluto program...\n");
+  // stmts
+  if (prog1->nstmts != prog2->nstmts) {
+    fprintf(stdout, "nstmts mismatch!\n");
+    diff = 1;
+  } 
+  for (int i = 0; i < prog1->nstmts; i++) {
+    if(pluto_stmt_cmp(prog1->stmts[i], prog2->stmts[i])) {
+      fprintf(stdout, "stmt %d mismatch!\n", i);
+      diff = 1;
+    }
+  }
+  // deps
+  if (prog1->ndeps != prog2->ndeps) {
+    fprintf(stdout, "ndeps mismatch!\n");
+    diff = 1;
+  }
+  for (int i = 0; i < prog1->ndeps; i++) {
+    if (pluto_dep_cmp(prog1->deps[i], prog2->deps[i])) {
+      fprintf(stdout, "dep %d mismatch!\n", i);
+      diff = 1;
+    }
+  }
+  if (prog1->ntransdeps != prog2->ntransdeps) {
+    fprintf(stdout, "ntransdeps mismatch!\n");
+    diff = 1;
+  }
+  for (int i = 0; i < prog1->ntransdeps; i++) {
+    if (pluto_dep_cmp(prog1->transdeps[i], prog2->transdeps[i])) {
+      fprintf(stdout, "trans dep %d mismatch!\n", i);
+      diff = 1;
+    }
+  }
+  // data_names
+  if (prog1->num_data != prog2->num_data) {
+    fprintf(stdout, "num_data mismatch!\n");
+    diff = 1;
+  }
+  for (int i = 0; i < prog1->num_data; i++) {
+    if (strcmp(prog1->data_names[i], prog2->data_names[i])) {
+      fprintf(stdout, "data_names %d mismatch!\n", i);
+      diff = 1;
+    }
+  }
+  // params
+  if (prog1->npar != prog2->npar) {
+    fprintf(stdout, "npar mismatch!\n");
+    diff = 1;
+  }
+  for (int i = 0; i < prog1->npar; i++) {
+    if (strcmp(prog1->params[i], prog2->params[i])) {
+      fprintf(stdout, "param %d mismatch!\n", i);
+      diff = 1;
+    }
+  }
+  return diff;
 }
 
 void pluto_prog_free(PlutoProg *prog) {
@@ -3364,6 +3498,9 @@ Dep *pluto_dep_alloc() {
   dep->cst = NULL;
   dep->bounding_cst = NULL;
   dep->src_unique_dpolytope = NULL;
+  /* Jie Added - Start */
+  dep->disvec = NULL;
+  /* Jie Added - End */
 
   return dep;
 }
@@ -3374,8 +3511,8 @@ Dep *pluto_dep_dup(Dep *d) {
   dep->id = d->id;
   dep->src = d->src;
   dep->dest = d->dest;
-  dep->src_acc = d->src_acc;
-  dep->dest_acc = d->dest_acc;
+  dep->src_acc = pluto_access_dup(d->src_acc);
+  dep->dest_acc = pluto_access_dup(d->dest_acc);
   dep->dpolytope = pluto_constraints_dup(d->dpolytope);
   dep->bounding_poly = pluto_constraints_dup(d->bounding_poly);
 
@@ -3393,6 +3530,7 @@ Dep *pluto_dep_dup(Dep *d) {
   dep->cst = d->cst ? pluto_constraints_dup(d->cst) : NULL;
   dep->bounding_cst =
       d->bounding_cst ? pluto_constraints_dup(d->bounding_cst) : NULL;
+  dep->disvec = NULL; // TODO
 
   return dep;
 }
@@ -3475,6 +3613,19 @@ PlutoAccess *pluto_access_dup(const PlutoAccess *acc) {
   nacc->sym_id = acc->sym_id;
 
   return nacc;
+}
+
+bool pluto_access_cmp(const PlutoAccess *acc1, const PlutoAccess *acc2) {
+  assert(acc1);
+  assert(acc2);
+
+  if (acc1->sym_id != acc2->sym_id)
+    return 1;
+  if (strcmp(acc1->name, acc2->name))
+    return 1;
+  if (pluto_matrix_cmp(acc1->mat, acc2->mat)) 
+    return 1;
+  return 0;
 }
 
 void pluto_access_free(PlutoAccess *acc) {

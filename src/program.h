@@ -42,6 +42,11 @@ void pluto_dep_print(FILE *fp, const Dep *dep);
 void pluto_deps_print(FILE *, PlutoProg *prog);
 
 PlutoProg *pluto_prog_alloc();
+/* Jie Added - Start */
+int pluto_stmt_cmp(const Stmt *stmt1, const Stmt *stmt2);
+int pluto_dep_cmp(const Dep *dep1, const Dep *dep2);
+int pluto_prog_cmp(const PlutoProg *prog1, const PlutoProg *prog2);
+/* Jie Added - End */
 void pluto_prog_free(PlutoProg *prog);
 PlutoProg *scop_to_pluto_prog(osl_scop_p scop, PlutoOptions *options);
 
@@ -112,6 +117,7 @@ void pluto_transformation_print_level(const PlutoProg *prog, int level);
 
 Stmt *pluto_stmt_dup(const Stmt *stmt);
 PlutoAccess *pluto_access_dup(const PlutoAccess *acc);
+bool pluto_access_cmp(const PlutoAccess *acc1, const PlutoAccess *acc2); 
 void pluto_dep_free(Dep *dep);
 Dep *pluto_dep_dup(Dep *d);
 void pluto_remove_stmt(PlutoProg *prog, int stmt_id);

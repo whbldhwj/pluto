@@ -40,6 +40,7 @@ void pluto_matrix_read(FILE *, const PlutoMatrix *);
 PlutoMatrix *pluto_matrix_alloc(int nrows, int ncols);
 void pluto_matrix_free(PlutoMatrix *mat);
 PlutoMatrix *pluto_matrix_dup(const PlutoMatrix *src);
+int pluto_matrix_cmp(const PlutoMatrix *mat1, const PlutoMatrix *mat2);
 PlutoMatrix *pluto_matrix_identity(int size);
 void pluto_matrix_set(PlutoMatrix *mat, int val);
 PlutoMatrix *pluto_matrix_input(FILE *fp);
@@ -82,6 +83,9 @@ int pluto_vector_is_normal(PlutoMatrix *mat1, int r1, PlutoMatrix *mat2,
                            int r2);
 
 PlutoMatrix *pluto_matrix_from_isl_mat(__isl_keep isl_mat *mat);
+/* Jie Added - Start */
+__isl_keep isl_mat *pluto_matrix_to_isl_mat(PlutoMatrix *pluto_mat);
+/* Jie Added - End */
 int isl_aff_to_pluto_func(__isl_take isl_set *set, __isl_take isl_aff *aff,
                           void *user);
 

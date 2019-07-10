@@ -65,6 +65,9 @@ typedef PlutoConstraints Hyperplane;
 
 PlutoConstraints *pluto_constraints_alloc(int nrows, int ncols);
 void pluto_constraints_free(PlutoConstraints *);
+/* Jie Added - Start */
+int pluto_constraints_cmp(const PlutoConstraints *cst1, const PlutoConstraints *cst2); 
+/* Jie Added - End */
 PlutoConstraints *pluto_constraints_from_equalities(const PlutoMatrix *mat);
 void pluto_constraints_resize(PlutoConstraints *, int, int);
 void pluto_constraints_resize_single(PlutoConstraints *cst, int nrows,

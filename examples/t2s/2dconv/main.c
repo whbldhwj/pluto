@@ -1,3 +1,5 @@
+#define S1(r,s,i,j) Z[r - 1][s - 1] += X[r + i - 1][s + j - 1] * W[i][j];
+
 /*
  * This code implements the 2D convolution (3x3 filter window), which performs:
  * Z(r,s) += X(r+i-1,s+j-1) * W(i,j)
@@ -25,27 +27,21 @@ int main(){
       W[i][j] = (float)rand() / RAND_MAX;
     }
 
+  for (int r = 0; r < R; r++)
+    for (int s = 0; s < S; s++) {
+      Z[r][s] = 0;
+    }
+
   // computation
 #pragma scop
   for (int r = 1; r < R + 1; r++)
     for (int s = 1 ; s < S + 1; s++) {
-      Z[r - 1][s - 1] = 0;
+//      Z[r - 1][s - 1] = 0;
       for (int i = 0; i < 3; i++)
         for (int j = 0; j < 3; j++) {
           Z[r - 1][s - 1] += X[r + i - 1][s + j - 1] * W[i][j];
         }
     }
-//  for (int r = 1; r < R + 1; r++)
-//    for (int s = 1 ; s < S + 1; s++) {
-//      // Z[r - 1][s - 1] = 0;
-//      for (int i = 0; i < 3; i++)
-//        for (int j = 0; j < 3; j++) {
-//          if (i == 0 && j == 0) {
-//            Z[r - 1][s - 1] = 0;
-//          }
-//          Z[r - 1][s - 1] += X[r + i - 1][s + j - 1] * W[i][j];
-//        }
-//    }
 #pragma endscop  
 
   dsa_kernel(X, W, Z_dsa);
