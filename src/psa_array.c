@@ -15,6 +15,7 @@
 #include "constraints.h"
 #include "psa_dep.h"
 #include "psa_helpers.h"
+#include "psa_knobs.h"
 
 #include "osl/macros.h"
 #include "osl/scop.h"
@@ -723,7 +724,7 @@ void psa_compute_dep_distances(PlutoProg *prog) {
 PlutoProg **sa_candidates_generation_band(Band *band, int array_dim, 
               PlutoProg *prog, int *nprogs) {
   PlutoProg **progs = NULL;
-  unsigned i, j, nloops;
+  unsigned i, j, k, nloops;
 
   Ploop **loops;
 
@@ -831,6 +832,60 @@ PlutoProg **sa_candidates_generation_band(Band *band, int array_dim,
         }
       }
     }
+  } else if (array_dim == 3) {
+    for (i = firstD; i < firstD + band->width; i++) {
+      if (is_space_loop[i]) {
+        for (j = i + 1; j < firstD + band->width; j++) {
+          if (is_space_loop[j]) {
+            for (k = j + 1; k < firstD + band->width; k++) {
+              if (is_space_loop[k]) {
+                PlutoProg *new_prog = pluto_prog_dup(prog);
+                /* As new prog is generated, we will need to generate new bands correspondingly */
+                Band **new_bands;
+                unsigned new_nbands;
+                new_bands = pluto_get_outermost_permutable_bands(new_prog, &new_nbands);
+    
+                Ploop *loop = new_bands[0]->loop;
+                /* Make the loop i, j, k the outermost loops */
+                unsigned d;
+                for (d = k; d > firstD; d--) {
+                  pluto_interchange(new_prog, d, d - 1);
+                }
+                for (d = j + 1; d > firstD; d--) {
+                  pluto_interchange(new_prog, d, d - 1);
+                }
+                for (d = i + 2; d > firstD; d--) {
+                  pluto_interchange(new_prog, d, d - 1);
+                }
+    
+                pluto_compute_dep_directions(new_prog);
+                pluto_compute_dep_satisfaction(new_prog);
+    
+                /* Update psa_hyp_type */
+                psa_detect_hyperplane_types(new_prog, array_dim, 0);
+                psa_detect_hyperplane_types_stmtwise(new_prog, array_dim, 0);
+    
+                /* Update array dim */
+                new_prog->array_dim = array_dim;
+                // new_prog->array_part_dim = band->width;
+                new_prog->array_part_dim = 0;
+    
+                /* Add the new invariant to the list */
+                if (progs) {
+                  progs = (PlutoProg **)realloc(progs, (*nprogs + 1) * sizeof(PlutoProg));
+                  progs[*nprogs] = new_prog;
+                  *nprogs = *nprogs + 1;
+                } else {
+                  progs = (PlutoProg **)malloc((*nprogs + 1) * sizeof(PlutoProg));
+                  progs[*nprogs] = new_prog;
+                  *nprogs = *nprogs + 1;
+                }
+              }
+            }
+          }
+        }
+      }
+    }
   }
 
   free(is_space_loop);
@@ -857,6 +912,9 @@ PlutoProg **sa_candidates_generation(PlutoProg *prog, int *nprogs_p) {
 
   /* Grasp the outermost permutable loop bands */
   bands = pluto_get_outermost_permutable_bands(prog, &nbands);
+#ifdef PSA_ARRAY_DEBUG
+  fprintf(stdout, "[PSA] nbands: %d\n", nbands);
+#endif
 
   /* Enumerate different combinations of loops in the permutable bands to generate
    * different systolic array candidates 
@@ -868,8 +926,10 @@ PlutoProg **sa_candidates_generation(PlutoProg *prog, int *nprogs_p) {
     return progs;
   }
 
+#if SA_DIM_UB >= 1
   /* 1D systolic array */
-  if (bands[0]->width >= 1) {    
+  if (bands[0]->width >= 1) {   
+    fprintf(stdout, "[PSA] Explore 1D systolic array... ");
     PlutoProg **new_progs = NULL;
     int new_nprogs = 0;
     new_progs = sa_candidates_generation_band(bands[0], 1, prog, &new_nprogs);
@@ -887,9 +947,13 @@ PlutoProg **sa_candidates_generation(PlutoProg *prog, int *nprogs_p) {
       }      
       nprogs += new_nprogs;
     }
+    fprintf(stdout, "%d variants found.\n", new_nprogs);
   }
+#endif
+#if SA_DIM_UB >= 2
   /* 2D systolic array */
   if (bands[0]->width >= 2) {
+    fprintf(stdout, "[PSA] Explore 2D systolic array... ");
     PlutoProg **new_progs = NULL;
     int new_nprogs = 0;
 #ifdef JIE_DEBUG
@@ -917,7 +981,29 @@ PlutoProg **sa_candidates_generation(PlutoProg *prog, int *nprogs_p) {
       }
       nprogs += new_nprogs;
     }
+    fprintf(stdout, "%d variants found.\n", new_nprogs);
   }
+#endif
+#if SA_DIM_UB >= 3
+  /* 3D systolic array */
+  if (bands[0]->width >= 3) {
+    fprintf(stdout, "[PSA] Explore 3D systolic array... ");
+    PlutoProg **new_progs = NULL;
+    int new_nprogs = 0;
+    new_progs = sa_candidates_generation_band(bands[0], 3, prog, &new_nprogs);
+    if (!progs) {
+      nprogs += new_nprogs;
+      progs = new_progs;
+    } else {
+      progs = (PlutoProg **)realloc(progs, (nprogs + new_nprogs) * sizeof(PlutoProg **));
+      for (i = nprogs; i < nprogs + new_nprogs; i++) {
+        progs[i] = new_progs[i - nprogs];
+      }
+      nprogs += new_nprogs;
+    }
+    fprintf(stdout, "%d variants found.\n", new_nprogs);
+  } 
+#endif
 
   *nprogs_p = nprogs;
   
@@ -930,4 +1016,68 @@ PlutoProg **sa_candidates_generation(PlutoProg *prog, int *nprogs_p) {
 	// }
 
 	return progs;
+}
+
+/*
+ * This function select the optimal systolic array based on heuristics
+ * The selected optimal systolic array will be placed in the first place
+ * in the list.
+ * The heuristics is: the more reuse has been carried in the space loops, 
+ * the better the design is. This is based on the fact that if the resue 
+ * can be carried in the space loops, we could alleviate the efforts of 
+ * interior I/O elimination, which brings more design overheads.
+ * Following the heuristic, this function adds up number of access functions
+ * in the systolic array candidate that have reuse (RAR, RAW) been carried in
+ * the space loops. And then rank the design based on this score.
+ */ 
+void sa_candidates_smart_pick(PlutoProg **progs, int nprogs) {
+  int *score = (int*)malloc(nprogs * sizeof(int));
+  for (int i = 0; i < nprogs; i++)
+    score[i] = 0;
+  int max_score = -1;
+  int opt_prog_id = -1;
+
+  for (int i = 0; i < nprogs; i++) {
+    PlutoProg *prog = progs[i];
+    // scan through all depedences
+    int ndeps = prog->ndeps;
+    Dep **deps = prog->deps;
+    for (int j = 0; j < ndeps; j++) {
+      Dep *dep = deps[j];
+      if (IS_RAW(dep->type) || IS_RAR(dep->type)) {
+        int array_dim = prog->array_dim;
+        int space_hyp_start;
+        int h;
+        for (h = 0; h < prog->num_hyperplanes; h++) {
+          if (IS_PSA_SPACE_LOOP(prog->hProps[h].psa_type)) {
+            space_hyp_start = h;
+            break;
+          }
+        }
+
+        for (h = space_hyp_start; h < space_hyp_start + array_dim; h++) {
+          if (dep->disvec[h] != DEP_DIS_ZERO)
+            break;
+        }
+        if (h < space_hyp_start + array_dim)
+          score[i]++;
+      }
+    }
+
+    // rank the score
+    if (score[i] > max_score) {
+      max_score = score[i];
+      opt_prog_id = i;
+    }
+  }
+
+  // move the optimal prog to the first place
+  fprintf(stdout, "[PSA] The %dth design is picked.\n", opt_prog_id + 1);
+  fprintf(stdout, "[PSA] The optimal design is placed in the first place.\n");
+  PlutoProg *tmp_prog = NULL;
+  tmp_prog = progs[0];
+  progs[0] = progs[opt_prog_id];
+  progs[opt_prog_id] = tmp_prog;
+
+  free(score);
 }

@@ -77,7 +77,7 @@
 #define DEFAULT_L1_TILE_SIZE 32
 
 /* Jie Added - Start */
-#define DEFAULT_TASK_INTERLEAVE_TILE_FACTOR 8
+#define DEFAULT_LATENCY_HIDING_TILE_FACTOR 8
 #define DEFAULT_SIMD_TILE_FACTOR 2
 /* Jie Added - End */
 
@@ -95,6 +95,9 @@
 /* Jie Added - Start */
 //#define PLUTO_TRANSFORM_DEBUG
 //#define PSA_DEP_DEBUG
+//#define PSA_ARRAY_DEBUG
+//#define PSA_LATENCY_HIDING_DEBUG
+//#define PSA_SIMD_VECTORIZATION_DEBUG
 /* Jie Added - End */
 
 typedef enum dirvec_type {
@@ -148,6 +151,13 @@ typedef enum psahyptype {
 #define IS_PSA_TASK_INTER_LOOP(type)  ((int)(type & 0x08) == (int)PSA_H_TASK_INTER_LOOP)
 #define IS_PSA_SIMD_LOOP(type)        ((int)(type & 0x10) == (int)PSA_H_SIMD_LOOP)
 #define IS_PSA_SCALAR(type)           ((int)(type & 0x20) == (int)PSA_H_SCALAR)
+/* Jie Added - End */
+
+/* Jie Added - Start */
+#define PSA_SUCCESS 0
+#define PSA_FAILURE 1
+#define IS_PSA_SUCCESS(ret) (ret == PSA_SUCCESS)
+#define IS_PSA_FAILURE(ret) (ret == PSA_FAILURE)
 /* Jie Added - End */
 
 typedef enum looptype {
@@ -205,6 +215,14 @@ typedef struct pluto_access {
 
   PlutoMatrix *mat;
 } PlutoAccess;
+
+/* Jie Added - Start */
+typedef struct psa_access {
+  PlutoAccess *acc;
+  bool layout_trans;
+  int simd_dim;
+} PSAAccess;
+/* Jie Added - End */
 
 struct pet_stmt;
 
@@ -929,6 +947,8 @@ Ploop **psa_get_outermost_loops(const PlutoProg *prog,
                                 Stmt **stmts, int nstmts,
                                 int depth, int *ndploops);
 //void psa_redetect_hyperplane_types(PlutoProg *prog, int array_dim);                                
+void pluto_print_program(const PlutoProg *prog, char *srcFileName, char *suffix);
+void psa_print_deps(const PlutoProg *prog);
 /* Jie Added - End */                                
 #endif
 #endif

@@ -1046,26 +1046,23 @@ void psa_detect_hyperplane_types_stmtwise(PlutoProg *prog, int array_dim, int ar
     Stmt *stmt = prog->stmts[s];
     for (i = 0; i < stmt->trans->nrows; i++) {
       if (pluto_is_hyperplane_loop(stmt, i)) {
+        bool is_task_inter_loop = IS_PSA_TASK_INTER_LOOP(stmt->psa_hyp_types[i]);
+        bool is_simd_loop = IS_PSA_SIMD_LOOP(stmt->psa_hyp_types[i]);
+        PSAHypType psa_hyp_type_mask = (is_task_inter_loop)? PSA_H_TASK_INTER_LOOP : 0;
+        psa_hyp_type_mask = (is_simd_loop)? psa_hyp_type_mask | PSA_H_SIMD_LOOP : psa_hyp_type_mask;
+
         if (num_array_part_loop < array_part_dim) {
-          stmt->psa_hyp_types[i] = PSA_H_ARRAY_PART_LOOP;
+          stmt->psa_hyp_types[i] = PSA_H_ARRAY_PART_LOOP | psa_hyp_type_mask;
           num_array_part_loop++;
         } else if (num_array_space_loop < array_dim) {
-          stmt->psa_hyp_types[i] = PSA_H_SPACE_LOOP;
+          stmt->psa_hyp_types[i] = PSA_H_SPACE_LOOP | psa_hyp_type_mask;
           num_array_space_loop++;
         } else {
-          stmt->psa_hyp_types[i] = PSA_H_TIME_LOOP;
+          stmt->psa_hyp_types[i] = PSA_H_TIME_LOOP | psa_hyp_type_mask;
         }
       } else {
         stmt->psa_hyp_types[i] = PSA_H_SCALAR;
       }
-
-//      if (stmt->psa_hyp_types[i] == PSA_H_UNKNOWN) {
-//        if (i < array_dim) {
-//          stmt->psa_hyp_types[i] = pluto_is_hyperplane_loop(stmt, i) ? PSA_H_SPACE_LOOP : PSA_H_SCALAR;
-//        } else {
-//          stmt->psa_hyp_types[i] = pluto_is_hyperplane_loop(stmt, i) ? PSA_H_TIME_LOOP : PSA_H_SCALAR;
-//        }      
-//      }
     }
   }
 }
@@ -1100,38 +1097,8 @@ void psa_detect_hyperplane_types(PlutoProg *prog, int array_dim, int array_part_
     } else {
       prog->hProps[depth].psa_type = PSA_H_SCALAR;
     }
-
-//    if (prog->hProps[depth].psa_type == PSA_H_UNKNOWN) {
-//      for (i = 0; i < nstmts; i++) {
-//        if (pluto_is_hyperplane_loop(prog->stmts[i], depth))
-//          break;
-//      }      
-//      if (depth < array_dim) {
-//        prog->hProps[depth].psa_type = (i < nstmts) ? PSA_H_SPACE_LOOP : PSA_H_SCALAR;      
-//      } else {
-//        prog->hProps[depth].psa_type = (i < nstmts) ? PSA_H_TIME_LOOP : PSA_H_SCALAR;
-//      }
-//    }
   }
 }
-
-/* This is based on the hyperplane type of each statement has been detected */
-// void psa_redetect_hyperplane_types(PlutoProg *prog, int array_dim) {
-//   int i, depth;
-//   int nstmts = prog->nstmts;
-
-//   for (depth = 0; depth < prog->num_hyperplanes; depth++) {
-//     for (i = 0; i < nstmts; i++) {
-//       if (pluto_is_hyperplane_loop(prog->stmts[i], depth))
-//         break;
-//     }
-//     if (i < nstmts) {
-//       prog->hProps[depth].psa_type = prog->stmts[i]->psa_hyp_types[depth];
-//     } else {
-//       prog->hProps[depth].psa_type = PSA_H_SCALAR;
-//     }
-//   }  
-// }
 /* Jie Added - End */
 
 void pluto_detect_hyperplane_types_stmtwise(PlutoProg *prog) {
@@ -2484,4 +2451,99 @@ int is_access_scalar(PlutoAccess *access) {
       return 0;
 
   return 1;
+}
+
+/* Print out the Pluto program */
+void pluto_print_program(const PlutoProg *prog, char *srcFileName, char *suffix) {
+  /* Get basename */
+  char *basec, *bname;
+  basec = strdup(srcFileName);
+  bname = basename(basec);
+
+  char *dumpFileName;
+//  dumpFileName = malloc(strlen(bname) - 2 + strlen(".pluto_transform.c") + 1);
+  dumpFileName = malloc(strlen(bname) - 2 + strlen(".") + strlen(suffix) + strlen(".c") + 1);  
+  strncpy(dumpFileName, bname, strlen(bname) - 2);
+  dumpFileName[strlen(bname) - 2] = '\0';
+  strcat(dumpFileName, ".");
+  strcat(dumpFileName, suffix);
+  strcat(dumpFileName, ".c");
+
+  char *cloogFileName;
+//  cloogFileName = malloc(strlen(bname) - 2 + strlen(".pluto_transform.cloog") + 1);
+  cloogFileName = malloc(strlen(bname) - 2 + strlen(".") + strlen(suffix) + strlen(".cloog") + 1);
+  strncpy(cloogFileName, bname, strlen(bname) - 2);
+  cloogFileName[strlen(bname) - 2] = '\0';
+  strcat(cloogFileName, ".");
+  strcat(cloogFileName, suffix);
+  strcat(cloogFileName, ".cloog");
+  free(basec);
+
+  // Write Cloog File
+  FILE *cloogfp, *outfp;
+  cloogfp = fopen(cloogFileName, "w+");
+  if (!cloogfp) {
+    fprintf(stderr, "[PSA] Can't open .cloog file: '%s'\n", cloogFileName);
+    free(cloogFileName);
+    // pluto_options_free(options);
+    pluto_prog_free(prog);
+    return 9;
+  }
+  free(cloogFileName);
+
+  outfp = fopen(dumpFileName, "w");
+  if (!outfp) {
+    fprintf(stderr, "[PSA] Can't open file '%s' for writing", dumpFileName);
+    free(dumpFileName);
+    // pluto_options_free(options);
+    pluto_prog_free(prog);
+    fclose(outfp);
+    return 10;
+  }
+
+  pluto_gen_cloog_file(cloogfp, prog);
+//  /* Add the <irregular> tag from clan, if any */
+//  if (!pluto->options->pet) {
+//    if (irroption) {
+//      fprintf(cloogfp, "<irregular>\n%s\n</irregular>\n\n", irroption);
+//      free(irroption);
+//    }
+//  }
+  rewind(cloogfp);
+
+  /* Generate code using Cloog */
+  psa_generate_declarations(prog, outfp);
+  fprintf(stdout, "[Debug] number of hyps: %d\n", prog->num_hyperplanes);
+  pluto_gen_cloog_code(prog, prog->num_hyperplanes, 1, cloogfp, outfp);
+
+  free(dumpFileName);
+  fclose(cloogfp);
+  fclose(outfp);
+}
+
+void psa_print_deps(const PlutoProg *prog) {
+  fprintf(stdout, "[PSA] Print out the dependences.\n");
+  fprintf(stdout, "[PSA] Total number of dependences: %d\n", prog->ndeps);
+  for (int i = 0; i < prog->ndeps; i++) {
+    Dep *dep = prog->deps[i];
+    fprintf(stdout, "***********************\n");
+    fprintf(stdout, "[PSA] Dependences ID: %d\n", i);
+    fprintf(stdout, "[PSA] Src stmt ID: %d\n", dep->src);
+    fprintf(stdout, "[PSA] Dest stmt ID: %d\n", dep->dest);
+    if (IS_WAR(dep->type)) {
+      fprintf(stdout, "[PSA] Dep type: WAR\n");
+    } else if (IS_WAW(dep->type)) {
+      fprintf(stdout, "[PSA] Dep type: WAW\n");
+    } else if (IS_RAW(dep->type)) {
+      fprintf(stdout, "[PSA] Dep type: RAW\n");
+    } else if (IS_RAR(dep->type)) {
+      fprintf(stdout, "[PSA] Dep type: RAR\n");
+    }
+    PlutoAccess *acc = dep->src_acc;
+    fprintf(stdout, "[PSA] Arr name: %s\n", acc->name);    
+
+    PlutoConstraints* dpolytope = dep->dpolytope;
+    pluto_constraints_pretty_print(stdout, dpolytope);
+    fprintf(stdout, "***********************\n");
+  }
 }

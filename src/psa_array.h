@@ -26,5 +26,6 @@ void psa_compute_dep_distances(PlutoProg *prog);
 PlutoProg **sa_candidates_generation_band(Band *band, int array_dim, 
               PlutoProg *prog, int *nprogs);
 PlutoProg **sa_candidates_generation(PlutoProg *prog, int *nprogs_p);
+void sa_candidates_smart_pick(PlutoProg **progs, int nprogs);
 
 #endif

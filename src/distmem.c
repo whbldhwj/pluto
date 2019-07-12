@@ -809,4 +809,4 @@ static PlutoConstraints *get_context_equality(int copy_level, int src_nrows,
     cst->val[cst->nrows - 1][src_nrows + i] = -1;
   }
   return cst;
-};
+}
