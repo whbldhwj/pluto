@@ -76,17 +76,17 @@ int psa_read_tile_sizes(
   if (i < num_tile_dims) {
     fprintf(stdout, "[PSA] WARNING: not enough tile sizes provided! The required number: %d\n", num_tile_dims);
     fclose(tsfile);
-    return 0;
+    return PSA_FAILURE;
   }
 
   fclose(tsfile);
-  return 1;
+  return PSA_SUCCESS;
 }
 
 /* Manipulate statement domain and transformation to tile scattering dimesnions 
  * from firstD to lastD */
-void psa_array_partition_tile_band(PlutoProg *prog, Band *band, int *tile_sizes) {
-  int j, s;
+int psa_array_partition_tile_band(PlutoProg *prog, Band *band, int *tile_sizes) {
+  int i, j, s;
   int depth, npar;
 
   npar = prog->npar;
@@ -94,7 +94,7 @@ void psa_array_partition_tile_band(PlutoProg *prog, Band *band, int *tile_sizes)
   int firstD = band->loop->depth;
   int lastD = band->loop->depth + band->width - 1;
 
-  int num_domain_supernodes[band->loop->nstmts];
+  int num_domain_supernodes[band->loop->nstmts]; // store the number of domain supernodes for each stmt
 
   for (s = 0; s < band->loop->nstmts; s++) {
     num_domain_supernodes[s] = 0;
@@ -103,14 +103,13 @@ void psa_array_partition_tile_band(PlutoProg *prog, Band *band, int *tile_sizes)
   int array_part_dim = 0;
   int skipped_loop = 0;
 
+  // tile the loops;
   for (depth = firstD; depth <= lastD; depth++) {
     PSAHypType hyp_type = prog->hProps[depth].psa_type;
+    // stop at the latency hiding / simd loop
     if (IS_PSA_TASK_INTER_LOOP(hyp_type) || IS_PSA_SIMD_LOOP(hyp_type)) {
       skipped_loop++;
-// #ifdef JIE_DEBUG
-//       fprintf(stdout, "[Debug] array_part depth : %d\n", depth);
-// #endif
-      continue;
+      break;
     }
 
     for (s = 0; s < band->loop->nstmts; s++) {
@@ -189,21 +188,22 @@ void psa_array_partition_tile_band(PlutoProg *prog, Band *band, int *tile_sizes)
             stmt->trans->val[1 + (depth - skipped_loop - firstD) + depth][j];
         }
       } 
-      stmt->num_tiled_loops++;
-      stmt->first_tile_dim = firstD;
-      stmt->last_tile_dim = lastD;      
+      stmt->num_tiled_loops++; // not used
+      stmt->first_tile_dim = firstD; // not used
+      stmt->last_tile_dim = lastD; // not used
     } /* all statements */
 
     array_part_dim++;
   }   /* all scats to be tiled */
 
   prog->array_part_dim = array_part_dim;
+  return array_part_dim;
 }
 
 /*
  * Tile the loops in the outermost permutable loop band
  */
-void psa_array_partition_band(PlutoProg *prog, Band *band) {
+int psa_array_partition_optimize_band(PlutoProg *prog, Band *band) {
   int i, j;
   int tile_sizes[band->width];
   int depth;
@@ -220,9 +220,38 @@ void psa_array_partition_band(PlutoProg *prog, Band *band) {
     band->loop->nstmts, band->loop->depth
   );
 
+  /* Print out the array partition loop candidates */
+  // TODO: to fix this function grasp all the loops, which may be beyond the scope of the band
+  Ploop **loops = NULL;
+  int nloops = 0;
+//  loops = pluto_get_loops_under(
+//      band->loop->stmts, band->loop->nstmts,
+//      band->loop->depth, prog, &nloops);
+  loops = psa_get_loops_in_band(band, prog, &nloops);
+
+  int num_array_part_loops = 0;
+  Ploop **array_part_loops = NULL;
+  for (i = 0; i < nloops; i++) {
+    Ploop *loop = loops[i];
+    PSAHypType hyp_type = prog->hProps[loop->depth].psa_type;
+    if (IS_PSA_TASK_INTER_LOOP(hyp_type) || IS_PSA_SIMD_LOOP(hyp_type)) {
+      break;
+    }
+    num_array_part_loops++;
+    array_part_loops = realloc(array_part_loops, num_array_part_loops * sizeof(Ploop *));
+    array_part_loops[num_array_part_loops - 1] = loop;
+  }
+#ifdef PRINT_ARRAY_PARTITIONING_MISC
+  psa_array_partitioning_misc_pretty_print(
+      prog, 
+      num_array_part_loops, array_part_loops);
+#endif
+//  pluto_loops_free(array_part_loops, num_array_part_loops);
+//  pluto_loops_free(loops, nloops);
+
   /* Tile the band */
-  psa_array_partition_tile_band(prog, band, tile_sizes);
-  
+  int num_tiled_loops = psa_array_partition_tile_band(prog, band, tile_sizes);
+
   /* Interpret the sa_rows and sa_cols */
   if (prog->array_dim == 1) {
     prog->array_nrow = 1;
@@ -249,6 +278,83 @@ void psa_array_partition_band(PlutoProg *prog, Band *band) {
     pluto_prog_add_hyperplane(prog, depth, H_UNKNOWN, PSA_H_UNKNOWN);
   }  
 
+  return num_tiled_loops;
+}
+
+void psa_array_partitioning_misc_pretty_print(
+  const PlutoProg *prog,
+  int num_array_part_loops,
+  Ploop **array_part_loops
+) {
+  int nstmts, i, j;
+  nstmts = prog->nstmts;
+
+  for (i = 0; i < nstmts; i++) {
+    Stmt *stmt = prog->stmts[i];
+
+    int *mark_loops = (int *)malloc(stmt->trans->nrows * sizeof(int));
+    /* initialization */
+    for (j = 0; j < stmt->trans->nrows; j++)
+      mark_loops[j] = 0;
+
+    for (j = 0; j < num_array_part_loops; j++) {
+      Ploop *loop = array_part_loops[j];
+      /* detect if the stmt is under the loop */
+      if (pluto_stmt_is_member_of(stmt->id, loop->stmts, loop->nstmts))
+        mark_loops[loop->depth] = 1;
+    }
+
+    fprintf(stdout, "T(S%d): ", stmt->id + 1);
+    int level;
+    fprintf(stdout, "(");
+    for (level = 0; level < stmt->trans->nrows; level++) {
+      pluto_stmt_print_hyperplane(stdout, stmt, level);
+      if (level <= stmt->trans->nrows - 2)
+        fprintf(stdout, ", ");
+    }
+    fprintf(stdout, ")\n");
+    
+    fprintf(stdout, "loop types (");
+    for (level = 0; level < stmt->trans->nrows; level++) {
+      if (level > 0)
+        fprintf(stdout, ", ");
+      if (stmt->hyp_types[level] == H_SCALAR)
+        fprintf(stdout, "scalar");
+      else if (stmt->hyp_types[level] == H_LOOP)
+        fprintf(stdout, "loop");
+      else if (stmt->hyp_types[level] == H_TILE_SPACE_LOOP)
+        fprintf(stdout, "tloop");
+      else
+        fprintf(stdout, "unknown");
+      // the candidate loops comes with an asterisk as the suffix
+      if (mark_loops[level])
+        fprintf(stdout, "*");
+    }
+    fprintf(stdout, ")\n");
+
+    fprintf(stdout, "psa loop types (");
+    for (level = 0; level < stmt->trans->nrows; level++) {
+      if (level > 0)
+        fprintf(stdout, ", ");
+      if (IS_PSA_SCALAR(stmt->psa_hyp_types[level]))
+        fprintf(stdout, "scalar");
+      else if (IS_PSA_SPACE_LOOP(stmt->psa_hyp_types[level]))
+        fprintf(stdout, "space_loop");
+      else if (IS_PSA_TIME_LOOP(stmt->psa_hyp_types[level]))
+        fprintf(stdout, "time_loop");
+      else if (IS_PSA_ARRAY_PART_LOOP(stmt->psa_hyp_types[level]))
+        fprintf(stdout, "array_part_loop");
+      else if (IS_PSA_TASK_INTER_LOOP(stmt->psa_hyp_types[level]))
+        fprintf(stdout, "task_inter_loop");
+      else if (IS_PSA_SIMD_LOOP(stmt->psa_hyp_types[level]))
+        fprintf(stdout, "simd_loop");
+      else
+        fprintf(stdout, "unknown");
+    }
+    fprintf(stdout, ")\n");
+
+    free(mark_loops);
+  } 
 }
 
 /*
@@ -324,20 +430,15 @@ void psa_reorg_array_part_loops(PlutoProg *prog) {
  * Apply loop tiling on the outermost permutable loop bands (ignore loops that 
  * are intra-tiled loops, for task-interleaving, SIMD vectorization)
  * Place sync-free loops before pipelined loops to reduce communication. */
-void psa_array_partition(PlutoProg *prog) {
+int psa_array_partition_optimize(PlutoProg *prog, VSA *vsa) {
   /* Get the outermost permutable loop band */
   unsigned nbands;
   Band **bands;
   bands = pluto_get_outermost_permutable_bands(prog, &nbands);
   assert(nbands == 1);
 
-// #ifdef JIE_DEBUG
-//   fprintf(stdout, "[Debug] loop band number: %d\n", nbands);
-//   fprintf(stdout, "[Debug] loop band width: %d\n", bands[0]->width);
-// #endif
-
   /* Tile the array partition candidate loops */  
-  psa_array_partition_band(prog, bands[0]);  
+  int ret = psa_array_partition_optimize_band(prog, bands[0]);  
 
   /* Detect properties after tiling */
   pluto_compute_dep_directions(prog);
@@ -353,6 +454,7 @@ void psa_array_partition(PlutoProg *prog) {
   /* Permuate the inter-tile loops.
    * Place sync-free loops before pipelined loops to reduce communication.
    */
+  // TODO
   //psa_reorg_array_partition_band(prog, bands[0]);  
 
   /* Detect properties after permutation */
@@ -366,10 +468,11 @@ void psa_array_partition(PlutoProg *prog) {
   psa_detect_hyperplane_types_stmtwise(prog, prog->array_dim, prog->array_part_dim);
   psa_detect_hyperplane_types(prog, prog->array_dim, prog->array_part_dim);  
 
-  if (!options->silent) {
-    fprintf(stdout, "[Pluto] After tiling:\n");
-    pluto_transformations_pretty_print(prog);
-  }
-
   pluto_bands_free(bands, nbands);
+
+  if (ret > 0) {
+    return PSA_SUCCESS;
+  } else {
+    return PSA_FAILURE;
+  }
 }

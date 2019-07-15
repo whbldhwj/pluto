@@ -824,7 +824,7 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
 #ifdef ARRAY_PARTITIONING    
       if (options->tile) {
         fprintf(stdout, "[PSA] Apply array partitioning.\n");
-        int ret = psa_array_partition(prog, vsa);
+        int ret = psa_array_partition_optimize(prog, psa_vsa);
         if (IS_PSA_SUCCESS(ret)) {
           fprintf(stdout, "[PSA] Completed array partitioning.\n");
           /* Print out transformations */
@@ -833,6 +833,10 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
           fprintf(stdout, "[PSA] Failed array partitioning.\n");
         }
       }
+  #ifdef PRINT_ARRAY_PARTITIONING_TRANS_PROGRAM
+      fprintf(stdout, "[PSA] Dump out the transformed program after array partitioning.\n");
+      pluto_print_program(prog, srcFileName, "array_part");
+  #endif
 #endif    
      
 /*

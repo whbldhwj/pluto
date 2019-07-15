@@ -114,6 +114,36 @@ Ploop **pluto_get_loops_immediately_inner(Ploop *ploop, PlutoProg *prog,
   return imloops;
 }
 
+/* Jie Added - Start */
+Ploop **psa_get_loops_in_band(Band *band, const PlutoProg *prog, unsigned *num) {
+  Ploop **all_loops = NULL;
+  int num_loops = 0;
+
+  int firstD = band->loop->depth;
+  int lastD = firstD + band->width - 1;
+  int depth = firstD;
+
+  Ploop *loop = band->loop;
+  num_loops++;
+
+  all_loops = realloc(all_loops, num_loops * sizeof(Ploop *));
+  all_loops[num_loops - 1] = loop;
+  depth++;
+
+  while(depth <= lastD) {
+    int num_nxt_loops = 0;
+    Ploop **nxt_loops = pluto_get_loops_immediately_inner(all_loops[num_loops - 1], prog, &num_nxt_loops);
+    all_loops = pluto_loops_cat(all_loops, num_loops, nxt_loops, num_nxt_loops);
+    num_loops += num_nxt_loops;
+
+    depth++;
+  }
+
+  *num = num_loops;
+  return all_loops;
+}
+/* Jie Added - End */
+
 /* Get loops at this depth under the scattering tree that contain only and all
  * of the statements in 'stmts'
  * If all 'stmts' aren't fused up to depth-1, no such loops exist by

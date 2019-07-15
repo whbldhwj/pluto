@@ -902,6 +902,9 @@ Ploop **pluto_get_loops_under(Stmt **stmts, unsigned nstmts, unsigned depth,
                               const PlutoProg *prog, unsigned *num);
 Ploop **pluto_get_loops_immediately_inner(Ploop *ploop, PlutoProg *prog,
                                           unsigned *num);
+/* Jie Added - Start */
+Ploop **psa_get_loops_in_band(Band *band, const PlutoProg *prog, unsigned *num);
+/* Jie Added - End */
 int pluto_intra_tile_optimize(PlutoProg *prog, int is_tiled);
 int pluto_intra_tile_optimize_band(Band *band, int is_tiled, PlutoProg *prog);
 

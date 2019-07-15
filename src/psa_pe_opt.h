@@ -36,7 +36,7 @@ int psa_read_simd_tile_sizes(
   int num_tile_dims
 );
 bool is_stride_zero_one(Stmt *stmt, PlutoAccess *acc, int depth, int *is_transform, int *transform_dim);
-int psa_is_loop_vectorizable(Ploop *loop, PlutoProg *prog, PSAAccess **psa_acc, int *num_psa_acc);
+int psa_is_loop_vectorizable(Ploop *loop, PlutoProg *prog, PSAAccess ***psa_acc, int *num_psa_acc);
 int psa_simd_vectorization_optimize(PlutoProg *prog, VSA *vsa);
 int psa_simd_vectorization_optimize_band(Band *band, PlutoProg *prog);
 void psa_simd_vectorization_misc_pretty_print(

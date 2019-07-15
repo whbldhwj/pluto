@@ -57,7 +57,7 @@ int psa_read_simd_tile_sizes(
   FILE *tsfile = fopen("simd_tile.sizes", "r");
 
   if (!tsfile) {
-    fprintf(stdout, "[PSA] WARNING: ti_tile.sizes not found!\n");
+    fprintf(stdout, "[PSA] WARNING: simd_tile.sizes not found!\n");
     return 0;
   }
 
@@ -201,9 +201,10 @@ int psa_latency_hiding_optimize_band(Band *band, PlutoProg *prog) {
   Ploop **loops;
 
   /* Grasp all the loops in the current band */
-  loops = pluto_get_loops_under(
-      band->loop->stmts, band->loop->nstmts,
-      band->loop->depth, prog, &nloops);
+//  loops = pluto_get_loops_under(
+//      band->loop->stmts, band->loop->nstmts,
+//      band->loop->depth, prog, &nloops);
+  loops = psa_get_loops_in_band(band, prog, &nloops);
 
   /* Mark the hyp properties */
   unsigned first_space_hyp, first_time_hyp;
@@ -419,7 +420,7 @@ bool is_stride_zero_one(Stmt *stmt, PlutoAccess *acc, int depth, int *is_transfo
  * compared to the parallel loop. And we favor loops that doesn't lead to layout transformation than loops that require
  * the layout transformation.
  */
-int psa_is_loop_vectorizable(Ploop *loop, PlutoProg *prog, PSAAccess **psa_acc, int *num_psa_acc) {
+int psa_is_loop_vectorizable(Ploop *loop, PlutoProg *prog, PSAAccess ***psa_acc, int *num_psa_acc) {
   bool is_reduction = 0;
   int score = 0;
   /* check if the loop is a reduction loop with single statement */
@@ -461,7 +462,7 @@ int psa_is_loop_vectorizable(Ploop *loop, PlutoProg *prog, PSAAccess **psa_acc, 
   int i, j;  
   for (i = 0; i < loop->nstmts; i++) {
     Stmt *stmt = loop->stmts[i];    
-    psa_acc = realloc(psa_acc, (num_accs + stmt->nreads + stmt->nwrites) * sizeof(PSAAccess *));
+    *psa_acc = realloc(*psa_acc, (num_accs + stmt->nreads + stmt->nwrites) * sizeof(PSAAccess *));
 
     for (j = 0; j < stmt->nreads; j++) {
       int is_layout_trans_required;
@@ -469,10 +470,10 @@ int psa_is_loop_vectorizable(Ploop *loop, PlutoProg *prog, PSAAccess **psa_acc, 
       bool ret = is_stride_zero_one(stmt, stmt->reads[j], loop->depth, &is_layout_trans_required, &acc_simd_dim);
       score += ret * (1 - is_layout_trans_required);
 
-      psa_acc[num_accs++] = (PSAAccess *)malloc(sizeof(PSAAccess));
-      psa_acc[num_accs - 1]->acc = stmt->reads[j];
-      psa_acc[num_accs - 1]->layout_trans = is_layout_trans_required;
-      psa_acc[num_accs - 1]->simd_dim = acc_simd_dim;
+      (*psa_acc)[num_accs++] = (PSAAccess *)malloc(sizeof(PSAAccess));
+      (*psa_acc)[num_accs - 1]->acc = stmt->reads[j];
+      (*psa_acc)[num_accs - 1]->layout_trans = is_layout_trans_required;
+      (*psa_acc)[num_accs - 1]->simd_dim = acc_simd_dim;
     }
     for (j = 0; j < stmt->nwrites; j++) {
       int is_layout_trans_required;
@@ -480,10 +481,10 @@ int psa_is_loop_vectorizable(Ploop *loop, PlutoProg *prog, PSAAccess **psa_acc, 
       bool ret = is_stride_zero_one(stmt, stmt->writes[j], loop->depth, &is_layout_trans_required, &acc_simd_dim);
       score += ret * (1 - is_layout_trans_required);
   
-      psa_acc[num_accs++] = (PSAAccess *)malloc(sizeof(PSAAccess));
-      psa_acc[num_accs - 1]->acc = stmt->writes[j];
-      psa_acc[num_accs - 1]->layout_trans = is_layout_trans_required;
-      psa_acc[num_accs - 1]->simd_dim = acc_simd_dim;
+      (*psa_acc)[num_accs++] = (PSAAccess *)malloc(sizeof(PSAAccess));
+      (*psa_acc)[num_accs - 1]->acc = stmt->writes[j];
+      (*psa_acc)[num_accs - 1]->layout_trans = is_layout_trans_required;
+      (*psa_acc)[num_accs - 1]->simd_dim = acc_simd_dim;
     }
   }
   *num_psa_acc = num_accs;
@@ -516,6 +517,7 @@ int psa_simd_vectorization_optimize(PlutoProg *prog, VSA *vsa) {
   pluto_compute_dep_satisfaction(prog);
   psa_compute_dep_distances(prog);
 
+  pluto_bands_free(bands, nbands);
   return ret;
 }
 
@@ -632,9 +634,10 @@ int psa_simd_vectorization_optimize_band(Band *band, PlutoProg *prog) {
 
   /* Grasp all the loops in the current band */
   /* Note: We only consider time loops */
-  loops = pluto_get_loops_under(
-      band->loop->stmts, band->loop->nstmts,
-      PLMAX(band->loop->depth, first_time_hyp), prog, &nloops);
+//  loops = pluto_get_loops_under(
+//      band->loop->stmts, band->loop->nstmts,
+//      PLMAX(band->loop->depth, first_time_hyp), prog, &nloops);
+  loops = psa_get_loops_in_band(band, prog, &nloops);
 
   Ploop *best_loop = NULL;
   Ploop **simd_loops = NULL;
@@ -647,18 +650,21 @@ int psa_simd_vectorization_optimize_band(Band *band, PlutoProg *prog) {
   int num_accs = 0;
 
   for (i = 0; i < nloops; i++) {
-    int score = psa_is_loop_vectorizable(loops[l], prog, accs, &num_accs);
-    if (score > 0) {
-      num_simd_loops++;
-      simd_loops = realloc(simd_loops, num_simd_loops * sizeof(Ploop *));
-      simd_loops[num_simd_loops - 1] = loops[l];    
-    }
+    // we only consider time loop so far
+    if (loops[i]->depth >= first_time_hyp) {
+      int score = psa_is_loop_vectorizable(loops[i], prog, &accs, &num_accs);
+      if (score > 0) {
+        num_simd_loops++;
+        simd_loops = realloc(simd_loops, num_simd_loops * sizeof(Ploop *));
+        simd_loops[num_simd_loops - 1] = loops[i];    
+      }
 
-    if (score > best_score) {
-      best_score = score;
-      best_loop = loops[l];
-      best_accs = accs;
-      best_num_accs = num_accs;
+      if (score > best_score) {
+        best_score = score;
+        best_loop = loops[i];
+        best_accs = accs;
+        best_num_accs = num_accs;
+      }
     }
   }
 
@@ -699,11 +705,11 @@ int psa_simd_vectorization_optimize_band(Band *band, PlutoProg *prog) {
     // TODO
     psa_tile_loop(prog, best_loop, tile_sizes[0], H_TILE_SPACE_LOOP, PSA_H_TIME_LOOP);
     
-    int num_intra_tile_loop = 0;
-    Ploop *intra_tile_loop = pluto_get_loops_immediately_inner(best_loop, prog, &num_intra_tile_loop);
-    assert(num_intra_tile_loop == 1);
+    int num_intra_tile_loops = 0;
+    Ploop **intra_tile_loops = pluto_get_loops_immediately_inner(best_loop, prog, &num_intra_tile_loops);
+    assert(num_intra_tile_loops == 1);
 
-    pluto_make_innermost_loop(intra_tile_loop, prog);
+    pluto_make_innermost_loop(intra_tile_loops[0], prog);
 
     int last_depth = prog->num_hyperplanes - 1;
     for (i = 0; i < best_loop->nstmts; i++) {
@@ -806,6 +812,7 @@ int psa_latency_hiding_optimize(PlutoProg *prog, VSA *vsa) {
   pluto_compute_dep_satisfaction(prog);
   psa_compute_dep_distances(prog);
 
+  pluto_bands_free(bands, nbands);
   return ret;
 }
 

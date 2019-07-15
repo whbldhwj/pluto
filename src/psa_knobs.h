@@ -58,23 +58,23 @@
 // dump out latency hiding candidates
 #define PRINT_LATENCY_HIDING_MISC
 
-//// perfom array partitioning optimization
-//#define ARRAY_PARTITIONING
-
-//// dump out array partitioning candidates
-//#define PRINT_ARRAY_PARTITIONING_MISC
-
 // perfrom SIMD vectorization
 #define SIMD_VECTORIZATION
 
 // print out the transformed code after SIMD vectorization
-#define PRINT_SIMD_VECTORIZATION_TRANS_PROGRAM
+#define PRINT_SIMD_VECTORIZATION_TRANS_CODE
 
 // dump out SIMD vectorization candidates
 #define PRINT_SIMD_VECTORIZATION_MISC
 
-//// dump out SIMD candidates
-//#define PRINT_SIMD_VECTORIZATION_MISC
+// perfom array partitioning optimization
+#define ARRAY_PARTITIONING
+
+// print out the transformed code after array partitioning
+#define PRINT_ARRAY_PARTITIONING_TRANS_PROGRAM
+
+// dump out array partitioning candidates
+#define PRINT_ARRAY_PARTITIONING_MISC
 
 /*
  * ************************************

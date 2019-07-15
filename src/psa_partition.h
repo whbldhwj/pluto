@@ -24,6 +24,9 @@ int psa_read_tile_sizes(
 void psa_tile_band(PlutoProg *prog, Band *band, int *tile_sizes);
 void psa_tile_outermost_permutable_band(PlutoProg *prog, Band *band);
 void psa_permute_outermost_tile_band(PlutoProg *prog, Band *band);
-void psa_array_partition(PlutoProg *prog);
+int psa_array_partition_optimize(PlutoProg *prog, VSA *vsa);
+int psa_array_partition_optimize_band(PlutoProg *prog, Band *band);
+int psa_array_partition_tile_band(PlutoProg *prog, Band *band, int *tile_sizes);
+void psa_array_partitioning_misc_pretty_print(const PlutoProg *prog, int num_array_part_loops, Ploop **array_part_loops);
 
 #endif
