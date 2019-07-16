@@ -353,7 +353,7 @@ void psa_tile_loop_constant(PlutoProg *prog, Ploop *loop, int tile_factor,
       }
 
       stmt->domain->val[stmt->domain->nrows - 1][num_domain_internodes[s] - 1] = tile_factor;
-      stmt->domain->val[stmt->domain->nrows - 1][stmt->dim + npar] = tile_factor - 1;
+      stmt->domain->val[stmt->domain->nrows - 1][stmt->dim + npar] += tile_factor - 1;
 
       lb = pluto_constraints_select_row(stmt->domain, stmt->domain->nrows - 1);
       pluto_update_deps(stmt, lb, prog);
@@ -379,13 +379,13 @@ void psa_tile_loop_constant(PlutoProg *prog, Ploop *loop, int tile_factor,
 
   /* Sink everything to the same depth */
   int max = 0, curr;
-  for (i = 0; i < loop->nstmts; i++) {
-    max = PLMAX(loop->stmts[i]->trans->nrows, max);
+  for (i = 0; i < prog->nstmts; i++) {
+    max = PLMAX(prog->stmts[i]->trans->nrows, max);
   }
-  for (i = 0; i < loop->nstmts; i++) {
-    curr = loop->stmts[i]->trans->nrows; 
+  for (i = 0; i < prog->nstmts; i++) {
+    curr = prog->stmts[i]->trans->nrows; 
     for (j = curr; j < max; j++) {
-      pluto_sink_transformation(loop->stmts[i], loop->stmts[i]->trans->nrows, prog);
+      pluto_sink_transformation(prog->stmts[i], prog->stmts[i]->trans->nrows, prog);
     }
   }
 
@@ -393,14 +393,14 @@ void psa_tile_loop_constant(PlutoProg *prog, Ploop *loop, int tile_factor,
   curr = firstD + 1;
   pluto_prog_add_hyperplane(prog, depth, H_UNKNOWN, PSA_H_UNKNOWN);  
 
-  /* Re-detect hyperplane types (H_SCALAR, H_LOOP) */
-  pluto_detect_hyperplane_types(prog);
-  pluto_detect_hyperplane_types_stmtwise(prog);
-  psa_detect_hyperplane_types(prog, prog->array_dim, prog->array_part_dim);
-  psa_detect_hyperplane_types_stmtwise(prog, prog->array_dim, prog->array_part_dim);  
-
-  /* Detect properties after permuation */
-  pluto_compute_dep_directions(prog);
-  pluto_compute_dep_satisfaction(prog);
-  psa_compute_dep_distances(prog);
+//  /* Re-detect hyperplane types (H_SCALAR, H_LOOP) */
+//  pluto_detect_hyperplane_types(prog);
+//  pluto_detect_hyperplane_types_stmtwise(prog);
+//  psa_detect_hyperplane_types(prog, prog->array_dim, prog->array_part_dim);
+//  psa_detect_hyperplane_types_stmtwise(prog, prog->array_dim, prog->array_part_dim);  
+//
+//  /* Detect properties after permuation */
+//  pluto_compute_dep_directions(prog);
+//  pluto_compute_dep_satisfaction(prog);
+//  psa_compute_dep_distances(prog);
 }

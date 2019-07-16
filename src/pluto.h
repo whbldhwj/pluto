@@ -74,10 +74,10 @@
 
 #define MAX_TILING_LEVELS 2
 
-#define DEFAULT_L1_TILE_SIZE 32
+#define DEFAULT_L1_TILE_SIZE 8
 
 /* Jie Added - Start */
-#define DEFAULT_LATENCY_HIDING_TILE_FACTOR 8
+#define DEFAULT_LATENCY_HIDING_TILE_FACTOR 4
 #define DEFAULT_SIMD_TILE_FACTOR 2
 /* Jie Added - End */
 
@@ -98,6 +98,7 @@
 //#define PSA_ARRAY_DEBUG
 //#define PSA_LATENCY_HIDING_DEBUG
 //#define PSA_SIMD_VECTORIZATION_DEBUG
+#define PSA_ARRAY_PARTITIONING_DEBUG
 /* Jie Added - End */
 
 typedef enum dirvec_type {

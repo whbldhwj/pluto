@@ -1,15 +1,21 @@
-#define S1(zT6,zT7,zT8,zT9,zT10,oT5,oT4,oT3,i,j,k) C[i][j] += A[i][k] * B[k][j];
+#define S1(oT6,oT7,oT8,oT5,oT4,oT3,i,j,k) C[i][j] += A[i][k] * B[k][j];
 
-int t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11;
+int t1, t2, t3, t4, t5, t6, t7, t8, t9;
 
 /* Start of CLooG code */
-for (t6=0;t6<=7;t6++) {
-  for (t7=0;t7<=7;t7++) {
-    for (t8=0;t8<=31;t8++) {
-      for (t9=0;t9<=7;t9++) {
-        for (t10=0;t10<=7;t10++) {
-          for (t11=0;t11<=1;t11++) {
-            S1(0,0,0,0,0,t8,t7,t6,(8*t6+t9),(8*t7+t10),(2*t8+t11));
+for (t1=0;t1<=1;t1++) {
+  for (t2=0;t2<=1;t2++) {
+    for (t3=0;t3<=3;t3++) {
+      for (t4=0;t4<=7;t4++) {
+        for (t5=0;t5<=7;t5++) {
+          for (t6=0;t6<=7;t6++) {
+            for (t7=0;t7<=3;t7++) {
+              for (t8=0;t8<=3;t8++) {
+                for (t9=0;t9<=1;t9++) {
+                  S1(t1,t2,t3,(8*t3+t6),(8*t2+t5),(8*t1+t4),(32*t1+4*t4+t7),(32*t2+4*t5+t8),(16*t3+2*t6+t9));
+                }
+              }
+            }
           }
         }
       }

@@ -10,6 +10,7 @@
 #include "constraints.h"
 #include "program.h"
 #include "psa_vsa.h"
+#include "psa_knobs.h"
 
 #include "clan/clan.h"
 #include "candl/candl.h"
@@ -28,5 +29,7 @@ int psa_array_partition_optimize(PlutoProg *prog, VSA *vsa);
 int psa_array_partition_optimize_band(PlutoProg *prog, Band *band);
 int psa_array_partition_tile_band(PlutoProg *prog, Band *band, int *tile_sizes);
 void psa_array_partitioning_misc_pretty_print(const PlutoProg *prog, int num_array_part_loops, Ploop **array_part_loops);
+int psa_tile_band_constant(PlutoProg *prog, Band *band, int *tile_sizes, 
+    PlutoHypType htype, PSAHypType psa_htype);
 
 #endif

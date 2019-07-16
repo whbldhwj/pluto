@@ -200,6 +200,131 @@ int psa_array_partition_tile_band(PlutoProg *prog, Band *band, int *tile_sizes) 
   return array_part_dim;
 }
 
+/* Manipulate statement domain and transformation to tile scattering dimesnions 
+ * from firstD to lastD */
+int psa_tile_band_constant(PlutoProg *prog, Band *band, int *tile_sizes, 
+    PlutoHypType htype, PSAHypType psa_htype) {
+  int i, j, s;
+  int depth, npar;
+
+  npar = prog->npar;
+
+  int firstD = band->loop->depth;
+  int lastD = band->loop->depth + band->width - 1;
+
+  int num_domain_supernodes[band->loop->nstmts]; // store the number of domain supernodes for each stmt
+
+  for (s = 0; s < band->loop->nstmts; s++) {
+    num_domain_supernodes[s] = 0;
+  }
+
+  int array_part_dim = 0;
+
+  // tile the loops;
+  for (depth = firstD; depth <= lastD; depth++) {
+    for (s = 0; s < band->loop->nstmts; s++) {
+      Stmt *stmt = band->loop->stmts[s];
+      /* 1. Specify tiles in the original domain */
+      /* 1.1 Add additional dimensions */
+      char iter[6];
+      sprintf(iter, "oT%d", stmt->dim);      
+
+      int hyp_type = (stmt->hyp_types[depth + depth - firstD] == H_SCALAR)
+                          ? H_SCALAR
+                          : htype;
+
+      int psa_hyp_type = (stmt->psa_hyp_types[depth + depth - firstD] == PSA_H_SCALAR)
+                          ? PSA_H_SCALAR
+                          : psa_htype;
+
+      /* 1.2 Specify tile shapes in the original domain */
+      /* Domain supernodes aren't added for scalar dimensions */
+      if (hyp_type != H_SCALAR) {
+        assert(tile_sizes[depth - firstD] >= 1);
+        pluto_stmt_add_dim(stmt, num_domain_supernodes[s], depth, iter,
+                            hyp_type, psa_hyp_type, prog);
+        num_domain_supernodes[s]++;
+
+        /* Add relation b/w tile space variable and intra-tile variables like
+         * 32*xt <= 2t+i <= 32xt + 31 */
+        /* Lower bound */
+        pluto_constraints_add_inequality(stmt->domain);
+
+        for (j = num_domain_supernodes[s]; j < stmt->dim + npar + 1; j++) {
+          stmt->domain->val[stmt->domain->nrows - 1][j] = 
+            stmt->trans->val[1 + (depth - firstD) + depth][j];
+        }
+
+        stmt->domain->val[stmt->domain->nrows - 1][num_domain_supernodes[s] - 1] = 
+          -tile_sizes[depth - firstD];
+        
+        PlutoConstraints *lb =        
+          pluto_constraints_select_row(stmt->domain, stmt->domain->nrows - 1);
+        /* Add the new constraints into dependence polyhedron */
+        pluto_update_deps(stmt, lb, prog); 
+        pluto_constraints_free(lb);
+
+        /* Upper bound */
+        pluto_constraints_add_inequality(stmt->domain);
+        for (j = num_domain_supernodes[s]; j < stmt->dim + npar + 1; j++) {
+          stmt->domain->val[stmt->domain->nrows - 1][j] = 
+            -stmt->trans->val[1 + (depth - firstD) + depth][j];
+        }
+
+        stmt->domain->val[stmt->domain->nrows - 1][num_domain_supernodes[s] - 1] =
+          tile_sizes[depth - firstD];
+
+        stmt->domain->val[stmt->domain->nrows - 1][stmt->domain->ncols - 1] += 
+          tile_sizes[depth - firstD] - 1;
+
+        PlutoConstraints *ub =
+          pluto_constraints_select_row(stmt->domain, stmt->domain->nrows - 1);
+        /* Add the new constraints into dependence polyhedron */
+        pluto_update_deps(stmt, ub, prog);
+        pluto_constraints_free(ub);
+
+        // resetting the shceduling row for 2t+i
+        // phi = 2t+i - 32*oT
+        stmt->trans->val[1 + (depth - firstD) + depth][num_domain_supernodes[s] - 1] = -tile_sizes[depth - firstD];
+      } else {
+        /* Scattering function for the tile space iterator is set the same as its
+         * associated domain iterator. Dimension is not a loop; tile it trivially
+         */
+        pluto_stmt_add_hyperplane(stmt, H_SCALAR, PSA_H_SCALAR, depth);
+        for (j = 0; j < stmt->dim + npar + 1; j++) {
+          stmt->trans->val[depth][j] = 
+            stmt->trans->val[1 + (depth - firstD) + depth][j];
+        }
+      } 
+      stmt->num_tiled_loops++; // not used
+      //stmt->first_tile_dim = firstD; // not used
+      //stmt->last_tile_dim = lastD; // not used
+    } /* all statements */
+
+    array_part_dim++;
+  }   /* all scats to be tiled */
+
+  /* Sink everything to the same depth */
+  int max = 0, curr;
+  for (i = 0; i < prog->nstmts; i++) {
+    max = PLMAX(prog->stmts[i]->trans->nrows, max);    
+  }
+  for (i = 0; i < prog->nstmts; i++) {
+    curr = prog->stmts[i]->trans->nrows;
+    for (j = curr; j < max; j++) {
+      pluto_sink_transformation(prog->stmts[i], prog->stmts[i]->trans->nrows, prog);
+    }
+  }
+
+  curr = prog->num_hyperplanes;  
+  for (depth = curr; depth < max; depth++) {
+    pluto_prog_add_hyperplane(prog, depth, H_UNKNOWN, PSA_H_UNKNOWN);
+  }  
+
+  return array_part_dim;
+}
+
+
 /*
  * Tile the loops in the outermost permutable loop band
  */
@@ -251,7 +376,16 @@ int psa_array_partition_optimize_band(PlutoProg *prog, Band *band) {
     array_part_loops = realloc(array_part_loops, num_array_part_loops * sizeof(Ploop *));
     array_part_loops[num_array_part_loops - 1] = loop;
   }
+#ifdef PSA_ARRAY_PARTITIONING_DEBUG
+  fprintf(stdout, "[Debug] Hey.\n");
+#endif
+
 #ifdef PRINT_ARRAY_PARTITIONING_MISC
+
+  #ifdef PSA_ARRAY_PARTITIONING_DEBUG
+  fprintf(stdout, "[Debug] Enter the print misc.\n");
+  #endif
+
   psa_array_partitioning_misc_pretty_print(
       prog, 
       num_array_part_loops, array_part_loops);
@@ -260,8 +394,11 @@ int psa_array_partition_optimize_band(PlutoProg *prog, Band *band) {
 //  pluto_loops_free(loops, nloops);
 
   /* Tile the band */
-  int num_tiled_loops = psa_array_partition_tile_band(prog, band, tile_sizes);
+  band->width = num_array_part_loops;
+  //int num_tiled_loops = psa_array_partition_tile_band(prog, band, tile_sizes);
+  int num_tiled_loops = psa_tile_band_constant(prog, band, tile_sizes, H_TILE_SPACE_LOOP, PSA_H_ARRAY_PART_LOOP);
 
+  prog->array_part_dim = num_tiled_loops;
   /* Interpret the sa_rows and sa_cols */
   if (prog->array_dim == 1) {
     prog->array_nrow = 1;
@@ -270,23 +407,6 @@ int psa_array_partition_optimize_band(PlutoProg *prog, Band *band) {
     prog->array_nrow = tile_sizes[0];
     prog->array_ncol = tile_sizes[1];
   }
-
-  /* Sink everything to the same depth */
-  int max = 0, curr;
-  for (i = 0; i < prog->nstmts; i++) {
-    max = PLMAX(stmts[i]->trans->nrows, max);    
-  }
-  for (i = 0; i < prog->nstmts; i++) {
-    curr = stmts[i]->trans->nrows;
-    for (j = curr; j < max; j++) {
-      pluto_sink_transformation(stmts[i], stmts[i]->trans->nrows, prog);
-    }
-  }
-
-  curr = prog->num_hyperplanes;  
-  for (depth = curr; depth < max; depth++) {
-    pluto_prog_add_hyperplane(prog, depth, H_UNKNOWN, PSA_H_UNKNOWN);
-  }  
 
   return num_tiled_loops;
 }
