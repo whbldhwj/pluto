@@ -36,5 +36,11 @@ void pluto_stmt_loop_interchange(Stmt *stmt, int level1, int level2,
                                  PlutoProg *prog);
 void psa_tile_loop(PlutoProg *prog, Ploop *loop, int tile_factor, 
                    PlutoHypType htype, PSAHypType psa_htype);
+void psa_tile_loop_constant(PlutoProg *prog, Ploop *loop, int tile_factor, 
+                   PlutoHypType htype, PSAHypType psa_htype);
+//void psa_tile_loop_constant2(PlutoProg *prog, Ploop *loop, int tile_factor, 
+//                   PlutoHypType htype, PSAHypType psa_htype);
+//void psa_tile_loop_constant3(PlutoProg *prog, Ploop *loop, int tile_factor, 
+//                   PlutoHypType htype, PSAHypType psa_htype);
 
 #endif

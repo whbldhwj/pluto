@@ -233,10 +233,20 @@ int psa_array_partition_optimize_band(PlutoProg *prog, Band *band) {
   Ploop **array_part_loops = NULL;
   for (i = 0; i < nloops; i++) {
     Ploop *loop = loops[i];
-    PSAHypType hyp_type = prog->hProps[loop->depth].psa_type;
-    if (IS_PSA_TASK_INTER_LOOP(hyp_type) || IS_PSA_SIMD_LOOP(hyp_type)) {
-      break;
+//    PSAHypType hyp_type = prog->hProps[loop->depth].psa_type;
+//    if (IS_PSA_TASK_INTER_LOOP(hyp_type) || IS_PSA_SIMD_LOOP(hyp_type)) {
+//      break;
+//    }
+    for (j = 0; j < loop->nstmts; j++) {
+      Stmt *stmt = loop->stmts[j];
+      PSAHypType hyp_type = stmt->psa_hyp_types[loop->depth];
+      if (IS_PSA_TASK_INTER_LOOP(hyp_type) || IS_PSA_SIMD_LOOP(hyp_type)) {
+        break;
+      }
     }
+    if (j < loop->nstmts)
+      break;
+
     num_array_part_loops++;
     array_part_loops = realloc(array_part_loops, num_array_part_loops * sizeof(Ploop *));
     array_part_loops[num_array_part_loops - 1] = loop;

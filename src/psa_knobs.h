@@ -62,7 +62,7 @@
 #define SIMD_VECTORIZATION
 
 // print out the transformed code after SIMD vectorization
-#define PRINT_SIMD_VECTORIZATION_TRANS_CODE
+#define PRINT_SIMD_VECTORIZATION_TRANS_PROGRAM
 
 // dump out SIMD vectorization candidates
 #define PRINT_SIMD_VECTORIZATION_MISC

@@ -1,0 +1,37 @@
+# CLooG script generated automatically by PLUTO 0.11.4-546-g08c074e
+# language: C
+c
+
+0 2
+
+1
+
+
+# Number of statements
+1
+
+# S1 (C[i][j] += A[i][k] * B[k][j];)
+6 5
+1 1 0 0 0 
+1 -1 0 0 63 
+1 0 1 0 0 
+1 0 -1 0 63 
+1 0 0 1 0 
+1 0 0 -1 63 
+0 0 0
+
+# we want cloog to set the iterator names
+0
+
+# Number of scattering functions
+1
+
+# T(S1)
+3 8
+0 1 0 0 -1 0 0 0 
+0 0 1 0 0 -1 0 0 
+0 0 0 1 0 0 -1 0 
+
+# we will set the scattering dimension names
+3
+t1 t2 t3 

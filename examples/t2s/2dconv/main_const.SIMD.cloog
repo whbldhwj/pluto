@@ -1,0 +1,44 @@
+# CLooG script generated automatically by PLUTO 0.11.4-546-g08c074e
+# language: C
+c
+
+0 2
+
+1
+
+
+# Number of statements
+1
+
+# S1 (Z[r - 1][s - 1] += X[r + i - 1][s + j - 1] * W[i][j];)
+11 8
+1 0 0 1 0 0 0 -1 
+1 0 0 -1 0 0 0 32 
+1 0 0 0 1 0 0 -1 
+1 0 0 0 -1 0 0 32 
+1 0 0 0 0 1 0 0 
+1 0 0 0 0 -1 0 2 
+1 0 0 0 0 0 1 0 
+1 0 0 0 0 0 -1 2 
+0 -2 -1 1 0 0 0 0 
+1 0 1 0 0 0 0 0 
+1 0 -1 0 0 0 0 1 
+0 0 0
+
+# we want cloog to set the iterator names
+0
+
+# Number of scattering functions
+1
+
+# T(S1)
+5 13
+0 1 0 0 0 0 0 0 0 -1 0 0 0 
+0 0 1 0 0 0 0 0 0 0 -1 0 0 
+0 0 0 1 0 0 0 0 -1 0 -2 -1 0 
+0 0 0 0 1 0 -1 0 0 0 0 0 0 
+0 0 0 0 0 1 0 -1 0 0 0 0 0 
+
+# we will set the scattering dimension names
+5
+t1 t2 t3 t4 t5 
