@@ -32,6 +32,7 @@ void pluto_reschedule_tile(PlutoProg *prog);
 void pluto_interchange(PlutoProg *prog, int level1, int level2);
 void pluto_sink_transformation(Stmt *stmt, int pos, PlutoProg *prog);
 void pluto_make_innermost_loop(Ploop *loop, PlutoProg *prog);
+void psa_make_innermost_loop_band(Ploop *loop, Band *band, PlutoProg *prog);
 void pluto_stmt_loop_interchange(Stmt *stmt, int level1, int level2,
                                  PlutoProg *prog);
 void psa_tile_loop(PlutoProg *prog, Ploop *loop, int tile_factor, 

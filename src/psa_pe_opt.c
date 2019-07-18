@@ -264,19 +264,22 @@ int psa_latency_hiding_optimize_band(Band *band, PlutoProg *prog) {
     /* Permute sync-free loop innermost */
     for (i = 0; i < num_parallel_time_loop; i++) {
       Ploop *loop = parallel_time_loops[i];
-      pluto_make_innermost_loop(loop, prog);
+      // pluto_make_innermost_loop(loop, prog);
+      psa_make_innermost_loop_band(loop, band, prog);
+      
+      int last_depth = band->loop->depth + band->width - 1;
 
-      int last_depth = prog->num_hyperplanes - 1;
-      for (j = 0; j < loop->nstmts; j++) {
-        Stmt *stmt = loop->stmts[j];
-        int d;
-        for (d = loop->depth; d < stmt->trans->nrows; d++) {
-          if (pluto_is_hyperplane_scalar(stmt, d)) {
-            break;
-          }
-        }
-        last_depth = PLMIN(last_depth, d - 1);
-      }
+//      int last_depth = prog->num_hyperplanes - 1;
+//      for (j = 0; j < loop->nstmts; j++) {
+//        Stmt *stmt = loop->stmts[j];
+//        int d;
+//        for (d = loop->depth; d < stmt->trans->nrows; d++) {
+//          if (pluto_is_hyperplane_scalar(stmt, d)) {
+//            break;
+//          }
+//        }
+//        last_depth = PLMIN(last_depth, d - 1);
+//      }      
 
       // update the hyperplane properties
       prog->hProps[last_depth].psa_type = PSA_H_TASK_INTER_LOOP;
@@ -316,19 +319,22 @@ int psa_latency_hiding_optimize_band(Band *band, PlutoProg *prog) {
       Ploop **intra_tile_loops = pluto_get_loops_immediately_inner(loop, prog, &num_intra_tile_loops);
       assert(num_intra_tile_loops == 1);
 
-      pluto_make_innermost_loop(intra_tile_loops[0], prog);
+      band->width++;
+      psa_make_innermost_loop_band(intra_tile_loops[0], band, prog);
+      // pluto_make_innermost_loop(intra_tile_loops[0], prog);
 
-      int last_depth = prog->num_hyperplanes - 1;
-      for (j = 0; j < loop->nstmts; j++) {
-        Stmt *stmt = loop->stmts[j];
-        int d;
-        for (d = loop->depth; d < stmt->trans->nrows; d++) {
-          if (pluto_is_hyperplane_scalar(stmt, d)) {
-            break;
-          }
-        }
-        last_depth = PLMIN(last_depth, d - 1);
-      }
+//      int last_depth = prog->num_hyperplanes - 1;
+//      for (j = 0; j < loop->nstmts; j++) {
+//        Stmt *stmt = loop->stmts[j];
+//        int d;
+//        for (d = loop->depth; d < stmt->trans->nrows; d++) {
+//          if (pluto_is_hyperplane_scalar(stmt, d)) {
+//            break;
+//          }
+//        }
+//        last_depth = PLMIN(last_depth, d - 1);
+//      }
+      int last_depth = band->loop->depth + band->width - 1;
 
       // update the hyperplane properties
       prog->hProps[last_depth].psa_type = PSA_H_TASK_INTER_LOOP;
@@ -722,20 +728,25 @@ int psa_simd_vectorization_optimize_band(Band *band, PlutoProg *prog) {
     int num_intra_tile_loops = 0;
     Ploop **intra_tile_loops = pluto_get_loops_immediately_inner(best_loop, prog, &num_intra_tile_loops);
     assert(num_intra_tile_loops == 1);
+    
+    band->width++;
+    psa_make_innermost_loop_band(intra_tile_loops[0], band, prog);
 
-    pluto_make_innermost_loop(intra_tile_loops[0], prog);
+    int last_depth = band->loop->depth + band->width - 1;
 
-    int last_depth = prog->num_hyperplanes - 1;
-    for (i = 0; i < best_loop->nstmts; i++) {
-      Stmt *stmt = best_loop->stmts[i];
-      int d;
-      for (d = best_loop->depth; d < stmt->trans->nrows; d++) {
-        if (pluto_is_hyperplane_scalar(stmt, d)) {
-          break;
-        }
-      }
-      last_depth = PLMIN(last_depth, d - 1);
-    }
+//    pluto_make_innermost_loop(intra_tile_loops[0], prog);
+//
+//    int last_depth = prog->num_hyperplanes - 1;
+//    for (i = 0; i < best_loop->nstmts; i++) {
+//      Stmt *stmt = best_loop->stmts[i];
+//      int d;
+//      for (d = best_loop->depth; d < stmt->trans->nrows; d++) {
+//        if (pluto_is_hyperplane_scalar(stmt, d)) {
+//          break;
+//        }
+//      }
+//      last_depth = PLMIN(last_depth, d - 1);
+//    }
 
     // update the hyperplane properties
     prog->hProps[last_depth].psa_type = PSA_H_SIMD_LOOP;

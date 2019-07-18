@@ -158,6 +158,18 @@ void pluto_make_innermost_loop(Ploop *loop, PlutoProg *prog) {
   }
 }
 
+/* Make loop the innermost loop in the permutable loop band */
+void psa_make_innermost_loop_band(Ploop *loop, Band *band, PlutoProg *prog) {
+  int i, d;
+  for (i = 0; i < loop->nstmts; i++) {
+    Stmt *stmt = loop->stmts[i];
+    int d;
+    for (d = loop->depth; d < band->loop->depth + band->width - 1; d++) {
+      pluto_stmt_loop_interchange(stmt, d, d + 1, prog);
+    }
+  }
+}
+
 /* Tile the single loop */
 void psa_tile_loop(PlutoProg *prog, Ploop *loop, int tile_factor, 
                    PlutoHypType htype, PSAHypType psa_htype) {

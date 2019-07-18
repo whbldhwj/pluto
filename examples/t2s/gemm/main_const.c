@@ -24,16 +24,18 @@ int main(){
       B[k][j] = (float)rand() / RAND_MAX;
     }
 
-  for (int i = 0; i < I; i++)
-    for (int j = 0; j < J; j++)
-      C[i][j] = 0;
+//  for (int i = 0; i < I; i++)
+//    for (int j = 0; j < J; j++)
+//      C[i][j] = 0;
 
   // computation
 #pragma scop   
   for (int i = 0; i < 64; i++)
     for (int j = 0; j < 64; j++) {
-//      C[i][j] = 0;
+      C[i][j] = 0;
       for (int k = 0; k < 64; k++) {
+//        if (k == 0)
+//          C[i][j] = 0;
         C[i][j] += A[i][k] * B[k][j];
       }
     }
