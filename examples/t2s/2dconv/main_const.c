@@ -39,6 +39,8 @@ int main(){
 //      Z[r - 1][s - 1] = 0;
       for (int i = 0; i < 3; i++)
         for (int j = 0; j < 3; j++) {
+          if (i == 0 && j == 0)
+            Z[r - 1][s - 1] = 0;
           Z[r - 1][s - 1] += X[r + i - 1][s + j - 1] * W[i][j];
         }
     }

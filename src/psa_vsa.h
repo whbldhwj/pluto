@@ -165,7 +165,22 @@ struct psaVSA {
   //int *op_engine_band_width;
   //int *res_engine_band_width;
   int *engine_band_width;
-  
+
+  /*************************************/
+  /* Below are fields added for T2S */
+  /*************************************/
+  /* EXTERNAL_VARIABLE_NUMBER */
+  int evar_num;
+
+  /* INTERMEDIATE_VARIABLE_NUMBER */
+  int ivar_num;
+
+  /* EXTERNAL_VARIABLE_NAMES */
+  char **evar_names;
+
+  /* INTERMEDIATE_VARIABLE_NAMES */
+  char **ivar_names;
+
 };
 typedef struct psaVSA VSA;
 
@@ -182,5 +197,8 @@ void psa_print_int_with_indent(FILE *fp, int indent, int to_print);
 void psa_print_string_list_with_indent(FILE *fp, int indent, char **list, int len);
 void psa_print_int_list_with_indent(FILE *fp, int indent, int *list, int len);
 void psa_vsa_pretty_print(FILE *fp, const VSA *vsa);
+/* T2S Added */
+void vsa_var_extract(PlutoProg *prog, VSA *vsa);
+void psa_t2s_pretty_print(FILE *fp, const VSA *vsa);
 
 #endif

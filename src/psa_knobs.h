@@ -89,7 +89,13 @@
  */
 // dump out virtual systolic array
 #define DUMP_VSA
-// print out the final transformed code
-#define PRINT_FINAL_PROGRAM
+// print out the final transformed CPU code
+#define CPU_CODEGEN
+// generate T2S code
+#define T2S_CODEGEN
+// generate Intel OpenCL code
+#define INTEL_CODEGEN
+// generate Xilinx HLS code
+#define XILINX_CODEGEN
 
 #endif

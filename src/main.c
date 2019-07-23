@@ -663,6 +663,7 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
     }
   
     t_start = rtclock();
+    fprintf(stdout, "[PSA] ****************************\n");
     fprintf(stdout, "[PSA] Run Pluto's Algorithm.\n");
     /* Auto transformation */
     if (!options->identity) {
@@ -719,6 +720,7 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
  * *******************************************
  */
 #ifdef SPACE_TIME_MAPPING  
+    fprintf(stdout, "[PSA] ****************************\n");
     fprintf(stdout, "[PSA] Explore different systolic array candidates.\n");
     PlutoProg** progs;
     int nprogs;
@@ -729,6 +731,7 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
 #ifdef SA_SMART_PICK
     // If SA_SMART_PICK is enabled, PolySA will rank the systolic array candidates based on 
     // heuristics, and place the optimal one in the first place of the list
+    fprintf(stdout, "[PSA] ****************************\n");
     fprintf(stdout, "[PSA] Smart pick systolic array candidate.\n");
     sa_candidates_smart_pick(progs, nprogs);     
     for (int i = 1; i < nprogs; i++) {
@@ -770,6 +773,7 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
 */
 #ifdef LATENCY_HIDING     
       if (options->tile) {
+        fprintf(stdout, "[PSA] ****************************\n");
         fprintf(stdout, "[PSA] Apply latency hiding.\n");
         int ret = psa_latency_hiding_optimize(prog, psa_vsa);
         if (IS_PSA_SUCCESS(ret)) {
@@ -798,6 +802,7 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
 */
 #ifdef SIMD_VECTORIZATION
       if (options->tile) {
+        fprintf(stdout, "[PSA] ****************************\n");
         fprintf(stdout, "[PSA] Apply SIMD vectorization.\n");
         int ret = psa_simd_vectorization_optimize(prog, psa_vsa);
         if (IS_PSA_SUCCESS(ret)) {
@@ -823,6 +828,7 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
  */
 #ifdef ARRAY_PARTITIONING    
       if (options->tile) {
+        fprintf(stdout, "[PSA] ****************************\n");
         fprintf(stdout, "[PSA] Apply array partitioning.\n");
         int ret = psa_array_partition_optimize(prog, psa_vsa);
         if (IS_PSA_SUCCESS(ret)) {
@@ -858,6 +864,36 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
         return 1;
       }
       fclose(vsa_fp);
+#endif
+
+/*
+ * *******************************************
+ * Stage: Code Generation
+ * Step: T2S Input Generation
+ * *******************************************
+ */
+#ifdef T2S_CODEGEN
+
+#endif
+
+/*
+ * *******************************************
+ * Stage: Code Generation
+ * Step: Intel OpenCL Code Generation
+ * *******************************************
+ */
+#ifdef INTEL_CODEGEN
+
+#endif
+
+/*
+ * *******************************************
+ * Stage: Code Generation
+ * Step: Xilinx HLS Code Generation
+ * *******************************************
+ */
+#ifdef XILINX_CODEGEN
+
 #endif
 
       /* Jie Added - End */
@@ -911,7 +947,7 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
  * Step: CPU Program Generation
  * *******************************************
  */
-#ifdef PRINT_FINAL_PROGRAM 
+#ifdef CPU_CODEGEN 
       if (!options->pet && !strcmp(srcFileName, "stdin")) {
         // input stdin == output stdout
         pluto_populate_scop(scop, prog, options);
@@ -925,7 +961,8 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
 
         pluto_print_program(prog, srcFileName, "psa");
       }
-    
+#endif
+
 //      t_all = rtclock() - t_start_all;
 //    
 //      if (options->time && !options->silent) {
@@ -953,8 +990,7 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
 //      }
     
       pluto_prog_free(prog);
-      prog = NULL;
-#endif      
+      prog = NULL;      
     }
   }
   pluto_options_free(options);
