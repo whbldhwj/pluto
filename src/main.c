@@ -750,13 +750,13 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
       prog = progs[prog_id];  
       pluto_transformations_pretty_print(prog);
 
-      /* OP_NUM, RES_NUM, OP_DIM, RES_DIM, OP_NAME, RES_NAME */      
-      vsa_op_res_extract(prog, psa_vsa);
-      /* Extract OP_CHANNEL_DIR and RES_CHANNEL_DIR */    
-      vsa_channel_dir_extract(prog, psa_vsa);    
-      /* TYPE */
-      vsa_type_extract(prog, psa_vsa);
-      /* Jie Added - End */
+//      /* OP_NUM, RES_NUM, OP_DIM, RES_DIM, OP_NAME, RES_NAME */      
+//      vsa_op_res_extract(prog, psa_vsa);
+//      /* Extract OP_CHANNEL_DIR and RES_CHANNEL_DIR */    
+//      vsa_channel_dir_extract(prog, psa_vsa);    
+//      /* TYPE */
+//      vsa_type_extract(prog, psa_vsa);
+//      /* Jie Added - End */
     
       /* NOTE: Due to the supernode tiling, we will tile from the lower level to 
        * upper level. Therefore, we will perform the intra-PE optimization first,
@@ -853,6 +853,7 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
  */
 #ifdef DUMP_VSA 
       /* Jie Added - Start */
+      fprintf(stdout, "[PSA] ***************************************\n");
       fprintf(stdout, "[PSA] Generate Virtual Systolic Array (VSA).\n");    
       /* Complete the rest of VSA fields */
       pluto_prog_to_vsa(prog, psa_vsa);
@@ -873,7 +874,29 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
  * *******************************************
  */
 #ifdef T2S_CODEGEN
+      fprintf(stdout, "[PSA] ***********************\n");
+      fprintf(stdout, "[PSA] Generate T2S inputs.\n");
+      /* Get basename */
+      char *basec, *bname;
+      basec = strdup(srcFileName);
+      bname = basename(basec);
 
+      char *dumpFileName;
+      dumpFileName = malloc(strlen(bname) - 2 + strlen(".") + strlen("t2s") + strlen(".c") + 1);
+      strncpy(dumpFileName, bname, strlen(bname) - 2);
+      dumpFileName[strlen(bname) - 2] = '\0';
+      strcat(dumpFileName, ".");
+      strcat(dumpFileName, "t2s");
+      strcat(dumpFileName, ".c");
+
+      FILE *t2s_fp = fopen(dumpFileName, "w");
+      if (t2s_fp) {
+        psa_t2s_codegen(t2s_fp, psa_vsa);
+      } else {
+        fprintf(stdout, "[PSA] ERROR! File %s can't be opened!\n", "t2s.c");
+        return 1;
+      }
+      fclose(t2s_fp);
 #endif
 
 /*
@@ -958,8 +981,9 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
 //         * transformations are performed, changed loop order/iterator names will
 //         * be missed. */
 //        gen_unroll_file(prog);
-
-        pluto_print_program(prog, srcFileName, "psa");
+        fprintf(stdout, "[PSA] ************************\n");
+        fprintf(stdout, "[PSA] Generate CPU program.\n");
+        pluto_print_program(prog, srcFileName, "cpu");
       }
 #endif
 

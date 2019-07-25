@@ -53,6 +53,21 @@ struct scc {
 };
 typedef struct scc Scc;
 
+struct cc {
+  /* Number of vertices in it */
+  int size;
+
+  /* Maximum dimensionality access in this CC */
+  int max_dim;
+
+  /* Id of this CC */
+  int id;
+
+  /* Acc Id's of the vertices in the CC */
+  int *vertices;
+};
+typedef struct cc CC;
+
 struct graph {
   /* List of vertices. For Pluto, this list vertices directly corresponds to
    * the list of statements in the order they appear in Stmt *stmts with a
@@ -69,6 +84,9 @@ struct graph {
   Scc *sccs;
   int num_sccs;
 
+  /* Jie Added - Start */
+  CC *ccs;
+  /* Jie Added - End */
   int num_ccs;
 
   /* Indicates whether the graph has to be rebuilt. Used by pluto-dfp in order
@@ -81,6 +99,7 @@ typedef struct graph Graph;
 Graph *graph_alloc(int nVertices);
 void graph_free(Graph *g);
 void graph_print_sccs(Graph *g);
+void graph_print_ccs(Graph *g);
 void dfs_for_scc(Graph *g);
 Graph *get_undirected_graph(const Graph *g);
 Graph *graph_transpose(Graph *g);

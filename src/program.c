@@ -2722,6 +2722,9 @@ PlutoProg *pluto_prog_alloc() {
   prog->ntransdeps = 0;
   prog->ddg = NULL;
   prog->fcg = NULL;
+  /* Jie Added - Start */
+  prog->adg = NULL;
+  /* Jie Added - End */
   prog->hProps = NULL;
   prog->num_hyperplanes = 0;
   prog->decls = malloc(16384 * 9);

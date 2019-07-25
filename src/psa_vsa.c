@@ -8,6 +8,284 @@
 #include "psa_vsa_dfc.h"
 #include "psa_vsa_pe.h"
 
+char **get_vsa_array_names(Array **arrays, int array_num) {
+  char **array_names = (char **)malloc(array_num * sizeof(char *));
+  for (int i = 0; i < array_num; i++) {
+    array_names[i] = strdup(arrays[i]->text);
+  }
+  return array_names;
+}
+
+/*
+ * This function extracts the array information from the program
+ */
+void vsa_array_extract(PlutoProg *prog, VSA *vsa) {
+  int array_num = 0;
+  for (int i = 0; i < prog->nstmts; i++) {
+    Stmt *stmt = prog->stmts[i];
+    for (int j = 0; j < stmt->nreads; j++) {
+      PlutoAccess *acc = stmt->reads[j];
+      if (is_access_scalar(acc))
+        continue;
+      int p;
+      for (p = 0; p < array_num; p++) {
+        Array *arr = vsa->arrays[p];
+        if (!strcmp(arr->text, acc->name)) {
+          break;
+        }
+      }
+      if (p == array_num) {
+        array_num++;
+        vsa->arrays = realloc(vsa->arrays, array_num * sizeof(Array *));
+        vsa->arrays[array_num - 1] = (Array *)malloc(sizeof(Array));
+        vsa->arrays[array_num - 1]->text = strdup(acc->name);
+        vsa->arrays[array_num - 1]->id = array_num - 1;
+        vsa->arrays[array_num - 1]->dim = acc->mat->nrows;
+        vsa->arrays[array_num - 1]->data_type = "float"; // By default
+      }    
+    }
+    for (int j = 0; j < stmt->nwrites; j++) {
+      PlutoAccess *acc = stmt->writes[j];
+      if (is_access_scalar(acc))
+        continue;
+      int p;
+      for (p = 0; p < array_num; p++) {
+        Array *arr = vsa->arrays[p];
+        if (!strcmp(arr->text, acc->name)) {
+          break;
+        }
+      }
+      if (p == array_num) {
+        array_num++;
+        vsa->arrays = realloc(vsa->arrays, array_num * sizeof(Array *));
+        vsa->arrays[array_num - 1] = (Array *)malloc(sizeof(Array));
+        vsa->arrays[array_num - 1]->text = strdup(acc->name);
+        vsa->arrays[array_num - 1]->id = array_num - 1;
+        vsa->arrays[array_num - 1]->dim = acc->mat->nrows;
+        vsa->arrays[array_num - 1]->data_type = "float"; // By default
+      }
+    }
+  }
+  vsa->array_num = array_num;
+}
+
+/* 
+ * This function extracts the iterators for T2S program
+ * T2S program assumes that all statements are inside one
+ * permutable loop bands, and we will only keep the loop
+ * iterators and throw the scalar iterators
+ */
+void vsa_t2s_iter_extract(PlutoProg *prog, VSA *vsa) {
+  int band_width = prog->num_hyperplanes;
+  for (int i = 0; i < prog->num_hyperplanes; i++) {
+    bool loop_hyp = false;
+    for (int j = 0; j < prog->nstmts; j++) {
+      if (pluto_is_hyperplane_loop(prog->stmts[j], i)) {
+        loop_hyp = true;
+        break;
+      }
+    }
+    if (!loop_hyp) {
+      band_width = i;
+    }
+  }
+
+  vsa->t2s_iter_num = band_width;
+  vsa->t2s_iters = (char **)malloc(sizeof(char *) * band_width);
+  char iter[10];
+  for (int i = 0; i < vsa->t2s_iter_num; i++) {
+    sprintf(iter, "t%d", i + 1);
+    vsa->t2s_iters[i] = strdup(iter);
+  }
+}
+
+/* 
+ * This function extracts the variables in the program and generates info:
+ * - evar_num
+ * - edvar_num
+ * - ivar_num
+ * - idvar_num
+ * - evar_names
+ * - edvar_names
+ * - ivar_names
+ * - idvar_names
+ */
+void vsa_var_extract(PlutoProg *prog, VSA *vsa) {
+  int *num_stmts_per_acc; // indexed by data variables
+  int num_read_write_data;
+  struct stmt_access_pair ***acc_stmts; // indexed by data variable
+  
+  acc_stmts = get_read_write_access_with_stmts(
+      prog->stmts, prog->nstmts, &num_read_write_data, &num_stmts_per_acc);    
+
+  int total_accs = 0;
+  for (int i = 0; i < num_read_write_data; i++) {
+    total_accs += num_stmts_per_acc[i];
+  }  
+
+  struct stmt_access_var_pair **acc_var_map = NULL;
+  acc_var_map = (struct stmt_access_var_pair **)malloc(total_accs * sizeof(struct stmt_access_var_pair *)); 
+  // initialization
+  for (int i = 0; i < total_accs; i++) {
+    acc_var_map[i] = (struct stmt_access_var_pair *)malloc(sizeof(struct stmt_access_var_pair));
+    acc_var_map[i]->ei = -1;
+    acc_var_map[i]->d = -1;
+  }
+
+  // In the context of UREs in T2S, we are assuming all statements are within one permutable band
+  int band_width = prog->num_hyperplanes;
+  for (int i = 0; i < prog->num_hyperplanes; i++) {
+    bool loop_hyp = false;
+    for (int j = 0; j < prog->nstmts; j++) {      
+      if (pluto_is_hyperplane_loop(prog->stmts[j], i))  {
+        loop_hyp = true;
+        break;
+      }        
+    }
+    if (!loop_hyp) {
+      band_width = i;
+    }
+  }
+
+  char *iters = "t1";;
+  for (int i = 1; i < band_width; i++) {  
+    char iter_tmp[6];
+    sprintf(iter_tmp, ", t%d", i + 1);
+    iters = concat(iters, iter_tmp);
+  }
+
+  // Build the access dependence graph. Each node in the graph is one unique access function in the program.
+  // Then compute the connected components of the graph, all the accesses in the same componenet will 
+  // use the same variable name, the variable is named as [arr_name]_CC[cc_id]_[E/I][D]
+  // If there is only access function in the component, then it is an external variable
+  // If there are more than one access function in the component, then it is an intermediate variable
+  // Additionally, if the access function is a write access, we will add the drain variable correspondingly.
+
+  Graph *adg = adg_create(prog);
+  prog->adg= adg;
+  adg_compute_cc(prog);
+ 
+  // scan through all ccs
+  for (int i = 0; i < prog->adg->num_ccs; i++) {
+    int cc_id = prog->adg->ccs[i].id;
+    if (prog->adg->ccs[i].size == 1) {
+      // external variable
+      vsa->evar_num++;
+      vsa->evar_names = realloc(vsa->evar_names, vsa->evar_num * sizeof(char *));
+      vsa->evar_refs = realloc(vsa->evar_refs, vsa->evar_num * sizeof(char *));
+      
+      for (int j = 0; j < num_read_write_data; j++) {
+        for (int k = 0; k < num_stmts_per_acc[j]; k++) {
+          struct stmt_access_pair *acc_stmt = acc_stmts[j][k];
+          Stmt *stmt = acc_stmt->stmt;
+          PlutoAccess *acc = acc_stmt->acc;
+          if (acc_stmt->acc->cc_id == cc_id) {
+            char *arr_name = acc->name;
+            int cc_id = acc->cc_id;
+            int acc_id = acc->sym_id;
+            // build the var_name
+            char var_name[50];
+            sprintf(var_name, "%s_CC%d_E", arr_name, cc_id);
+      
+            vsa->evar_names[vsa->evar_num - 1] = strdup(var_name);
+      
+            // build the var reference
+            char var_ref[50];
+            sprintf(var_ref, "%s(%s)", var_name, iters); // to be modified later
+      
+            vsa->evar_refs[vsa->evar_num - 1] = strdup(var_ref);
+        
+            // update acc_var_map
+            acc_var_map[acc_id]->stmt = stmt;
+            acc_var_map[acc_id]->acc = acc;
+            acc_var_map[acc_id]->var_name = strdup(var_name);
+            acc_var_map[acc_id]->var_ref = strdup(var_ref);
+            acc_var_map[acc_id]->ei = 0;
+            acc_var_map[acc_id]->d = 0;
+
+            // build the drain variable
+            if (acc_stmt->acc_rw == 1) {
+              vsa->edvar_num++;
+              vsa->edvar_names = realloc(vsa->edvar_names, vsa->edvar_num * sizeof(char *));
+              vsa->edvar_refs = realloc(vsa->edvar_refs, vsa->edvar_num * sizeof(char *));
+              sprintf(var_name, "%s_CC%d_ED", arr_name, cc_id);
+              vsa->edvar_names[vsa->edvar_num - 1] = strdup(var_name);
+    
+              sprintf(var_ref, "%s(%s)", var_name, iters); // to be modifited later
+    
+              vsa->edvar_refs[vsa->edvar_num - 1] = strdup(var_ref);
+    
+              acc_var_map[acc_id]->dvar_name = strdup(var_name);
+              acc_var_map[acc_id]->dvar_ref = strdup(var_ref);
+              acc_var_map[acc_id]->d = 1;
+            }
+          }
+        }
+      }
+    } else {
+      // intermediate variable
+      vsa->ivar_num++;
+      vsa->ivar_names = realloc(vsa->ivar_names, vsa->ivar_num * sizeof(char *));
+      vsa->ivar_refs = realloc(vsa->ivar_refs, vsa->ivar_num * sizeof(char *));
+      
+      bool d_defined = false;
+
+      for (int j = 0; j < num_read_write_data; j++) {
+        for (int k = 0; k < num_stmts_per_acc[j]; k++) {
+          struct stmt_access_pair *acc_stmt = acc_stmts[j][k];
+          Stmt *stmt = acc_stmt->stmt;
+          PlutoAccess *acc = acc_stmt->acc;
+          if (acc_stmt->acc->cc_id == cc_id) {
+            char *arr_name = acc->name;
+            int cc_id = acc->cc_id;
+            int acc_id = acc->sym_id;
+            // build the var_name
+            char var_name[50];
+            sprintf(var_name, "%s_CC%d_I", arr_name, cc_id);
+      
+            vsa->ivar_names[vsa->ivar_num - 1] = strdup(var_name);
+      
+            // build the var reference
+            char var_ref[50];
+            sprintf(var_ref, "%s(%s)", var_name, iters); // to be modified later
+      
+            vsa->ivar_refs[vsa->ivar_num - 1] = strdup(var_ref);
+        
+            // update acc_var_map
+            acc_var_map[acc_id]->stmt = stmt;
+            acc_var_map[acc_id]->acc = acc;
+            acc_var_map[acc_id]->var_name = strdup(var_name);
+            acc_var_map[acc_id]->var_ref = strdup(var_ref);
+            acc_var_map[acc_id]->ei = 0;
+            acc_var_map[acc_id]->d = 0;
+
+            // build the drain variable
+            if (acc_stmt->acc_rw == 1) {
+              sprintf(var_name, "%s_CC%d_ID", arr_name, cc_id);
+              sprintf(var_ref, "%s(%s)", var_name, iters); // to be modified later
+              acc_var_map[acc_id]->dvar_name = strdup(var_name);
+              acc_var_map[acc_id]->dvar_ref = strdup(var_ref);
+              acc_var_map[acc_id]->d = 1;
+            }
+
+            if (acc_stmt->acc_rw == 1 && !d_defined) {
+              // Only allocate one drain variable for the whole CC
+              d_defined = true;
+              vsa->idvar_num++;
+              vsa->idvar_names = realloc(vsa->idvar_names, vsa->idvar_num * sizeof(char *));
+              vsa->idvar_refs = realloc(vsa->idvar_refs, vsa->idvar_num * sizeof(char *));
+              vsa->idvar_names[vsa->idvar_num - 1] = strdup(var_name);
+              vsa->idvar_refs[vsa->idvar_num - 1] = strdup(var_ref);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  vsa->acc_var_map = acc_var_map;
+}
+
 /*
  * This function analyzes the read/write access info from the program and extracts
  * information about operands and results, including:
@@ -428,70 +706,86 @@ void vsa_type_extract(PlutoProg *prog, VSA *vsa) {
 void pluto_prog_to_vsa(PlutoProg *prog, VSA *vsa) {
   int i, j;  
 
-  /* SA_ROWS */
-  vsa->sa_rows = prog->array_nrow;
+//  /* SA_ROWS */
+//  vsa->sa_rows = prog->array_nrow;
+//
+//  /* SA_COLS */
+//  vsa->sa_cols = prog->array_ncol;
+//
+//  /* IL_ENABLE */
+//  vsa->il_enable = prog->array_il_enable;
+//
+//  /* ROW_IL_FACTOR */
+//  vsa->row_il_factor = prog->array_il_factor[0];
+//
+//  /* COL_IL_FACTOR */
+//  vsa->col_il_factor = prog->array_il_factor[1];
+//
+//  /* SIMD_FACTOR */
+//  vsa->simd_factor = prog->array_simd_factor;
+//
+//  /* OP_ENGINE_NUM, RES_ENGINE_NUM */ 
+//  vsa_engine_num_extract(prog, vsa);   
+//
+//  /* FC_SPLIT_FACTOR */
+//  // TODO: add this feature in the future
+//  vsa->fc_split_factors = (int *)malloc((vsa->op_num + vsa->res_num) * sizeof(int));
+//  for (i = 0; i < vsa->op_num + vsa->res_num; i++) {
+//    vsa->fc_split_factors[i] = 1;
+//  }
+//
+//  /* FC_GROUP_FACTOR */
+//  // TODO: add this feature in the future
+//  vsa->fc_group_factors = (int *)malloc((vsa->op_num + vsa->res_num) *sizeof(int));
+//  for (i = 0; i < vsa->op_num + vsa->res_num; i++) {
+//    vsa->fc_group_factors[i] = 1;
+//  }
+//
+//  /* FC_SIMD_FACTOR */
+//  // TODO: add this feature in the future
+//  vsa->fc_simd_factors = (int *)malloc((vsa->op_num + vsa->res_num) *sizeof(int));
+//  for (i = 0; i < vsa->op_num; i++) {
+//    vsa->fc_simd_factors[i] = vsa->simd_factor;
+//  }
+//  for (i = vsa->op_num; i < vsa->op_num + vsa->res_num; i++) {
+//    vsa->fc_simd_factors[i] = 1;
+//  }
+//
+//  /* ARRAY_PART Band Width */
+//  vsa_band_width_extract(prog, vsa);  
+//
+//  /* DF Code */
+//  PlutoProg *new_prog;
+//  new_prog = pluto_prog_dup(prog);
+//  vsa_df_code_extract(new_prog, vsa);
+//  pluto_prog_free(new_prog);
+//
+//  /* DC Code */
+//  new_prog = pluto_prog_dup(prog);
+//  vsa_dc_code_extract(new_prog, vsa);
+//  pluto_prog_free(new_prog);
+//
+//  /* PE Code */
+//  new_prog = pluto_prog_dup(prog);
+//  vsa_pe_code_extract(new_prog, vsa);
+//  pluto_prog_free(new_prog);
 
-  /* SA_COLS */
-  vsa->sa_cols = prog->array_ncol;
+  /* Added for T2S */
+  /* EXTERNAL_VAR_NUMBER
+   * EXTERNAL_DVAR_NUMBER
+   * INTERMEDIATE_VAR_NUMBER
+   * INTERMEDIATE_DVAR_NUMBER
+   * EXETERNAL_VAR_NAMES
+   * EXETER
+   */
+  vsa_var_extract(prog, vsa);
 
-  /* IL_ENABLE */
-  vsa->il_enable = prog->array_il_enable;
+  /* T2S_ITERS */
+  vsa_t2s_iter_extract(prog, vsa);
 
-  /* ROW_IL_FACTOR */
-  vsa->row_il_factor = prog->array_il_factor[0];
-
-  /* COL_IL_FACTOR */
-  vsa->col_il_factor = prog->array_il_factor[1];
-
-  /* SIMD_FACTOR */
-  vsa->simd_factor = prog->array_simd_factor;
-
-  /* OP_ENGINE_NUM, RES_ENGINE_NUM */ 
-  vsa_engine_num_extract(prog, vsa);   
-
-  /* FC_SPLIT_FACTOR */
-  // TODO: add this feature in the future
-  vsa->fc_split_factors = (int *)malloc((vsa->op_num + vsa->res_num) * sizeof(int));
-  for (i = 0; i < vsa->op_num + vsa->res_num; i++) {
-    vsa->fc_split_factors[i] = 1;
-  }
-
-  /* FC_GROUP_FACTOR */
-  // TODO: add this feature in the future
-  vsa->fc_group_factors = (int *)malloc((vsa->op_num + vsa->res_num) *sizeof(int));
-  for (i = 0; i < vsa->op_num + vsa->res_num; i++) {
-    vsa->fc_group_factors[i] = 1;
-  }
-
-  /* FC_SIMD_FACTOR */
-  // TODO: add this feature in the future
-  vsa->fc_simd_factors = (int *)malloc((vsa->op_num + vsa->res_num) *sizeof(int));
-  for (i = 0; i < vsa->op_num; i++) {
-    vsa->fc_simd_factors[i] = vsa->simd_factor;
-  }
-  for (i = vsa->op_num; i < vsa->op_num + vsa->res_num; i++) {
-    vsa->fc_simd_factors[i] = 1;
-  }
-
-  /* ARRAY_PART Band Width */
-  vsa_band_width_extract(prog, vsa);  
-
-  /* DF Code */
-  PlutoProg *new_prog;
-  new_prog = pluto_prog_dup(prog);
-  vsa_df_code_extract(new_prog, vsa);
-  pluto_prog_free(new_prog);
-
-  /* DC Code */
-  new_prog = pluto_prog_dup(prog);
-  vsa_dc_code_extract(new_prog, vsa);
-  pluto_prog_free(new_prog);
-
-  /* PE Code */
-  new_prog = pluto_prog_dup(prog);
-  vsa_pe_code_extract(new_prog, vsa);
-  pluto_prog_free(new_prog);
-
+  /* ARRAYS */
+  vsa_array_extract(prog, vsa);
+  
   return vsa;
 }
 
@@ -611,6 +905,25 @@ VSA *vsa_alloc() {
   vsa->space_band_width = 0;
   vsa->engine_band_width = NULL;  
 
+  /* T2S */
+  vsa->evar_num = 0;
+  vsa->edvar_num = 0;
+  vsa->ivar_num = 0;
+  vsa->idvar_num = 0;
+  vsa->evar_names = NULL;
+  vsa->edvar_names = NULL;
+  vsa->evar_refs = NULL;
+  vsa->edvar_refs = NULL;
+  vsa->ivar_names = NULL;
+  vsa->idvar_names = NULL;
+  vsa->ivar_refs = NULL;
+  vsa->idvar_refs = NULL;
+  vsa->acc_var_map = NULL;
+  vsa->t2s_iter_num = -1;
+  vsa->t2s_iters = NULL;
+  vsa->array_num = -1;
+  vsa->arrays = NULL;
+
   return vsa;
 }
 
@@ -656,119 +969,202 @@ void psa_vsa_pretty_print(FILE *fp, const VSA *vsa) {
   int i;
   fprintf(fp, "{\n");
 
-  /* OP_NAME */
-  psa_print_string_with_indent(fp, 2, "\"OP_NAME\": [\n");
-  psa_print_string_list_with_indent(fp, 4, vsa->op_names, vsa->op_num);
-  psa_print_string_with_indent(fp, 2, "],\n");
+//  /* OP_NAME */
+//  psa_print_string_with_indent(fp, 2, "\"OP_NAME\": [\n");
+//  psa_print_string_list_with_indent(fp, 4, vsa->op_names, vsa->op_num);
+//  psa_print_string_with_indent(fp, 2, "],\n");
+//
+//  /* RES_NAME */
+//  psa_print_string_with_indent(fp, 2, "\"RES_NAME\": [\n");
+//  psa_print_string_list_with_indent(fp, 4, vsa->res_names, vsa->res_num);
+//  psa_print_string_with_indent(fp, 2, "],\n");
+//
+//  /* OP_DIM */
+//  psa_print_string_with_indent(fp, 2, "\"OP_DIM\": [\n");
+//  psa_print_int_list_with_indent(fp, 4, vsa->op_dims, vsa->op_num);
+//  psa_print_string_with_indent(fp, 2, "],\n");
+//
+//  /* RES_DIM */
+//  psa_print_string_with_indent(fp, 2, "\"RES_DIM\": [\n");
+//  psa_print_int_list_with_indent(fp, 4, vsa->res_dims, vsa->res_num);
+//  psa_print_string_with_indent(fp, 2, "],\n");
+//
+//  /* OP_CHANNEL_NUM */
+//  psa_print_string_with_indent(fp, 2, "\"OP_CHANNEL_NUM\": ");  
+//  psa_print_int_with_indent(fp, 0, vsa->op_num);
+//  psa_print_string_with_indent(fp, 0, ",\n");
+//
+//  /* RES_CHANNEL_NUM */
+//  psa_print_string_with_indent(fp, 2, "\"RES_CHANNEL_NUM\": ");
+//  psa_print_int_with_indent(fp, 0, vsa->res_num);
+//  psa_print_string_with_indent(fp, 0, ",\n");
+//
+//  /* FC_SPLIT_FACTOR */
+//  psa_print_string_with_indent(fp, 2, "\"FC_SPLIT_FACTOR\": [\n");
+//  psa_print_int_list_with_indent(fp, 4, vsa->fc_split_factors, vsa->op_num + vsa->res_num);
+//  psa_print_string_with_indent(fp, 2, "],\n");
+//
+//  /* FC_GROUP_FACTOR */
+//  psa_print_string_with_indent(fp, 2, "\"FC_GROUP_FACTOR\": [\n");
+//  psa_print_int_list_with_indent(fp, 4, vsa->fc_group_factors, vsa->op_num + vsa->res_num);
+//  psa_print_string_with_indent(fp, 2, "],\n");
+//
+//  /* FC_SIMD_FACTOR */
+//  psa_print_string_with_indent(fp, 2, "\"FC_SIMD_FACTOR\": [\n");
+//  psa_print_int_list_with_indent(fp, 4, vsa->fc_simd_factors, vsa->op_num + vsa->res_num);
+//  psa_print_string_with_indent(fp, 2, "],\n");  
+//
+//  /* OP_CHANNEL_DIR */
+//  psa_print_string_with_indent(fp, 2, "\"OP_CHANNEL_DIR\": [\n");
+//  psa_print_string_list_with_indent(fp, 4, vsa->op_channel_dirs, vsa->op_num);
+//  psa_print_string_with_indent(fp, 2, "],\n");
+//
+//  /* RES_CHANNEL_DIR */
+//  psa_print_string_with_indent(fp, 2, "\"RES_CHANNEL_DIR\": [\n");
+//  psa_print_string_list_with_indent(fp, 4, vsa->res_channel_dirs, vsa->res_num);
+//  psa_print_string_with_indent(fp, 2, "],\n");
+//
+//  /* IL_ENABLE */
+//  psa_print_string_with_indent(fp, 2, "\"IL_ENABLE\": ");
+//  psa_print_int_with_indent(fp, 0, vsa->il_enable);
+//  psa_print_string_with_indent(fp, 0, ",\n");
+//
+//  /* ROW_IL_FACTOR */
+//  psa_print_string_with_indent(fp, 2, "\"ROW_IL_FACTOR\": ");
+//  psa_print_int_with_indent(fp, 0, vsa->row_il_factor);
+//  psa_print_string_with_indent(fp, 0, ",\n");
+//
+//  /* COL_IL_FACTOR */
+//  psa_print_string_with_indent(fp, 2, "\"COL_IL_FACTOR\": ");
+//  psa_print_int_with_indent(fp, 0, vsa->col_il_factor);
+//  psa_print_string_with_indent(fp, 0, ",\n");
+//
+//  /* SIMD_FACTOR */
+//  psa_print_string_with_indent(fp, 2, "\"SIMD_FACTOR\": ");
+//  psa_print_int_with_indent(fp, 0, vsa->simd_factor);
+//  psa_print_string_with_indent(fp, 0, ",\n");
+//
+//  /* SA_ROWS */
+//  psa_print_string_with_indent(fp, 2, "\"SA_ROWS\": ");
+//  psa_print_int_with_indent(fp, 0, vsa->sa_rows);
+//  psa_print_string_with_indent(fp, 0, ",\n");  
+//
+//  /* SA_COLS */
+//  psa_print_string_with_indent(fp, 2, "\"SA_COLS\": ");
+//  psa_print_int_with_indent(fp, 0, vsa->sa_cols);
+//  psa_print_string_with_indent(fp, 0, ",\n");  
+//
+//  /* OP_ENGINE_NUM */
+//  psa_print_string_with_indent(fp, 2, "\"OP_ENGINE_NUM\": [\n");
+//  psa_print_int_list_with_indent(fp, 4, vsa->op_engine_nums, vsa->op_num);
+//  psa_print_string_with_indent(fp, 2, "],\n");
+//
+//  /* RES_ENGINE_NUM */
+//  psa_print_string_with_indent(fp, 2, "\"RES_ENGINE_NUM\": [\n");
+//  psa_print_int_list_with_indent(fp, 4, vsa->res_engine_nums, vsa->res_num);
+//  psa_print_string_with_indent(fp, 2, "],\n");
+//
+//  /* TYPE */
+//  psa_print_string_with_indent(fp, 2, "\"TYPE\": \"");
+//  psa_print_string_with_indent(fp, 0, vsa->type);
+//  psa_print_string_with_indent(fp, 0, "\",\n");
+//
+//  /* ARRAY_PART_BAND_WIDTH */
+//  psa_print_string_with_indent(fp, 2, "\"ARRAY_PART_BAND_WIDTH\": ");
+//  psa_print_int_with_indent(fp, 0, vsa->array_part_band_width);
+//  psa_print_string_with_indent(fp, 0, ",\n");  
+//
+//  /* SPACE_BAND_WIDTH */
+//  psa_print_string_with_indent(fp, 2, "\"SPACE_BAND_WIDTH\": ");
+//  psa_print_int_with_indent(fp, 0, vsa->space_band_width);
+//  psa_print_string_with_indent(fp, 0, ",\n");
+//
+//  /* ENGINE_BAND_WIDTH */
+//  psa_print_string_with_indent(fp, 2, "\"ENGINE_BAND_WIDTH\": [\n");
+//  psa_print_int_list_with_indent(fp, 4, vsa->engine_band_width, vsa->op_num + vsa->res_num);
+//  psa_print_string_with_indent(fp, 2, "],\n");
 
-  /* RES_NAME */
-  psa_print_string_with_indent(fp, 2, "\"RES_NAME\": [\n");
-  psa_print_string_list_with_indent(fp, 4, vsa->res_names, vsa->res_num);
-  psa_print_string_with_indent(fp, 2, "],\n");
-
-  /* OP_DIM */
-  psa_print_string_with_indent(fp, 2, "\"OP_DIM\": [\n");
-  psa_print_int_list_with_indent(fp, 4, vsa->op_dims, vsa->op_num);
-  psa_print_string_with_indent(fp, 2, "],\n");
-
-  /* RES_DIM */
-  psa_print_string_with_indent(fp, 2, "\"RES_DIM\": [\n");
-  psa_print_int_list_with_indent(fp, 4, vsa->res_dims, vsa->res_num);
-  psa_print_string_with_indent(fp, 2, "],\n");
-
-  /* OP_CHANNEL_NUM */
-  psa_print_string_with_indent(fp, 2, "\"OP_CHANNEL_NUM\": ");  
-  psa_print_int_with_indent(fp, 0, vsa->op_num);
+  /****************************************/
+  /* Following are T2S attibutes */
+  /****************************************/
+  /* EVAR_NUM */
+  psa_print_string_with_indent(fp, 2, "\"EVAR_NUM\": ");
+  psa_print_int_with_indent(fp, 0, vsa->evar_num);
   psa_print_string_with_indent(fp, 0, ",\n");
 
-  /* RES_CHANNEL_NUM */
-  psa_print_string_with_indent(fp, 2, "\"RES_CHANNEL_NUM\": ");
-  psa_print_int_with_indent(fp, 0, vsa->res_num);
+  /* EDVAR_NUM */
+  psa_print_string_with_indent(fp, 2, "\"EDVAR_NUM\": ");
+  psa_print_int_with_indent(fp, 0, vsa->edvar_num);
   psa_print_string_with_indent(fp, 0, ",\n");
 
-  /* FC_SPLIT_FACTOR */
-  psa_print_string_with_indent(fp, 2, "\"FC_SPLIT_FACTOR\": [\n");
-  psa_print_int_list_with_indent(fp, 4, vsa->fc_split_factors, vsa->op_num + vsa->res_num);
-  psa_print_string_with_indent(fp, 2, "],\n");
-
-  /* FC_GROUP_FACTOR */
-  psa_print_string_with_indent(fp, 2, "\"FC_GROUP_FACTOR\": [\n");
-  psa_print_int_list_with_indent(fp, 4, vsa->fc_group_factors, vsa->op_num + vsa->res_num);
-  psa_print_string_with_indent(fp, 2, "],\n");
-
-  /* FC_SIMD_FACTOR */
-  psa_print_string_with_indent(fp, 2, "\"FC_SIMD_FACTOR\": [\n");
-  psa_print_int_list_with_indent(fp, 4, vsa->fc_simd_factors, vsa->op_num + vsa->res_num);
-  psa_print_string_with_indent(fp, 2, "],\n");  
-
-  /* OP_CHANNEL_DIR */
-  psa_print_string_with_indent(fp, 2, "\"OP_CHANNEL_DIR\": [\n");
-  psa_print_string_list_with_indent(fp, 4, vsa->op_channel_dirs, vsa->op_num);
-  psa_print_string_with_indent(fp, 2, "],\n");
-
-  /* RES_CHANNEL_DIR */
-  psa_print_string_with_indent(fp, 2, "\"RES_CHANNEL_DIR\": [\n");
-  psa_print_string_list_with_indent(fp, 4, vsa->res_channel_dirs, vsa->res_num);
-  psa_print_string_with_indent(fp, 2, "],\n");
-
-  /* IL_ENABLE */
-  psa_print_string_with_indent(fp, 2, "\"IL_ENABLE\": ");
-  psa_print_int_with_indent(fp, 0, vsa->il_enable);
+  /* IVAR_NUM */
+  psa_print_string_with_indent(fp, 2, "\"IVAR_NUM\": ");
+  psa_print_int_with_indent(fp, 0, vsa->ivar_num);
   psa_print_string_with_indent(fp, 0, ",\n");
 
-  /* ROW_IL_FACTOR */
-  psa_print_string_with_indent(fp, 2, "\"ROW_IL_FACTOR\": ");
-  psa_print_int_with_indent(fp, 0, vsa->row_il_factor);
+  /* IDVAR_NUM */
+  psa_print_string_with_indent(fp, 2, "\"IDVAR_NUM\": ");
+  psa_print_int_with_indent(fp, 0, vsa->idvar_num);
   psa_print_string_with_indent(fp, 0, ",\n");
 
-  /* COL_IL_FACTOR */
-  psa_print_string_with_indent(fp, 2, "\"COL_IL_FACTOR\": ");
-  psa_print_int_with_indent(fp, 0, vsa->col_il_factor);
-  psa_print_string_with_indent(fp, 0, ",\n");
-
-  /* SIMD_FACTOR */
-  psa_print_string_with_indent(fp, 2, "\"SIMD_FACTOR\": ");
-  psa_print_int_with_indent(fp, 0, vsa->simd_factor);
-  psa_print_string_with_indent(fp, 0, ",\n");
-
-  /* SA_ROWS */
-  psa_print_string_with_indent(fp, 2, "\"SA_ROWS\": ");
-  psa_print_int_with_indent(fp, 0, vsa->sa_rows);
-  psa_print_string_with_indent(fp, 0, ",\n");  
-
-  /* SA_COLS */
-  psa_print_string_with_indent(fp, 2, "\"SA_COLS\": ");
-  psa_print_int_with_indent(fp, 0, vsa->sa_cols);
-  psa_print_string_with_indent(fp, 0, ",\n");  
-
-  /* OP_ENGINE_NUM */
-  psa_print_string_with_indent(fp, 2, "\"OP_ENGINE_NUM\": [\n");
-  psa_print_int_list_with_indent(fp, 4, vsa->op_engine_nums, vsa->op_num);
+  /* EVAR_NAMES */
+  psa_print_string_with_indent(fp, 2, "\"EVAR_NAMES\": [\n");
+  psa_print_string_list_with_indent(fp, 4, vsa->evar_names, vsa->evar_num);
   psa_print_string_with_indent(fp, 2, "],\n");
 
-  /* RES_ENGINE_NUM */
-  psa_print_string_with_indent(fp, 2, "\"RES_ENGINE_NUM\": [\n");
-  psa_print_int_list_with_indent(fp, 4, vsa->res_engine_nums, vsa->res_num);
+  /* EDVAR_NAMES */
+  psa_print_string_with_indent(fp, 2, "\"EDVAR_NAMES\": [\n");
+  psa_print_string_list_with_indent(fp, 4, vsa->edvar_names, vsa->edvar_num);
   psa_print_string_with_indent(fp, 2, "],\n");
 
-  /* TYPE */
-  psa_print_string_with_indent(fp, 2, "\"TYPE\": \"");
-  psa_print_string_with_indent(fp, 0, vsa->type);
-  psa_print_string_with_indent(fp, 0, "\",\n");
+  /* EVAR_REFS */
+  psa_print_string_with_indent(fp, 2, "\"EVAR_REFS\": [\n");
+  psa_print_string_list_with_indent(fp, 4, vsa->evar_refs, vsa->evar_num);
+  psa_print_string_with_indent(fp, 2, "],\n");
 
-  /* ARRAY_PART_BAND_WIDTH */
-  psa_print_string_with_indent(fp, 2, "\"ARRAY_PART_BAND_WIDTH\": ");
-  psa_print_int_with_indent(fp, 0, vsa->array_part_band_width);
-  psa_print_string_with_indent(fp, 0, ",\n");  
+  /* EDVAR_REFS */
+  psa_print_string_with_indent(fp, 2, "\"EDVAR_REFS\": [\n");
+  psa_print_string_list_with_indent(fp, 4, vsa->edvar_refs, vsa->edvar_num);
+  psa_print_string_with_indent(fp, 2, "],\n");
 
-  /* SPACE_BAND_WIDTH */
-  psa_print_string_with_indent(fp, 2, "\"SPACE_BAND_WIDTH\": ");
-  psa_print_int_with_indent(fp, 0, vsa->space_band_width);
+  /* IVAR_NAMES */
+  psa_print_string_with_indent(fp, 2, "\"IVAR_NAMES\": [\n");
+  psa_print_string_list_with_indent(fp, 4, vsa->ivar_names, vsa->ivar_num);
+  psa_print_string_with_indent(fp, 2, "],\n");
+
+  /* IDVAR_NAMES */
+  psa_print_string_with_indent(fp, 2, "\"IDVAR_NAMES\": [\n");
+  psa_print_string_list_with_indent(fp, 4, vsa->idvar_names, vsa->idvar_num);
+  psa_print_string_with_indent(fp, 2, "],\n");
+
+  /* IVAR_REFS */
+  psa_print_string_with_indent(fp, 2, "\"IVAR_REFS\": [\n");
+  psa_print_string_list_with_indent(fp, 4, vsa->ivar_refs, vsa->ivar_num);
+  psa_print_string_with_indent(fp, 2, "],\n");
+
+  /* IDVAR_REFS */
+  psa_print_string_with_indent(fp, 2, "\"IDVAR_REFS\": [\n");
+  psa_print_string_list_with_indent(fp, 4, vsa->idvar_refs, vsa->idvar_num);
+  psa_print_string_with_indent(fp, 2, "],\n");
+
+  /* T2S_ITER_NUM */
+  psa_print_string_with_indent(fp, 2, "\"T2S_ITER_NUM\": ");
+  psa_print_int_with_indent(fp, 0, vsa->t2s_iter_num);
   psa_print_string_with_indent(fp, 0, ",\n");
 
-  /* ENGINE_BAND_WIDTH */
-  psa_print_string_with_indent(fp, 2, "\"ENGINE_BAND_WIDTH\": [\n");
-  psa_print_int_list_with_indent(fp, 4, vsa->engine_band_width, vsa->op_num + vsa->res_num);
+  /* T2S_ITERS */
+  psa_print_string_with_indent(fp, 2, "\"T2S_ITERS\": [\n");
+  psa_print_string_list_with_indent(fp, 4, vsa->t2s_iters, vsa->t2s_iter_num);
+  psa_print_string_with_indent(fp, 2, "],\n");
+
+  /* ARRAY_NUM */
+  psa_print_string_with_indent(fp, 2, "\"ARRAY_NUM\": ");
+  psa_print_int_with_indent(fp, 0, vsa->array_num);
+  psa_print_string_with_indent(fp, 0, ",\n");
+
+  /* ARRAYS */
+  psa_print_string_with_indent(fp, 2, "\"ARRAYS\": [\n");
+  psa_print_string_list_with_indent(fp, 4, get_vsa_array_names(vsa->arrays, vsa->array_num), vsa->array_num);
   psa_print_string_with_indent(fp, 2, "],\n");
 
   fprintf(fp, "}\n");

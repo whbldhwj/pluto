@@ -367,6 +367,11 @@ PlutoProg *pluto_prog_dup(const PlutoProg *prog) {
   else
     new_prog->fcg = NULL;
 
+  if (prog->adg != NULL)
+    new_prog->adg = graph_dup(prog->adg);
+  else
+    new_prog->adg = NULL;
+
 // #ifdef JIE_DEBUG
 //   fprintf(stdout, "[Debug] Stop 5.\n");
 // #endif
@@ -484,6 +489,11 @@ PlutoProg *pluto_prog_dup(const PlutoProg *prog) {
 
   /* Systolic array interior I/O elimination */
   new_prog->array_io_enable = prog->array_io_enable;
+
+  // Reassociate the dep and stmts
+  // This step is vital for following stages which reply on comparing 
+  // dep's acc with stmt's acc directly
+  reassociate_dep_stmt_acc(new_prog);
 
   return new_prog;
 }

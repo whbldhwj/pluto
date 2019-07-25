@@ -172,15 +172,53 @@ struct psaVSA {
   /* EXTERNAL_VARIABLE_NUMBER */
   int evar_num;
 
+  /* EXTERNAL_DRAIN_VARIABLE_NNUMBER */
+  int edvar_num;
+
   /* INTERMEDIATE_VARIABLE_NUMBER */
   int ivar_num;
+
+  /* INTERMEDIATE_DRAIN_VARIABLE_NUMBER */
+  int idvar_num;
 
   /* EXTERNAL_VARIABLE_NAMES */
   char **evar_names;
 
+  /* EXTERNAL_DRAIN_VARIABLE_NAMES */
+  char **edvar_names;
+
+  /* EXTERNAL_VARIABLE_REFS */
+  char **evar_refs;
+
+  /* EXTERNAL_DRAIN_VARIABLE_REFS */
+  char **edvar_refs;
+
   /* INTERMEDIATE_VARIABLE_NAMES */
   char **ivar_names;
 
+  /* INTERMEDIATE_DRAIN_VARIABLE_NAMES */
+  char **idvar_names;
+
+  /* INTERMEDIATE_VARIABLE_REFS */
+  char **ivar_refs;
+
+  /* INTERMEDIATE_DRAIN_VARIABLE_REFS */
+  char **idvar_refs;
+
+  /* ACCESS_VARIABLE_MAP */
+  struct stmt_access_var_pair **acc_var_map;
+
+  /* T2S_ITERS_NUM */
+  int t2s_iter_num;
+
+  /* T2S_ITERS */
+  char **t2s_iters;
+ 
+  /* ARRAY_NUM */
+  int array_num;
+
+  /* ARRAYS */
+  Array **arrays;
 };
 typedef struct psaVSA VSA;
 
@@ -198,7 +236,8 @@ void psa_print_string_list_with_indent(FILE *fp, int indent, char **list, int le
 void psa_print_int_list_with_indent(FILE *fp, int indent, int *list, int len);
 void psa_vsa_pretty_print(FILE *fp, const VSA *vsa);
 /* T2S Added */
+void vsa_array_extract(PlutoProg *prog, VSA *vsa);
 void vsa_var_extract(PlutoProg *prog, VSA *vsa);
-void psa_t2s_pretty_print(FILE *fp, const VSA *vsa);
-
+void psa_t2s_codegen(FILE *fp, const VSA *vsa);
+char **get_vsa_array_names(Array **arrays, int array_num);
 #endif

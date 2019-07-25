@@ -211,6 +211,9 @@ typedef enum psastmttype {
 typedef struct pluto_access {
   int sym_id;
   char *name;
+  /* Jie Added - Start */
+  int cc_id;
+  /* Jie Added - End */
 
   /* scoplib_symbol_p symbol; */
 
@@ -315,6 +318,19 @@ typedef struct statement Stmt;
 struct stmt_access_pair {
   PlutoAccess *acc;
   Stmt *stmt;
+  bool acc_rw; // 0 - read 1 - write
+};
+
+struct stmt_access_var_pair {
+  Stmt *stmt;
+  PlutoAccess *acc;
+  char *var_name;  
+  char *var_ref;
+  char *dvar_name;
+  char *dvar_ref;
+  bool ei; // 0 - external 1 - intermediate
+  bool d; // 0 - not drain 1 - drain
+  // int cc_id;
 };
 
 struct TiledHyperplane {
@@ -562,6 +578,9 @@ struct plutoProg {
   /* Fusion conflict graph of the program */
   Graph *fcg;
 
+  /* Access dependence graph of the program */
+  Graph *adg;
+
   /* Options for Pluto */
   PlutoOptions *options;
 
@@ -770,6 +789,10 @@ void ddg_update(Graph *g, PlutoProg *prog);
 void ddg_compute_scc(PlutoProg *prog);
 void ddg_compute_cc(PlutoProg *prog);
 Graph *ddg_create(PlutoProg *prog);
+/* Jie Added - Start */
+Graph *adg_create(PlutoProg *prog);
+void adg_compute_cc(PlutoProg *prog);
+/* Jie Added - End */
 int ddg_sccs_direct_connected(Graph *g, PlutoProg *prog, int scc1, int scc2);
 int cut_between_sccs(PlutoProg *prog, Graph *ddg, int scc1, int scc2);
 int cut_all_sccs(PlutoProg *prog, Graph *ddg);

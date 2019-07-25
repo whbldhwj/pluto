@@ -53,6 +53,7 @@ Graph *graph_alloc(int nVertices) {
   }
 
   g->sccs = (Scc *)malloc(nVertices * sizeof(Scc));
+  g->ccs = (CC *)malloc(nVertices * sizeof(CC));
 
   /* Not computed yet */
   g->num_sccs = -1;
@@ -72,6 +73,19 @@ void graph_print_sccs(Graph *g) {
   for (i = 0; i < g->num_sccs; i++) {
     IF_DEBUG(printf("\tSCC %d: size: %d: max stmt dim: %d\n", g->sccs[i].id,
                     g->sccs[i].size, g->sccs[i].max_dim));
+  }
+}
+
+/* Print the connected components */
+void graph_print_ccs(Graph *g) {
+  int i;
+
+  /* CCs should have been computed */
+  assert(g->num_ccs != -1);
+
+  for (i = 0; i < g->num_ccs; i++) {
+    printf("\tCC %d: size: %d: max acc dim: %d\n", g->ccs[i].id, 
+        g->ccs[i].size, g->ccs[i].max_dim);
   }
 }
 
@@ -269,5 +283,6 @@ void graph_free(Graph *g) {
   pluto_matrix_free(g->adj);
   free(g->vertices);
   free(g->sccs);
+  free(g->ccs);
   free(g);
 }

@@ -57,6 +57,7 @@ get_read_write_access_with_stmts(Stmt **stmts, int nstmts, int *num_data,
       new = malloc(sizeof(struct stmt_access_pair));
       new->stmt = stmt;
       new->acc = stmt->reads[k];
+      new->acc_rw = 0;
 
       for (j = 0; j < curr_num; j++) {
         if (!strcmp(stmt->reads[k]->name, acc_stmts[j][0]->acc->name)) {
@@ -89,6 +90,7 @@ get_read_write_access_with_stmts(Stmt **stmts, int nstmts, int *num_data,
     new = malloc(sizeof(struct stmt_access_pair));
     new->stmt = stmt;
     new->acc = stmt->writes[0];
+    new->acc_rw = 1;
 
     for (j = 0; j < curr_num; j++) {
       if (!strcmp(stmt->writes[0]->name, acc_stmts[j][0]->acc->name)) {

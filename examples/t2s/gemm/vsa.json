@@ -1,0 +1,37 @@
+{
+  "OP_NAME": [
+  ],
+  "RES_NAME": [
+  ],
+  "OP_DIM": [
+  ],
+  "RES_DIM": [
+  ],
+  "OP_CHANNEL_NUM": 0,
+  "RES_CHANNEL_NUM": 0,
+  "FC_SPLIT_FACTOR": [
+  ],
+  "FC_GROUP_FACTOR": [
+  ],
+  "FC_SIMD_FACTOR": [
+  ],
+  "OP_CHANNEL_DIR": [
+  ],
+  "RES_CHANNEL_DIR": [
+  ],
+  "IL_ENABLE": 0,
+  "ROW_IL_FACTOR": 0,
+  "COL_IL_FACTOR": 0,
+  "SIMD_FACTOR": 0,
+  "SA_ROWS": 0,
+  "SA_COLS": 0,
+  "OP_ENGINE_NUM": [
+  ],
+  "RES_ENGINE_NUM": [
+  ],
+  "TYPE": "(null)",
+  "ARRAY_PART_BAND_WIDTH": 0,
+  "SPACE_BAND_WIDTH": 0,
+  "ENGINE_BAND_WIDTH": [
+  ],
+}

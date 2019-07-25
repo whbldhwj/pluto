@@ -2098,6 +2098,39 @@ Graph *ddg_create(PlutoProg *prog) {
   return g;
 }
 
+/* Jie Added - Start */
+/*
+ * Create the ADG (RAR deps not included)
+ */
+Graph *adg_create(PlutoProg *prog) {
+  int i;
+
+  // count the total number of access
+  int *num_stmts_per_acc;
+  int num_read_write_data;
+  struct stmt_access_pair ***acc_stmts;
+
+  acc_stmts = get_read_write_access_with_stmts(
+      prog->stmts, prog->nstmts, &num_read_write_data, &num_stmts_per_acc);
+
+  int total_accs = 0;
+  for (int i = 0; i < num_read_write_data; i++) {
+    total_accs += num_stmts_per_acc[i];
+  }
+
+  Graph *g = graph_alloc(total_accs);
+
+  for (int i = 0; i < prog->ndeps; i++) {
+    Dep *dep = prog->deps[i];
+    if (IS_RAR(dep->type)) 
+      continue;
+    g->adj->val[dep->src_acc->sym_id][dep->dest_acc->sym_id] += 1;
+  }
+
+  return g;
+}
+/* Jie Added - End */
+
 /*
  * Get the dimensionality of the stmt with max dimensionality in the SCC
  */
@@ -2115,6 +2148,31 @@ static int get_max_orig_dim_in_scc(PlutoProg *prog, int scc_id) {
   return max;
 }
 
+/*
+ * Get the dimensionality of the acc with max dimensionality in the CC
+ */
+static int get_max_dim_in_cc(PlutoProg *prog, int cc_id) {
+  int i, j;
+
+  int max = -1;
+  for (i = 0; i < prog->nstmts; i++) {
+    Stmt *stmt = prog->stmts[i];
+    for (j = 0; j < stmt->nreads; j++) {
+      PlutoAccess *acc = stmt->reads[j];
+      if (acc->cc_id == cc_id) {
+        max = PLMAX(max, acc->mat->nrows);
+      }
+    }
+    for (j = 0; j < stmt->nwrites; j++) {
+      PlutoAccess *acc = stmt->writes[j];
+      if (acc->cc_id == cc_id) {
+        max = PLMAX(max, acc->mat->nrows);
+      }
+    }
+  }
+  return max;
+}
+
 /* Number of vertices in a given SCC */
 static int get_scc_size(PlutoProg *prog, int scc_id) {
   int i;
@@ -2128,6 +2186,30 @@ static int get_scc_size(PlutoProg *prog, int scc_id) {
     }
   }
 
+  return num;
+}
+
+/* Number of vertices in a given CC */
+static int get_cc_size(PlutoProg *prog, int cc_id) {
+  int i, j;
+  Stmt *stmt;
+  PlutoAccess *acc;
+
+  int num = 0;
+  for (i = 0; i < prog->nstmts; i++) {
+    stmt = prog->stmts[i];
+    for (j = 0; j < stmt->nreads; j++) {
+      acc = stmt->reads[j];
+      if (acc->cc_id == cc_id) 
+        num++;
+    }
+    for (j = 0; j < stmt->nwrites; j++) {
+      acc = stmt->writes[j];
+      if (acc->cc_id == cc_id)
+        num++;
+    }
+  }
+  
   return num;
 }
 
@@ -2161,6 +2243,58 @@ void ddg_compute_cc(PlutoProg *prog) {
   g->num_ccs = num_cc;
   graph_free(gU);
 }
+
+/* Jie Added - Start */
+/* Compute the connected components of the graph */
+void adg_compute_cc(PlutoProg *prog) {
+  int i;
+  int cc_id = -1;
+  int num_cc = 0;
+  int stmt_id;
+  int acc_id;
+  int time = 0;
+  Graph *g = prog->adg;
+  /* Make the graph undirected */
+  Graph *gU = get_undirected_graph(g);
+  for (i = 0; i < gU->nVertices; i++) {
+    gU->vertices[i].vn = 0;
+  }
+  for (i = 0; i < gU->nVertices; i++) {
+    if (gU->vertices[i].vn == 0) {
+      cc_id++;
+      num_cc++;
+      gU->vertices[i].cc_id = cc_id;
+      dfs_vertex(gU, &gU->vertices[i], &time);
+      gU->vertices[i].cc_id = cc_id;
+    }
+    g->vertices[i].cc_id = gU->vertices[i].cc_id;
+    acc_id = g->vertices[i].id;
+    assert(acc_id == i);
+    for (int j = 0; j < prog->nstmts; j++) {
+      Stmt *stmt = prog->stmts[j];
+      for (int k = 0; k < stmt->nreads; k++) {
+        if (stmt->reads[k]->sym_id == acc_id)
+          stmt->reads[k]->cc_id = cc_id;      
+      }
+      for (int k = 0; k < stmt->nwrites; k++) {
+        if (stmt->writes[k]->sym_id == acc_id)
+          stmt->writes[k]->cc_id = cc_id;
+      }
+    }
+  }
+  g->num_ccs = num_cc;
+  // update the ccs
+  for (i = 0; i < g->num_ccs; i++) {
+    g->ccs[i].max_dim = get_max_dim_in_cc(prog, i);
+    g->ccs[i].size = get_cc_size(prog, i);
+    g->ccs[i].id = i;    
+  }
+
+  graph_free(gU);
+
+  graph_print_ccs(g);
+}
+/* Jie Added - End
 
 /* Compute the SCCs of a graph (using Kosaraju's algorithm) */
 void ddg_compute_scc(PlutoProg *prog) {
@@ -2546,4 +2680,29 @@ void psa_print_deps(const PlutoProg *prog) {
     pluto_constraints_pretty_print(stdout, dpolytope);
     fprintf(stdout, "***********************\n");
   }
+
+  fprintf(stdout, "[PSA] Total number of trans dependences: %d\n", prog->ntransdeps);
+  for (int i = 0; i < prog->ntransdeps; i++) {
+    Dep *dep = prog->transdeps[i];
+    fprintf(stdout, "***********************\n");
+    fprintf(stdout, "[PSA] Dependences ID: %d\n", i);
+    fprintf(stdout, "[PSA] Src stmt ID: %d\n", dep->src);
+    fprintf(stdout, "[PSA] Dest stmt ID: %d\n", dep->dest);
+    if (IS_WAR(dep->type)) {
+      fprintf(stdout, "[PSA] Dep type: WAR\n");
+    } else if (IS_WAW(dep->type)) {
+      fprintf(stdout, "[PSA] Dep type: WAW\n");
+    } else if (IS_RAW(dep->type)) {
+      fprintf(stdout, "[PSA] Dep type: RAW\n");
+    } else if (IS_RAR(dep->type)) {
+      fprintf(stdout, "[PSA] Dep type: RAR\n");
+    }
+    PlutoAccess *acc = dep->src_acc;
+    fprintf(stdout, "[PSA] Arr name: %s\n", acc->name);    
+
+    PlutoConstraints* dpolytope = dep->dpolytope;
+    pluto_constraints_pretty_print(stdout, dpolytope);
+    fprintf(stdout, "***********************\n");
+  }
+ 
 }
