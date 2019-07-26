@@ -8,6 +8,16 @@
 #include "psa_vsa_dfc.h"
 #include "psa_vsa_pe.h"
 
+char **get_vsa_URE_texts(URE **UREs, int URE_num) {
+  if (URE_num < 0)
+    return NULL;
+  char **URE_texts = (char **)malloc(URE_num * sizeof(char *));
+  for (int i = 0; i < URE_num; i++) {
+    URE_texts[i] = strdup(UREs[i]->text);
+  }
+  return URE_texts;
+}
+
 char **get_vsa_array_names(Array **arrays, int array_num) {
   char **array_names = (char **)malloc(array_num * sizeof(char *));
   for (int i = 0; i < array_num; i++) {
@@ -785,8 +795,9 @@ void pluto_prog_to_vsa(PlutoProg *prog, VSA *vsa) {
 
   /* ARRAYS */
   vsa_array_extract(prog, vsa);
-  
-  return vsa;
+
+  /* URES */
+  vsa_URE_extract(prog, vsa);
 }
 
 /*
@@ -923,6 +934,11 @@ VSA *vsa_alloc() {
   vsa->t2s_iters = NULL;
   vsa->array_num = -1;
   vsa->arrays = NULL;
+
+  vsa->URE_num = -1;
+  vsa->UREs = NULL;
+  vsa->domain_exp_num = -1;
+  vsa->domain_exps = NULL;
 
   return vsa;
 }
@@ -1165,6 +1181,26 @@ void psa_vsa_pretty_print(FILE *fp, const VSA *vsa) {
   /* ARRAYS */
   psa_print_string_with_indent(fp, 2, "\"ARRAYS\": [\n");
   psa_print_string_list_with_indent(fp, 4, get_vsa_array_names(vsa->arrays, vsa->array_num), vsa->array_num);
+  psa_print_string_with_indent(fp, 2, "],\n");
+
+  /* URE_NUM */
+  psa_print_string_with_indent(fp, 2, "\"URE_NUM\": ");
+  psa_print_int_with_indent(fp, 0, vsa->URE_num);
+  psa_print_string_with_indent(fp, 0, ",\n");
+
+  /* URES */
+  psa_print_string_with_indent(fp, 2, "\"URES\": [\n");
+  psa_print_string_list_with_indent(fp, 4, get_vsa_URE_texts(vsa->UREs, vsa->URE_num), vsa->URE_num);
+  psa_print_string_with_indent(fp, 2, "],\n");
+
+  /* DOMAIN_EXP_NUM */
+  psa_print_string_with_indent(fp, 2, "\"DOMAIN_EXP_NUM\": ");
+  psa_print_int_with_indent(fp, 0, vsa->domain_exp_num);
+  psa_print_string_with_indent(fp, 0, ",\n");
+
+  /* DOMAIN_EXPS */
+  psa_print_string_with_indent(fp, 2, "\"DOMAIN_EXPS\": [\n");
+  psa_print_string_list_with_indent(fp, 4, vsa->domain_exps, vsa->domain_exp_num);
   psa_print_string_with_indent(fp, 2, "],\n");
 
   fprintf(fp, "}\n");

@@ -57,7 +57,7 @@
 //
 //// dump out latency hiding candidates
 //#define PRINT_LATENCY_HIDING_MISC
-
+//
 //// perfrom SIMD vectorization
 //#define SIMD_VECTORIZATION
 //
@@ -93,9 +93,9 @@
 #define CPU_CODEGEN
 // generate T2S code
 #define T2S_CODEGEN
-// generate Intel OpenCL code
-#define INTEL_CODEGEN
-// generate Xilinx HLS code
-#define XILINX_CODEGEN
+//// generate Intel OpenCL code
+//#define INTEL_CODEGEN
+//// generate Xilinx HLS code
+//#define XILINX_CODEGEN
 
 #endif

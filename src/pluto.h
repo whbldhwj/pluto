@@ -98,7 +98,7 @@
 //#define PSA_ARRAY_DEBUG
 //#define PSA_LATENCY_HIDING_DEBUG
 //#define PSA_SIMD_VECTORIZATION_DEBUG
-#define PSA_ARRAY_PARTITIONING_DEBUG
+//#define PSA_ARRAY_PARTITIONING_DEBUG
 /* Jie Added - End */
 
 typedef enum dirvec_type {
@@ -332,6 +332,17 @@ struct stmt_access_var_pair {
   bool d; // 0 - not drain 1 - drain
   // int cc_id;
 };
+
+struct ure {
+  // URE text
+  char *text;
+
+  // URE name
+  char *name;
+
+  int id;
+};
+typedef struct ure URE;
 
 struct TiledHyperplane {
 

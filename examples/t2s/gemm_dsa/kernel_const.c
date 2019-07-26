@@ -33,9 +33,9 @@
 void dsa_kernel(data_t A[I][K], data_t B[K][J], data_t C[I][J]) {
   data_t C_ext[I][J][K + 1];
 #pragma scop
-  for (int i = 0; i < I; i++)
-    for (int j = 0; j < J; j++) {
-      for (int k = 0; k < K; k++) {
+  for (int i = 0; i < 64; i++)
+    for (int j = 0; j < 64; j++) {
+      for (int k = 0; k < 64; k++) {
         if (k == 0) 
           C_ext[i][j][k] = 0;      
         C_ext[i][j][k + 1] = C_ext[i][j][k]  + A[i][k] * B[k][j];        

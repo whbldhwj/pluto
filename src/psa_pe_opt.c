@@ -415,11 +415,13 @@ bool is_stride_zero_one(Stmt *stmt, PlutoAccess *acc, int depth, int *is_transfo
 
 /* This function calulates the score of each loop in terms of opportunities of SIMD vectorization.
  * Frist of all, the loop has to be either a parallel loop or a reduction loop.
- * For the parallel loop, we are currently limited in the case with one single statement.
- * If there is only one single statement inside the loop, we will ask users to mark if the statement
- * is a reduction statement. If so, the loop that carries RAW dep will be a reduction loop and can be put
- * in a SIMD vectorization canddiate loop.
+ * We test the reduction loop by exaimining if the carried dependence by the current loop is from the
+ * reudction statement.
+ * We need users to mark the reduction statement in the reduction.annotation file.
  * Next, we will need to test if all the access functions in the loop has only 0/1-stride access. 
+ * If either of the two criteria failss, the loop is non-vectorizable.
+ * Finally, we will calculate the score of each loop which will is used to rank the loop given there are 
+ * multiple SIMD loops available.
  * The score is calculated as:
  * score = Sigma_{all_accesses_under_the_loop} {is_access_0/1_stride * (1 - is_layout_transformation_required)} 
  *            + 2 * is_loop_parallel + 4 * is_loop_redunction
@@ -430,27 +432,48 @@ bool is_stride_zero_one(Stmt *stmt, PlutoAccess *acc, int depth, int *is_transfo
 int psa_is_loop_vectorizable(Ploop *loop, PlutoProg *prog, PSAAccess ***psa_acc, int *num_psa_acc) {
   bool is_reduction = 0;
   int score = 0;
-  /* check if the loop is a reduction loop with single statement */
-  if (loop->nstmts == 1) { 
-    fprintf(stdout, "[PSA] Trying to detect the reduction loop.\n");
-    fprintf(stdout, "[PSA] The statement to be analyzed: S%d\n", loop->stmts[0]->id + 1);
-    FILE *rdfile = fopen("reduce.annotation", "r");
+  
+  /* check if the loop is a reduction loop */
+  fprintf(stdout, "[PSA] Trying to detect the reduction loop.\n");
+  FILE *rdfile = fopen("reduce.annotation", "r");
+  if (!rdfile) {
+    fprintf(stdout, "[PSA] Annotation file not found!\n");
+    fprintf(stdout, "[PSA] The program will proceed as normal but please provide information in the file reduce.annotation if any.\n");    
+  } else {
+    int *rdstmt_id = (int *)malloc(prog->nstmts * sizeof(int));
+    int n_rdstmts;
+    for (n_rdstmts = 0; n_rdstmts < loop->nstmts && !feof(rdfile); n_rdstmts++) {
+      fscanf(rdfile, "S%d", &rdstmt_id[n_rdstmts]);
+    }
 
-    if (!rdfile) {
-      fprintf(stdout, "[PSA] Annnotation file not found!\n");
-      fprintf(stdout, "[PSA] Please provide information about statement S%d in the file reduce.annotation.\n", loop->stmts[0]->id + 1);
-      return -1;
-    } else {
-      int *rdstmt_id = (int *)malloc(prog->nstmts * sizeof(int));
-      int n_rdstmts;
-      for (n_rdstmts = 0; n_rdstmts < loop->nstmts && !feof(rdfile); n_rdstmts++) {
-        fscanf(rdfile, "S%d", &rdstmt_id[n_rdstmts]);
-      }
+    n_rdstmts--;
+    for (int i = 0; i < n_rdstmts; i++) {
+      fprintf(stdout, "[PSA] Statement S%d identified as reduction statement.\n", rdstmt_id[i]);
+    }
 
-      /* Compare if the current stmt is a reduction statement */
-      for (int i = 0; i < n_rdstmts; i++) {
-        if (rdstmt_id[i] == loop->stmts[0]->id + 1)  {
-          is_reduction = 1;
+    is_reduction = 1;
+    for (int i = 0; i < prog->ndeps; i++) {
+      Dep *dep = prog->deps[i];
+      // filter out RAR dependence
+      if (IS_RAR(dep->type))
+        continue;
+      // dep is alreay satisfied, skip it
+      if (loop->depth > dep->satisfaction_level)
+        continue;
+      // loop-carried dep
+      if (dep->dirvec[loop->depth] != DEP_ZERO) {
+        // examine if the stmt is reduction stmt
+        int src_id, dest_id;
+        for (src_id = 0; src_id < n_rdstmts; src_id++) {
+          if (rdstmt_id[src_id] == dep->src + 1)
+            break;
+        }
+        for (dest_id = 0; dest_id < n_rdstmts; dest_id++) {
+          if (rdstmt_id[dest_id] == dep->dest + 1)
+            break;
+        }
+        if (src_id == n_rdstmts || dest_id == n_rdstmts) {
+          is_reduction = 0;
           break;
         }
       }
@@ -470,7 +493,7 @@ int psa_is_loop_vectorizable(Ploop *loop, PlutoProg *prog, PSAAccess ***psa_acc,
   for (i = 0; i < loop->nstmts; i++) {
     Stmt *stmt = loop->stmts[i];    
     *psa_acc = realloc(*psa_acc, (num_accs + stmt->nreads + stmt->nwrites) * sizeof(PSAAccess *));
-
+ 
     for (j = 0; j < stmt->nreads; j++) {
       int is_layout_trans_required;
       int acc_simd_dim;
@@ -497,6 +520,91 @@ int psa_is_loop_vectorizable(Ploop *loop, PlutoProg *prog, PSAAccess ***psa_acc,
   *num_psa_acc = num_accs;
   return score;
 }
+
+///* This function calulates the score of each loop in terms of opportunities of SIMD vectorization.
+// * Frist of all, the loop has to be either a parallel loop or a reduction loop.
+// * For the parallel loop, we are currently limited in the case with one single statement.
+// * If there is only one single statement inside the loop, we will ask users to mark if the statement
+// * is a reduction statement. If so, the loop that carries RAW dep will be a reduction loop and can be put
+// * in a SIMD vectorization canddiate loop.
+// * Next, we will need to test if all the access functions in the loop has only 0/1-stride access. 
+// * The score is calculated as:
+// * score = Sigma_{all_accesses_under_the_loop} {is_access_0/1_stride * (1 - is_layout_transformation_required)} 
+// *            + 2 * is_loop_parallel + 4 * is_loop_redunction
+// * In the current heuristic, we favor reduction loop over parallel loop, because the reduction loop has less overhead
+// * compared to the parallel loop. And we favor loops that doesn't lead to layout transformation than loops that require
+// * the layout transformation.
+// */
+//int psa_is_loop_vectorizable(Ploop *loop, PlutoProg *prog, PSAAccess ***psa_acc, int *num_psa_acc) {
+//  bool is_reduction = 0;
+//  int score = 0;
+//  /* check if the loop is a reduction loop with single statement */
+//  if (loop->nstmts == 1) { 
+//    fprintf(stdout, "[PSA] Trying to detect the reduction loop.\n");
+//    fprintf(stdout, "[PSA] The statement to be analyzed: S%d\n", loop->stmts[0]->id + 1);
+//    FILE *rdfile = fopen("reduce.annotation", "r");
+//
+//    if (!rdfile) {
+//      fprintf(stdout, "[PSA] Annnotation file not found!\n");
+//      fprintf(stdout, "[PSA] Please provide information about statement S%d in the file reduce.annotation.\n", loop->stmts[0]->id + 1);
+//      return -1;
+//    } else {
+//      int *rdstmt_id = (int *)malloc(prog->nstmts * sizeof(int));
+//      int n_rdstmts;
+//      for (n_rdstmts = 0; n_rdstmts < loop->nstmts && !feof(rdfile); n_rdstmts++) {
+//        fscanf(rdfile, "S%d", &rdstmt_id[n_rdstmts]);
+//      }
+//
+//      /* Compare if the current stmt is a reduction statement */
+//      for (int i = 0; i < n_rdstmts; i++) {
+//        if (rdstmt_id[i] == loop->stmts[0]->id + 1)  {
+//          is_reduction = 1;
+//          break;
+//        }
+//      }
+//    }
+//  }
+//
+//  // If the loop is not reduction loop and loop is not parallel, it's
+//  // impossible to do SIMD
+//  if (!is_reduction && !pluto_loop_is_parallel(prog, loop)) 
+//    return -1;
+//
+//  score = 2 * pluto_loop_is_parallel(prog, loop) + 4 * is_reduction;
+//
+//  // test access function
+//  int num_accs = 0;
+//  int i, j;  
+//  for (i = 0; i < loop->nstmts; i++) {
+//    Stmt *stmt = loop->stmts[i];    
+//    *psa_acc = realloc(*psa_acc, (num_accs + stmt->nreads + stmt->nwrites) * sizeof(PSAAccess *));
+// 
+//    for (j = 0; j < stmt->nreads; j++) {
+//      int is_layout_trans_required;
+//      int acc_simd_dim;
+//      bool ret = is_stride_zero_one(stmt, stmt->reads[j], loop->depth, &is_layout_trans_required, &acc_simd_dim);
+//      score += ret * (1 - is_layout_trans_required);
+//
+//      (*psa_acc)[num_accs++] = (PSAAccess *)malloc(sizeof(PSAAccess));
+//      (*psa_acc)[num_accs - 1]->acc = stmt->reads[j];
+//      (*psa_acc)[num_accs - 1]->layout_trans = is_layout_trans_required;
+//      (*psa_acc)[num_accs - 1]->simd_dim = acc_simd_dim;
+//    }
+//    for (j = 0; j < stmt->nwrites; j++) {
+//      int is_layout_trans_required;
+//      int acc_simd_dim;
+//      bool ret = is_stride_zero_one(stmt, stmt->writes[j], loop->depth, &is_layout_trans_required, &acc_simd_dim);
+//      score += ret * (1 - is_layout_trans_required);
+//  
+//      (*psa_acc)[num_accs++] = (PSAAccess *)malloc(sizeof(PSAAccess));
+//      (*psa_acc)[num_accs - 1]->acc = stmt->writes[j];
+//      (*psa_acc)[num_accs - 1]->layout_trans = is_layout_trans_required;
+//      (*psa_acc)[num_accs - 1]->simd_dim = acc_simd_dim;
+//    }
+//  }
+//  *num_psa_acc = num_accs;
+//  return score;
+//}
 
 /* This function performs SIMD vectorization optimization */
 int psa_simd_vectorization_optimize(PlutoProg *prog, VSA *vsa) {

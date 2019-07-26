@@ -10,6 +10,7 @@
 #include "assert.h"
 #include "distmem.h"
 #include "program.h"
+#include "psa_ure.h"
 
 struct codeBlock {
   /* Number of lines */
@@ -219,6 +220,18 @@ struct psaVSA {
 
   /* ARRAYS */
   Array **arrays;
+
+  /* URES */
+  URE **UREs;
+
+  /* URE_NUM */
+  int URE_num;
+
+  /* DOMAIN_EXP_NUM */
+  int domain_exp_num;
+
+  /* DOMAIN_EXPS */
+  char **domain_exps;
 };
 typedef struct psaVSA VSA;
 
@@ -240,4 +253,6 @@ void vsa_array_extract(PlutoProg *prog, VSA *vsa);
 void vsa_var_extract(PlutoProg *prog, VSA *vsa);
 void psa_t2s_codegen(FILE *fp, const VSA *vsa);
 char **get_vsa_array_names(Array **arrays, int array_num);
+char **get_vsa_URE_texts(URE **UREs, int URE_num);
+void vsa_URE_extract(PlutoProg *prog, VSA *vsa);
 #endif

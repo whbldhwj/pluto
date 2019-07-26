@@ -32,23 +32,12 @@ int main(){
 #pragma scop   
   for (int i = 0; i < 64; i++)
     for (int j = 0; j < 64; j++) {
-      C[i][j] = 0;
       for (int k = 0; k < 64; k++) {
-//        if (k == 0)
-//          C[i][j] = 0;
+        if (k == 0)
+          C[i][j] = 0;
         C[i][j] += A[i][k] * B[k][j];
       }
     }
-//  for (int i = 0; i < 64; i++)
-//    for (int j = 0; j < 64; j++) {
-//      for (int k = 0; k < 64; k++) {
-//        if (k == 0) {
-//          C[i][j] = A[i][k] * B[k][j];
-//        } else if (k > 0) {
-//          C[i][j] += A[i][k] * B[k][j];
-//        }
-//      }
-//    }
 #pragma endscop  
 
   dsa_kernel(A, B, C_dsa);

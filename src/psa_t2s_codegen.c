@@ -58,8 +58,35 @@ void psa_t2s_codegen(FILE *fp, const VSA *vsa) {
 
   /* UREs */
   fprintf(fp, "// UREs\n");
+  for (int i = 0; i < vsa->URE_num; i++) {
+    fprintf(fp, "%s\n", vsa->UREs[i]);
+  }
+  fprintf(fp, "\n");
 
-  /* Transformation */
+  /* URE domain */
+  fprintf(fp, "// Build the initial loop nest\n");
+  fprintf(fp, "APP.merge_UREs(");
+  for (int i = 0; i < vsa->URE_num; i++) {
+    if (i == 0) {
+      fprintf(fp, vsa->UREs[i]->name);
+    } else {
+      fprintf(fp, ", %s", vsa->UREs[i]->name);
+    }
+  }
+  fprintf(fp, ")\n");
+  fprintf(fp, "   .domain(");
+  for (int i = 0; i < vsa->domain_exp_num; i++) {
+    if (i < vsa->domain_exp_num - 1) {
+      fprintf(fp, "%s,\n", vsa->domain_exps[i]);
+    } else {
+      fprintf(fp, "%s", vsa->domain_exps[i]);
+    }
+  }
+  fprintf(fp, ");\n\n");
+
+  /* Optimization */
+  
+  /* Space-time transformation */
 
   /* I/O network */
 

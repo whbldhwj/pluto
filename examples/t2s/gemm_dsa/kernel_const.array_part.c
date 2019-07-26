@@ -1,5 +1,5 @@
-#define S1(oT6,oT7,oT8,oT5,oT4,oT3,i,j,k) C[i][j] = 0;
-#define S2(oT6,oT7,oT8,oT5,oT4,oT3,i,j,k) C[i][j] += A[i][k] * B[k][j];
+#define S1(oT6,oT7,oT8,oT5,oT4,oT3,i,j,k) C_ext[i][j][k] = 0;
+#define S2(oT6,oT7,oT8,oT5,oT4,oT3,i,j,k) C_ext[i][j][k + 1] = C_ext[i][j][k] + A[i][k] * B[k][j];
 
 int t1, t2, t3, t4, t5, t6, t7, t8, t9, t10;
 

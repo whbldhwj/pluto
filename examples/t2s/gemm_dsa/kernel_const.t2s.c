@@ -15,3 +15,8 @@ Func A_CC1_E, B_CC2_E, C_ext_CC0_I, C_ext_CC0_ID, APP;
 Var t1, t2, t3;
 
 // UREs
+
+// Build the initial loop nest
+APP.merge_UREs()
+   .domain();
+

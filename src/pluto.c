@@ -1044,6 +1044,8 @@ void psa_detect_hyperplane_types_stmtwise(PlutoProg *prog, int array_dim, int ar
 
   for (s = 0; s < prog->nstmts; s++) {
     Stmt *stmt = prog->stmts[s];
+    num_array_part_loop = 0;
+    num_array_space_loop = 0;
     for (i = 0; i < stmt->trans->nrows; i++) {
       if (pluto_is_hyperplane_loop(stmt, i)) {
         bool is_task_inter_loop = IS_PSA_TASK_INTER_LOOP(stmt->psa_hyp_types[i]);
