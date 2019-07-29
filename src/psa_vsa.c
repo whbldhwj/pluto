@@ -8,6 +8,7 @@
 #include "psa_vsa_dfc.h"
 #include "psa_vsa_pe.h"
 
+/* Print out the URE texts as a list */
 char **get_vsa_URE_texts(URE **UREs, int URE_num) {
   if (URE_num < 0)
     return NULL;
@@ -18,6 +19,7 @@ char **get_vsa_URE_texts(URE **UREs, int URE_num) {
   return URE_texts;
 }
 
+/* Print out the array names as a list */
 char **get_vsa_array_names(Array **arrays, int array_num) {
   char **array_names = (char **)malloc(array_num * sizeof(char *));
   for (int i = 0; i < array_num; i++) {
@@ -109,6 +111,299 @@ void vsa_t2s_iter_extract(PlutoProg *prog, VSA *vsa) {
   }
 }
 
+/*
+ * RAW: iter_read + dep = iter_write
+ */ 
+void get_var_iters(int acc_id, struct stmt_access_var_pair **acc_var_map, PlutoProg *prog, VSA *vsa) {
+  int iter_num = vsa->t2s_iter_num;
+  char **iters = vsa->t2s_iters;
+
+  PlutoAccess *acc = acc_var_map[acc_id]->acc;
+
+  for (int i = 0; i < prog->ndeps; i++) {
+    Dep *dep = prog->deps[i];
+    if (IS_RAW(dep->type)) {
+      if (dep->src_acc == acc && acc_var_map[dep->dest_acc->sym_id]->var_name != NULL) {
+        // write access 
+        for (int iter_id = 0; iter_id < iter_num; iter_id++) {
+          int diff;
+          if (dep->disvec[iter_id] == DEP_DIS_MINUS_ONE)
+            diff = -1;
+          else if (dep->disvec[iter_id] == DEP_DIS_ZERO)
+            diff = 0;
+          else if (dep->disvec[iter_id] == DEP_DIS_PLUS_ONE)
+            diff = 1;
+
+          acc_var_map[acc_id]->var_iters[iter_id]->iter_name = strdup(iters[iter_id]);
+          acc_var_map[acc_id]->var_iters[iter_id]->iter_offset = acc_var_map[dep->dest_acc->sym_id]->var_iters[iter_id]->iter_offset + diff;
+        }
+      } else if (dep->dest_acc == acc && acc_var_map[dep->src_acc->sym_id]->var_name != NULL) {
+        // read access
+        for (int iter_id = 0; iter_id < iter_num; iter_id++) {
+          int diff;
+          if (dep->disvec[iter_id] == DEP_DIS_MINUS_ONE)
+            diff = -1;
+          else if (dep->disvec[iter_id] == DEP_DIS_ZERO)
+            diff = 0;
+          else if (dep->disvec[iter_id] == DEP_DIS_PLUS_ONE)
+            diff = 1;
+
+          acc_var_map[acc_id]->var_iters[iter_id]->iter_name = strdup(iters[iter_id]);
+          acc_var_map[acc_id]->var_iters[iter_id]->iter_offset = acc_var_map[dep->src_acc->sym_id]->var_iters[iter_id]->iter_offset - diff;
+        }
+      }
+    }
+  }
+}
+
+/*
+ * Use the DFS to update the intermediate variables
+ */
+void update_ivar(int acc_id, struct stmt_access_var_pair **acc_var_map, int cc_id, PlutoProg *prog, VSA *vsa) {
+  int iter_num = vsa->t2s_iter_num;
+  char **iters = vsa->t2s_iters;
+
+  PlutoAccess *acc = acc_var_map[acc_id]->acc;
+
+  if (acc_var_map[acc_id]->var_name == NULL) {
+    // test if it's the first access to be updated in the CC
+    bool is_first = true;
+    for (int dep_id = 0; dep_id < prog->ndeps; dep_id++) {
+      Dep *dep = prog->deps[dep_id];
+      if (IS_RAW(dep->type)) {
+        if ((dep->src_acc == acc && acc_var_map[dep->dest_acc->sym_id]->var_name != NULL) || (dep->dest_acc == acc && acc_var_map[dep->src_acc->sym_id]->var_name != NULL)) {
+          is_first = false;
+          break;
+        }
+      }
+    }
+    if (is_first) {
+      vsa->ivar_num++;
+      vsa->ivar_names = realloc(vsa->ivar_names, vsa->ivar_num * sizeof(char *));
+      vsa->ivar_refs = realloc(vsa->ivar_refs, vsa->ivar_num * sizeof(char *));
+
+      Stmt *stmt = acc_var_map[acc_id]->stmt;
+      PlutoAccess *acc = acc_var_map[acc_id]->acc;
+      char *arr_name = acc->name;
+      char var_name[50];
+      sprintf(var_name, "%s_CC%d_I", arr_name, cc_id);
+      
+      vsa->ivar_names[vsa->ivar_num - 1] = strdup(var_name);
+      acc_var_map[acc_id]->var_name = strdup(var_name);
+
+      // build the var_ref
+      acc_var_map[acc_id]->var_iters = (IterExp **)malloc(iter_num * sizeof(IterExp *));
+      for (int iter_id = 0; iter_id < iter_num; iter_id++) {
+       acc_var_map[acc_id]->var_iters[iter_id] = (IterExp *)malloc(sizeof(IterExp));
+       acc_var_map[acc_id]->var_iters[iter_id]->iter_name = strdup(iters[iter_id]);
+       acc_var_map[acc_id]->var_iters[iter_id]->iter_offset = 0;
+      }
+
+      char var_ref[50];
+      sprintf(var_ref, "%s(%s)", var_name, get_iter_str(acc_var_map[acc_id]->var_iters, iter_num));
+
+      vsa->ivar_refs[vsa->ivar_num - 1] = strdup(var_ref);
+      acc_var_map[acc_id]->var_ref = strdup(var_ref);
+
+      // build the drain variable
+      if (acc_var_map[acc_id]->d == 1) {
+        vsa->idvar_num++;
+        vsa->idvar_names = realloc(vsa->idvar_names, vsa->idvar_num * sizeof(char *));
+        vsa->idvar_refs = realloc(vsa->idvar_refs, vsa->idvar_num * sizeof(char *));
+        char var_name[50];
+        sprintf(var_name, "%s_CC%d_ID", arr_name, cc_id);
+
+        vsa->idvar_names[vsa->idvar_num - 1] = strdup(var_name);
+        acc_var_map[acc_id]->dvar_name = strdup(var_name);
+
+        acc_var_map[acc_id]->dvar_iters = (IterExp **)malloc(iter_num * sizeof(IterExp *));
+        for (int iter_id = 0; iter_id < iter_num; iter_id++) {
+          acc_var_map[acc_id]->dvar_iters[iter_id] = (IterExp *)malloc(sizeof(IterExp));
+          acc_var_map[acc_id]->dvar_iters[iter_id]->iter_name = strdup(iters[iter_id]);
+          acc_var_map[acc_id]->dvar_iters[iter_id]->iter_offset = 0;
+        }
+
+        char var_ref[50];
+        sprintf(var_ref, "%s(%s)", var_name, get_iter_str(acc_var_map[acc_id]->dvar_iters, iter_num));
+
+        vsa->idvar_refs[vsa->idvar_num - 1] = strdup(var_ref);
+        acc_var_map[acc_id]->dvar_ref = strdup(var_ref);
+      }
+    } else {
+      Stmt **stmt = acc_var_map[acc_id]->stmt;
+      PlutoAccess *acc = acc_var_map[acc_id]->acc;
+      char *arr_name = acc->name;
+      char var_name[50];
+      sprintf(var_name, "%s_CC%d_I", arr_name, cc_id);
+
+      acc_var_map[acc_id]->var_name = strdup(var_name);
+
+      // build the var_ref
+      acc_var_map[acc_id]->var_iters = (IterExp **)malloc(iter_num * sizeof(IterExp *));
+      for (int iter_id = 0; iter_id < iter_num; iter_id++) {
+        acc_var_map[acc_id]->var_iters[iter_id] = (IterExp *)malloc(sizeof(IterExp));
+      }
+      get_var_iters(acc_id, acc_var_map, prog, vsa);
+
+      char var_ref[50];
+      sprintf(var_ref, "%s(%s)", var_name, get_iter_str(acc_var_map[acc_id]->var_iters, iter_num));
+      acc_var_map[acc_id]->var_ref = strdup(var_ref);
+
+      // build the drain variable
+      if (acc_var_map[acc_id]->d == 1) {
+        char var_name[50];
+        sprintf(var_name, "%s_CC%d_ID", arr_name, cc_id);
+
+        acc_var_map[acc_id]->dvar_name = strdup(var_name);
+        acc_var_map[acc_id]->dvar_iters = (IterExp **)malloc(iter_num * sizeof(IterExp *));
+        for (int iter_id = 0; iter_id < iter_num; iter_id++) {
+          acc_var_map[acc_id]->dvar_iters[iter_id] = (IterExp *)malloc(sizeof(IterExp));
+        }
+
+        for (int iter_id = 0; iter_id < iter_num; iter_id++) {
+          acc_var_map[acc_id]->dvar_iters[iter_id]->iter_name = strdup(acc_var_map[acc_id]->var_iters[iter_id]->iter_name);
+          acc_var_map[acc_id]->dvar_iters[iter_id]->iter_offset = acc_var_map[acc_id]->var_iters[iter_id]->iter_offset;
+        }
+
+        char var_ref[50];
+        sprintf(var_ref, "%s(%s)", var_name, get_iter_str(acc_var_map[acc_id]->dvar_iters, iter_num));
+        acc_var_map[acc_id]->dvar_ref = strdup(var_ref);
+      }      
+    }
+    // update the neighbors
+    for (int dep_id = 0; dep_id < prog->ndeps; dep_id++) {
+      Dep *dep = prog->deps[dep_id];
+      if (IS_RAW(dep->type)) {
+        if (dep->src_acc == acc) {
+          update_ivar(dep->dest_acc->sym_id, acc_var_map, cc_id, prog, vsa);
+        } else if (dep->dest_acc == acc) {
+          update_ivar(dep->src_acc->sym_id, acc_var_map, cc_id, prog, vsa);
+        }
+      }
+    }
+  }
+}
+
+/*
+ * Print out the IterExp in string
+ */
+char *get_iter_str(IterExp **iters, int iter_num) {
+  char *iter_str = "";
+  for (int iter_id = 0; iter_id < iter_num; iter_id++) {
+    char *iter_name = iters[iter_id]->iter_name;
+    int iter_offset = iters[iter_id]->iter_offset;
+    char iter_exp[20];
+    if (iter_offset == 0) {
+      sprintf(iter_exp, "%s", iter_name);
+    } else {
+      sprintf(iter_exp, "%s + (%d)", iter_name, iter_offset);
+    }
+    iter_str = concat(iter_str, iter_exp);
+    if (iter_id < iter_num - 1) {
+      iter_str = concat(iter_str, ", ");
+    }
+  }
+  return iter_str;
+}
+
+/*
+ * Update the var_name, var_ref, var_iters
+ */
+void update_var(struct stmt_access_var_pair **acc_var_map, int total_accs, int cc_id, PlutoProg *prog, VSA *vsa) {
+  int iter_num = vsa->t2s_iter_num;
+  char **iters = vsa->t2s_iters;
+
+  Graph *adg = prog->adg;
+  if (adg->ccs[cc_id].size == 1) {
+    // external variable
+    vsa->evar_num++;
+    vsa->evar_names = realloc(vsa->evar_names, vsa->evar_num * sizeof(char *));
+    vsa->evar_refs = realloc(vsa->evar_refs, vsa->evar_num * sizeof(char *));
+
+    for (int i = 0; i < total_accs; i++) {
+      Stmt *stmt = acc_var_map[i]->stmt;
+      PlutoAccess *acc = acc_var_map[i]->acc;
+      int acc_id = acc->sym_id;
+      if (acc->cc_id == cc_id) {
+        char *arr_name = acc->name;
+        // build the var_name
+        char var_name[50];
+        sprintf(var_name, "%s_CC%d_E", arr_name, cc_id);
+
+        vsa->evar_names[vsa->evar_num - 1] = strdup(var_name);
+        acc_var_map[acc_id]->var_name = strdup(var_name);
+
+        // build the var_ref
+        acc_var_map[acc_id]->var_iters = (IterExp **)malloc(iter_num * sizeof(IterExp *));
+        for (int iter_id = 0; iter_id < iter_num; iter_id++) {
+          acc_var_map[acc_id]->var_iters[iter_id] = (IterExp *)malloc(sizeof(IterExp));
+          acc_var_map[acc_id]->var_iters[iter_id]->iter_name = strdup(iters[iter_id]);
+          acc_var_map[acc_id]->var_iters[iter_id]->iter_offset = 0;
+        }
+
+        char var_ref[50];
+        sprintf(var_ref, "%s(%s)", var_name, get_iter_str(acc_var_map[acc_id]->var_iters, iter_num));
+
+        vsa->evar_refs[vsa->evar_num - 1] = strdup(var_ref);
+        acc_var_map[acc_id]->var_ref = strdup(var_ref);
+
+        // build the drain variable
+        if (acc_var_map[acc_id]->d == 1) {
+          vsa->edvar_num++;
+          vsa->edvar_names = realloc(vsa->edvar_names, vsa->edvar_num * sizeof(char *));
+          vsa->edvar_refs = realloc(vsa->edvar_refs, vsa->edvar_num * sizeof(char *));
+          char var_name[50];
+          sprintf(var_name, "%s_CC%d_ED", arr_name, cc_id);
+
+          vsa->edvar_names[vsa->edvar_num - 1] = strdup(var_name);
+          acc_var_map[acc_id]->dvar_name = strdup(var_name);
+
+          acc_var_map[acc_id]->dvar_iters = (IterExp **)malloc(iter_num * sizeof(IterExp *));
+          for (int iter_id = 0; iter_id < iter_num; iter_id++) {
+            acc_var_map[acc_id]->dvar_iters[iter_id] = (IterExp *)malloc(sizeof(IterExp));
+            acc_var_map[acc_id]->dvar_iters[iter_id]->iter_name = strdup(iters[iter_id]);
+            acc_var_map[acc_id]->dvar_iters[iter_id]->iter_offset = 0;
+          }
+
+          char var_ref[50];
+          sprintf(var_ref, "%s(%s)", var_name, get_iter_str(acc_var_map[acc_id]->dvar_iters, iter_num));
+
+          vsa->edvar_refs[vsa->edvar_num - 1] = strdup(var_ref);
+          acc_var_map[acc_id]->dvar_ref = strdup(var_ref);
+        }
+      }
+    }
+  } else {
+    // intermediate variable
+    for (int i = 0; i < total_accs; i++) {
+      Stmt *stmt = acc_var_map[i]->stmt;
+      PlutoAccess *acc = acc_var_map[i]->acc;    
+      if (acc->cc_id == cc_id) {
+        update_ivar(acc->sym_id, acc_var_map, cc_id, prog, vsa);
+      }
+    }
+  }
+}
+
+void acc_var_map_pretty_print(struct stmt_access_var_pair **acc_var_map, int num_entry) {
+  for (int i = 0; i < 10 + 30 + 30 + 2; i++) {
+    fprintf(stdout, "-");
+  }
+  fprintf(stdout, "\n");
+  fprintf(stdout, "%10s|", "acc_id");
+  fprintf(stdout, "%30s|", "var_ref");
+  fprintf(stdout, "%30s\n", "dvar_ref");
+  for (int i = 0; i < num_entry; i++) {
+    fprintf(stdout, "%10d|", i);
+    fprintf(stdout, "%30s|", acc_var_map[i]->var_ref);
+    fprintf(stdout, "%30s\n", acc_var_map[i]->dvar_ref);
+  }
+  for (int i = 0; i < 10 + 30 + 30 + 2; i++) {
+    fprintf(stdout, "-");
+  }
+  fprintf(stdout, "\n"); 
+}
+
 /* 
  * This function extracts the variables in the program and generates info:
  * - evar_num
@@ -128,11 +423,13 @@ void vsa_var_extract(PlutoProg *prog, VSA *vsa) {
   acc_stmts = get_read_write_access_with_stmts(
       prog->stmts, prog->nstmts, &num_read_write_data, &num_stmts_per_acc);    
 
+  // total number of access functions in the program
   int total_accs = 0;
   for (int i = 0; i < num_read_write_data; i++) {
     total_accs += num_stmts_per_acc[i];
   }  
 
+  // initialize the acc_var_map
   struct stmt_access_var_pair **acc_var_map = NULL;
   acc_var_map = (struct stmt_access_var_pair **)malloc(total_accs * sizeof(struct stmt_access_var_pair *)); 
   // initialization
@@ -140,6 +437,12 @@ void vsa_var_extract(PlutoProg *prog, VSA *vsa) {
     acc_var_map[i] = (struct stmt_access_var_pair *)malloc(sizeof(struct stmt_access_var_pair));
     acc_var_map[i]->ei = -1;
     acc_var_map[i]->d = -1;
+    acc_var_map[i]->var_name = NULL;
+    acc_var_map[i]->var_ref = NULL;
+    acc_var_map[i]->var_iters = NULL;
+    acc_var_map[i]->dvar_name = NULL;
+    acc_var_map[i]->dvar_ref = NULL;
+    acc_var_map[i]->dvar_iters = NULL;
   }
 
   // In the context of UREs in T2S, we are assuming all statements are within one permutable band
@@ -175,125 +478,37 @@ void vsa_var_extract(PlutoProg *prog, VSA *vsa) {
   prog->adg= adg;
   adg_compute_cc(prog);
  
-  // scan through all ccs
-  for (int i = 0; i < prog->adg->num_ccs; i++) {
-    int cc_id = prog->adg->ccs[i].id;
-    if (prog->adg->ccs[i].size == 1) {
-      // external variable
-      vsa->evar_num++;
-      vsa->evar_names = realloc(vsa->evar_names, vsa->evar_num * sizeof(char *));
-      vsa->evar_refs = realloc(vsa->evar_refs, vsa->evar_num * sizeof(char *));
-      
-      for (int j = 0; j < num_read_write_data; j++) {
-        for (int k = 0; k < num_stmts_per_acc[j]; k++) {
-          struct stmt_access_pair *acc_stmt = acc_stmts[j][k];
-          Stmt *stmt = acc_stmt->stmt;
-          PlutoAccess *acc = acc_stmt->acc;
-          if (acc_stmt->acc->cc_id == cc_id) {
-            char *arr_name = acc->name;
-            int cc_id = acc->cc_id;
-            int acc_id = acc->sym_id;
-            // build the var_name
-            char var_name[50];
-            sprintf(var_name, "%s_CC%d_E", arr_name, cc_id);
-      
-            vsa->evar_names[vsa->evar_num - 1] = strdup(var_name);
-      
-            // build the var reference
-            char var_ref[50];
-            sprintf(var_ref, "%s(%s)", var_name, iters); // to be modified later
-      
-            vsa->evar_refs[vsa->evar_num - 1] = strdup(var_ref);
-        
-            // update acc_var_map
-            acc_var_map[acc_id]->stmt = stmt;
-            acc_var_map[acc_id]->acc = acc;
-            acc_var_map[acc_id]->var_name = strdup(var_name);
-            acc_var_map[acc_id]->var_ref = strdup(var_ref);
-            acc_var_map[acc_id]->ei = 0;
-            acc_var_map[acc_id]->d = 0;
-
-            // build the drain variable
-            if (acc_stmt->acc_rw == 1) {
-              vsa->edvar_num++;
-              vsa->edvar_names = realloc(vsa->edvar_names, vsa->edvar_num * sizeof(char *));
-              vsa->edvar_refs = realloc(vsa->edvar_refs, vsa->edvar_num * sizeof(char *));
-              sprintf(var_name, "%s_CC%d_ED", arr_name, cc_id);
-              vsa->edvar_names[vsa->edvar_num - 1] = strdup(var_name);
-    
-              sprintf(var_ref, "%s(%s)", var_name, iters); // to be modifited later
-    
-              vsa->edvar_refs[vsa->edvar_num - 1] = strdup(var_ref);
-    
-              acc_var_map[acc_id]->dvar_name = strdup(var_name);
-              acc_var_map[acc_id]->dvar_ref = strdup(var_ref);
-              acc_var_map[acc_id]->d = 1;
-            }
-          }
-        }
+  for (int i = 0; i < num_read_write_data; i++)
+    for (int j = 0; j < num_stmts_per_acc[i]; j++) {
+      struct stmt_access_pair *acc_stmt = acc_stmts[i][j];
+      Stmt *stmt = acc_stmt->stmt;
+      PlutoAccess *acc = acc_stmt->acc;
+      int acc_id = acc->sym_id;
+      acc_var_map[acc_id]->stmt = stmt;
+      acc_var_map[acc_id]->acc = acc;
+      if (acc_stmt->acc_rw == 1) {
+        acc_var_map[acc_id]->d = 1; // add the drain variable for write access
+      } else {
+        acc_var_map[acc_id]->d = 0; 
       }
-    } else {
-      // intermediate variable
-      vsa->ivar_num++;
-      vsa->ivar_names = realloc(vsa->ivar_names, vsa->ivar_num * sizeof(char *));
-      vsa->ivar_refs = realloc(vsa->ivar_refs, vsa->ivar_num * sizeof(char *));
-      
-      bool d_defined = false;
-
-      for (int j = 0; j < num_read_write_data; j++) {
-        for (int k = 0; k < num_stmts_per_acc[j]; k++) {
-          struct stmt_access_pair *acc_stmt = acc_stmts[j][k];
-          Stmt *stmt = acc_stmt->stmt;
-          PlutoAccess *acc = acc_stmt->acc;
-          if (acc_stmt->acc->cc_id == cc_id) {
-            char *arr_name = acc->name;
-            int cc_id = acc->cc_id;
-            int acc_id = acc->sym_id;
-            // build the var_name
-            char var_name[50];
-            sprintf(var_name, "%s_CC%d_I", arr_name, cc_id);
-      
-            vsa->ivar_names[vsa->ivar_num - 1] = strdup(var_name);
-      
-            // build the var reference
-            char var_ref[50];
-            sprintf(var_ref, "%s(%s)", var_name, iters); // to be modified later
-      
-            vsa->ivar_refs[vsa->ivar_num - 1] = strdup(var_ref);
-        
-            // update acc_var_map
-            acc_var_map[acc_id]->stmt = stmt;
-            acc_var_map[acc_id]->acc = acc;
-            acc_var_map[acc_id]->var_name = strdup(var_name);
-            acc_var_map[acc_id]->var_ref = strdup(var_ref);
-            acc_var_map[acc_id]->ei = 0;
-            acc_var_map[acc_id]->d = 0;
-
-            // build the drain variable
-            if (acc_stmt->acc_rw == 1) {
-              sprintf(var_name, "%s_CC%d_ID", arr_name, cc_id);
-              sprintf(var_ref, "%s(%s)", var_name, iters); // to be modified later
-              acc_var_map[acc_id]->dvar_name = strdup(var_name);
-              acc_var_map[acc_id]->dvar_ref = strdup(var_ref);
-              acc_var_map[acc_id]->d = 1;
-            }
-
-            if (acc_stmt->acc_rw == 1 && !d_defined) {
-              // Only allocate one drain variable for the whole CC
-              d_defined = true;
-              vsa->idvar_num++;
-              vsa->idvar_names = realloc(vsa->idvar_names, vsa->idvar_num * sizeof(char *));
-              vsa->idvar_refs = realloc(vsa->idvar_refs, vsa->idvar_num * sizeof(char *));
-              vsa->idvar_names[vsa->idvar_num - 1] = strdup(var_name);
-              vsa->idvar_refs[vsa->idvar_num - 1] = strdup(var_ref);
-            }
-          }
-        }
+      int cc_id = acc->cc_id;
+      if (adg->ccs[cc_id].size == 1) {
+        acc_var_map[acc_id]->ei = 0; // external variable
+      } else {
+        acc_var_map[acc_id]->ei = 1; // intermediate variable
       }
     }
+
+  // update the var_name, var_ref, var_iters by DFS in each CC
+  for (int i = 0; i < prog->adg->num_ccs; i++) {
+    int cc_id = prog->adg->ccs[i].id;
+    update_var(acc_var_map, total_accs, cc_id, prog, vsa);
   }
 
   vsa->acc_var_map = acc_var_map;
+#ifdef PSA_VSA_DEBUG
+  acc_var_map_pretty_print(acc_var_map, total_accs);
+#endif  
 }
 
 /*
@@ -780,18 +995,13 @@ void pluto_prog_to_vsa(PlutoProg *prog, VSA *vsa) {
 //  vsa_pe_code_extract(new_prog, vsa);
 //  pluto_prog_free(new_prog);
 
-  /* Added for T2S */
-  /* EXTERNAL_VAR_NUMBER
-   * EXTERNAL_DVAR_NUMBER
-   * INTERMEDIATE_VAR_NUMBER
-   * INTERMEDIATE_DVAR_NUMBER
-   * EXETERNAL_VAR_NAMES
-   * EXETER
-   */
-  vsa_var_extract(prog, vsa);
+  /* Added for T2s */
 
   /* T2S_ITERS */
   vsa_t2s_iter_extract(prog, vsa);
+
+  /* T2S_VARS */
+  vsa_var_extract(prog, vsa);
 
   /* ARRAYS */
   vsa_array_extract(prog, vsa);

@@ -1,8 +1,8 @@
 {
   "EVAR_NUM": 2,
   "EDVAR_NUM": 0,
-  "IVAR_NUM": 1,
-  "IDVAR_NUM": 1,
+  "IVAR_NUM": 2,
+  "IDVAR_NUM": 2,
   "EVAR_NAMES": [
     "A_CC1_E",
     "B_CC2_E"
@@ -10,34 +10,40 @@
   "EDVAR_NAMES": [
   ],
   "EVAR_REFS": [
-    "A_CC1_E(t1, t2, t3)",
-    "B_CC2_E(t1, t2, t3)"
+    "A_CC1_E(t1, t2, t3, t4)",
+    "B_CC2_E(t1, t2, t3, t4)"
   ],
   "EDVAR_REFS": [
   ],
   "IVAR_NAMES": [
-    "C_ext_CC0_I"
+    "C_ext_CC0_I",
+    "C_CC3_I"
   ],
   "IDVAR_NAMES": [
-    "C_ext_CC0_ID"
+    "C_ext_CC0_ID",
+    "C_CC3_ID"
   ],
   "IVAR_REFS": [
-    "C_ext_CC0_I(t1, t2, t3)"
+    "C_ext_CC0_I(t1, t2, t3, t4)",
+    "C_CC3_I(t1, t2, t3, t4)"
   ],
   "IDVAR_REFS": [
-    "C_ext_CC0_ID(t1, t2, t3)"
+    "C_ext_CC0_ID(t1, t2, t3, t4)",
+    "C_CC3_ID(t1, t2, t3, t4)"
   ],
-  "T2S_ITER_NUM": 3,
+  "T2S_ITER_NUM": 4,
   "T2S_ITERS": [
     "t1",
     "t2",
-    "t3"
+    "t3",
+    "t4"
   ],
-  "ARRAY_NUM": 3,
+  "ARRAY_NUM": 4,
   "ARRAYS": [
     "C_ext",
     "A",
-    "B"
+    "B",
+    "C"
   ],
   "URE_NUM": -1,
   "URES": [

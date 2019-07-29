@@ -2649,7 +2649,7 @@ void pluto_print_program(const PlutoProg *prog, char *srcFileName, char *suffix)
 
   /* Generate code using Cloog */
   psa_generate_declarations(prog, outfp);
-  fprintf(stdout, "[Debug] number of hyps: %d\n", prog->num_hyperplanes);
+  fprintf(stdout, "[PSA] number of hyps: %d\n", prog->num_hyperplanes);
   pluto_gen_cloog_code(prog, prog->num_hyperplanes, 1, cloogfp, outfp);
 
   free(dumpFileName);

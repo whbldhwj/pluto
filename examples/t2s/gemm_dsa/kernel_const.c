@@ -38,13 +38,16 @@ void dsa_kernel(data_t A[I][K], data_t B[K][J], data_t C[I][J]) {
       for (int k = 0; k < 64; k++) {
         if (k == 0) 
           C_ext[i][j][k] = 0;      
-        C_ext[i][j][k + 1] = C_ext[i][j][k]  + A[i][k] * B[k][j];        
+        C_ext[i][j][k + 1] = C_ext[i][j][k]  + A[i][k] * B[k][j];       
+        if (k == 63) {
+          C[i][j] = C_ext[i][j][k + 1];
+        }
       }
     }
 #pragma endscop
 
-  for (int i = 0; i < I; i++)
-    for (int j = 0; j < J; j++) {
-      C[i][j] = C_ext[i][j][K];
-    }
+//  for (int i = 0; i < I; i++)
+//    for (int j = 0; j < J; j++) {
+//      C[i][j] = C_ext[i][j][K];
+//    }
 }

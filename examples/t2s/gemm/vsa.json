@@ -1,37 +1,48 @@
 {
-  "OP_NAME": [
+  "EVAR_NUM": 2,
+  "EDVAR_NUM": 0,
+  "IVAR_NUM": 1,
+  "IDVAR_NUM": 1,
+  "EVAR_NAMES": [
+    "A_CC1_E",
+    "B_CC2_E"
   ],
-  "RES_NAME": [
+  "EDVAR_NAMES": [
   ],
-  "OP_DIM": [
+  "EVAR_REFS": [
+    "A_CC1_E(t1, t2, t3)",
+    "B_CC2_E(t1, t2, t3)"
   ],
-  "RES_DIM": [
+  "EDVAR_REFS": [
   ],
-  "OP_CHANNEL_NUM": 0,
-  "RES_CHANNEL_NUM": 0,
-  "FC_SPLIT_FACTOR": [
+  "IVAR_NAMES": [
+    "C_CC0_I"
   ],
-  "FC_GROUP_FACTOR": [
+  "IDVAR_NAMES": [
+    "C_CC0_ID"
   ],
-  "FC_SIMD_FACTOR": [
+  "IVAR_REFS": [
+    "C_CC0_I(t1, t2, t3)"
   ],
-  "OP_CHANNEL_DIR": [
+  "IDVAR_REFS": [
+    "C_CC0_ID(t1, t2, t3)"
   ],
-  "RES_CHANNEL_DIR": [
+  "T2S_ITER_NUM": 3,
+  "T2S_ITERS": [
+    "t1",
+    "t2",
+    "t3"
   ],
-  "IL_ENABLE": 0,
-  "ROW_IL_FACTOR": 0,
-  "COL_IL_FACTOR": 0,
-  "SIMD_FACTOR": 0,
-  "SA_ROWS": 0,
-  "SA_COLS": 0,
-  "OP_ENGINE_NUM": [
+  "ARRAY_NUM": 3,
+  "ARRAYS": [
+    "C",
+    "A",
+    "B"
   ],
-  "RES_ENGINE_NUM": [
+  "URE_NUM": -1,
+  "URES": [
   ],
-  "TYPE": "(null)",
-  "ARRAY_PART_BAND_WIDTH": 0,
-  "SPACE_BAND_WIDTH": 0,
-  "ENGINE_BAND_WIDTH": [
+  "DOMAIN_EXP_NUM": -1,
+  "DOMAIN_EXPS": [
   ],
 }

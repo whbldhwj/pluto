@@ -99,6 +99,7 @@
 //#define PSA_LATENCY_HIDING_DEBUG
 //#define PSA_SIMD_VECTORIZATION_DEBUG
 //#define PSA_ARRAY_PARTITIONING_DEBUG
+#define PSA_VSA_DEBUG
 /* Jie Added - End */
 
 typedef enum dirvec_type {
@@ -321,13 +322,21 @@ struct stmt_access_pair {
   bool acc_rw; // 0 - read 1 - write
 };
 
+struct iter_exp {
+  char *iter_name;
+  int iter_offset;
+};
+typedef struct iter_exp IterExp;
+
 struct stmt_access_var_pair {
   Stmt *stmt;
   PlutoAccess *acc;
   char *var_name;  
   char *var_ref;
+  IterExp **var_iters;
   char *dvar_name;
   char *dvar_ref;
+  IterExp **dvar_iters;
   bool ei; // 0 - external 1 - intermediate
   bool d; // 0 - not drain 1 - drain
   // int cc_id;

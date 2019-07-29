@@ -255,4 +255,9 @@ void psa_t2s_codegen(FILE *fp, const VSA *vsa);
 char **get_vsa_array_names(Array **arrays, int array_num);
 char **get_vsa_URE_texts(URE **UREs, int URE_num);
 void vsa_URE_extract(PlutoProg *prog, VSA *vsa);
+void vsa_t2s_iter_extract(PlutoProg *prog, VSA *vsa);
+void get_var_iters(int acc_id, struct stmt_access_var_pair **acc_var_map, PlutoProg *prog, VSA *vsa);
+void update_ivar(int acc_id, struct stmt_access_var_pair **acc_var_map, int cc_id, PlutoProg *prog, VSA *vsa);
+char *get_iter_str(IterExp **iters, int iter_num);
+void update_var(struct stmt_access_var_pair **acc_var_map, int total_accs, int cc_id, PlutoProg *prog, VSA *vsa);
 #endif
