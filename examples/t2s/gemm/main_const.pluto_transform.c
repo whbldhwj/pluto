@@ -1,5 +1,5 @@
 #define S1(i,j,k) C[i][j] = 0;
-#define S2(i,j,k) C[i][j] += A[i][k] * B[k][j];
+#define S2(i,j,k) C[i][j] = C[i][j] + A[i][k] * B[k][j];
 
 int t1, t2, t3, t4;
 

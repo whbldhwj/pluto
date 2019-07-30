@@ -59,7 +59,7 @@ void psa_t2s_codegen(FILE *fp, const VSA *vsa) {
   /* UREs */
   fprintf(fp, "// UREs\n");
   for (int i = 0; i < vsa->URE_num; i++) {
-    fprintf(fp, "%s\n", vsa->UREs[i]);
+    fprintf(fp, "%s\n", vsa->UREs[i]->text);
   }
   fprintf(fp, "\n");
 

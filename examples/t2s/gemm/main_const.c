@@ -35,7 +35,7 @@ int main(){
       for (int k = 0; k < 64; k++) {
         if (k == 0)
           C[i][j] = 0;
-        C[i][j] += A[i][k] * B[k][j];
+        C[i][j] = C[i][j] + A[i][k] * B[k][j];
       }
     }
 #pragma endscop  

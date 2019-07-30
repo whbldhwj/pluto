@@ -15,8 +15,12 @@ Func A_CC1_E, B_CC2_E, C_CC0_I, C_CC0_ID, APP;
 Var t1, t2, t3;
 
 // UREs
+C_CC0_I(t1, t2, t3) = 0;
+A_CC1_E(t1, t2, t3) = A_CC1_E(t1, t2 + (-1), t3);
+B_CC2_E(t1, t2, t3) = B_CC2_E(t1 + (-1), t2, t3);
+C_CC0_I(t1, t2, t3 + (1)) = C_CC0_I(t1, t2, t3) + A_CC1_E(t1, t2, t3) * B_CC2_E(t1, t2, t3);
 
 // Build the initial loop nest
-APP.merge_UREs()
+APP.merge_UREs(C_CC0_I, A_CC1_E, B_CC2_E, C_CC0_I.update(0))
    .domain();
 

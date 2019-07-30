@@ -19,6 +19,17 @@ char **get_vsa_URE_texts(URE **UREs, int URE_num) {
   return URE_texts;
 }
 
+/* Print out the URE names as a list */
+char **get_vsa_URE_names(URE **UREs, int URE_num) {
+  if (URE_num < 0)
+    return NULL;
+  char **URE_names = (char **)malloc(URE_num * sizeof(char *));
+  for (int i = 0; i < URE_num; i++) {
+    URE_names[i] = strdup(UREs[i]->name);
+  }
+  return URE_names;
+}
+
 /* Print out the array names as a list */
 char **get_vsa_array_names(Array **arrays, int array_num) {
   char **array_names = (char **)malloc(array_num * sizeof(char *));
