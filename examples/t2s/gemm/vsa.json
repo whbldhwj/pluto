@@ -39,14 +39,20 @@
     "A",
     "B"
   ],
-  "URE_NUM": 4,
+  "URE_NUM": 10,
   "URES": [
     "C_CC0_I(t1, t2, t3) = 0;",
+    "C_CC0_ID(t1, t2, t3) = select(, C_CC0_I(t1, t2, t3));",
+    "C(t1, t2) = C_CC0_ID(t1, t2, t3); // delete it in URE list and merge_UREs args during execution",
     "A_CC1_E(t1, t2, t3) = A_CC1_E(t1, t2 + (-1), t3);",
+    "A_CC1_E(t1, t2, t3) = select(, A(t1, t3));",
     "B_CC2_E(t1, t2, t3) = B_CC2_E(t1 + (-1), t2, t3);",
-    "C_CC0_I(t1, t2, t3 + (1)) = C_CC0_I(t1, t2, t3) + A_CC1_E(t1, t2, t3) * B_CC2_E(t1, t2, t3);"
+    "B_CC2_E(t1, t2, t3) = select(, B(t3, t2));",
+    "C_CC0_I(t1, t2, t3 + (1)) = C_CC0_I(t1, t2, t3) + A_CC1_E(t1, t2, t3) * B_CC2_E(t1, t2, t3);",
+    "C_CC0_ID(t1, t2, t3 + (1)) = select(, C_CC0_I(t1, t2, t3 + (1)));",
+    "C(t1, t2) = C_CC0_ID(t1, t2, t3 + (1)); // delete it in URE list and merge_UREs args during execution"
   ],
-  "DOMAIN_EXP_NUM": -1,
+  "DOMAIN_EXP_NUM": 0,
   "DOMAIN_EXPS": [
   ],
 }

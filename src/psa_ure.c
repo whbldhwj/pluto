@@ -1,5 +1,23 @@
 #include "psa_ure.h"
 
+/* Append one URE list to another list */
+URE **URE_append(URE **list1, int *num1, URE **list2, int num2) {
+  list1 = realloc(list1, (*num1 + num2) * sizeof(URE*));
+  for (int i = *num1; i < *num1 + num2; i++) {
+    list1[i] = list2[i - *num1];
+  }
+  *num1 = *num1 + num2;
+  return list1;
+}
+
+/*  Add one URE to one URE list */
+URE **URE_add(URE **list, int *num, URE *ele) {
+  list = realloc(list, (*num + 1) * sizeof(URE *));
+  list[*num] = ele;
+  *num = *num + 1;
+  return list;
+}
+
 // Compare the scalar column at the last row of the scattering function
 // Return 0 if both equal, which means that that are executed at the same time
 // Return 1 if the first stmt executes later than the second
@@ -13,6 +31,69 @@ int t2s_compare_stmt_order(Stmt *stmt1, Stmt *stmt2, int band_width) {
     return 1;
   else if (scalar1 < scalar2)
     return -1;
+}
+
+/*
+ * This function returns the transformed access function in the form of A(t1, t3).
+ */
+char *create_new_acc_str(Stmt *stmt, PlutoAccess *acc, PlutoProg *prog, VSA *vsa) {
+  // compute the new access function
+  int *divs;
+  PlutoMatrix *new_acc = pluto_get_new_access_func(stmt, acc->mat, &divs);
+
+  int npar = prog->npar;
+  char **params = prog->params;
+  char **iters = vsa->t2s_iters;
+
+  char *acc_str = "";
+  acc_str = concat(acc_str, acc->name);
+  acc_str = concat(acc_str, "(");
+  for (int row = 0; row < new_acc->nrows; row++) {
+    if (row > 0) {
+      acc_str = concat(acc_str, ", ");
+    }
+    bool first_exp = true;
+    if (divs[row] != 1) {
+      acc_str = concat(acc_str, "(");
+    }
+    for (int col = 0; col < new_acc->ncols; col++) {
+      if (new_acc->val[row][col] != 0) {
+        char exp[20];
+        if (col < stmt->trans->nrows) {
+          if (new_acc->val[row][col] == 1)
+            sprintf(exp, "%s", iters[col]);
+          else
+            sprintf(exp, "(%d) * %s", new_acc->val[row][col], iters[col]);
+        } else if (col < stmt->trans->nrows + npar) {
+          if (new_acc->val[row][col] == 1)
+            sprintf(exp, "%s", params[col - stmt->trans->nrows]);
+          else
+            sprintf(exp, "(%d) * %s", new_acc->val[row][col], params[col - stmt->trans->nrows]);
+        } else {
+          if (new_acc->val[row][col] == 1)
+            sprintf(exp, "%d", new_acc->val[row][col]);
+          else
+            sprintf(exp, "(%d)", new_acc->val[row][col]);
+        }
+        if (first_exp) {
+          acc_str = concat(acc_str, exp);
+          first_exp = ~first_exp;
+        } else {
+          acc_str = concat(acc_str, " + ");
+          acc_str = concat(acc_str, exp);          
+        }
+      }      
+    }
+    if (divs[row] != 1) {
+      acc_str = concat(acc_str, ") / ");
+      char exp[20];
+      sprintf(exp, "%d", divs[row]);
+      acc_str = concat(acc_str, exp);
+    }
+  }   
+  acc_str = concat(acc_str, ")");
+
+  return acc_str;
 }
 
 /* This function generates UREs from the program, the fields in VSA are:
@@ -71,32 +152,35 @@ void vsa_URE_extract(PlutoProg *prog, VSA *vsa) {
     for (int i = 0; i < stmt->nreads; i++) {
       PlutoAccess *acc = stmt->reads[i];
       if (vsa->acc_var_map[acc->sym_id]->ei == 0) {
-        int num_tmp;
-        URE **UREs_tmp = create_RAR_UREs(acc, prog, vsa, &num_tmp);        
-        UREs = URE_append(UREs, &URE_num, UREs_tmp, num_tmp);
-
-        // update VSA
-        vsa->URE_num = URE_num;
-        vsa->UREs = UREs;
+//        int num_tmp;
+//        URE **UREs_tmp = create_RAR_UREs(stmt, acc, prog, vsa, &num_tmp);        
+//        UREs = URE_append(UREs, &URE_num, UREs_tmp, num_tmp);
+//
+//        // update VSA
+//        vsa->URE_num = URE_num;
+//        vsa->UREs = UREs;
+        create_RAR_UREs(stmt, acc, prog, vsa);
       }
     }
     // URE for the stmt
-    int num_tmp;
-    URE **UREs_tmp = stmt_to_UREs(stmt, prog, vsa, &num_tmp);
-    UREs = URE_append(UREs, &URE_num, UREs_tmp, num_tmp);
+//    int num_tmp;
+//    URE **UREs_tmp = stmt_to_UREs(stmt, prog, vsa, &num_tmp);
+//    UREs = URE_append(UREs, &URE_num, UREs_tmp, num_tmp);
+    stmt_to_UREs(stmt, prog, vsa);
 
-    // update VSA
-    vsa->URE_num = URE_num;
-    vsa->UREs = UREs;
+//    // update VSA
+//    vsa->URE_num = URE_num;
+//    vsa->UREs = UREs;
 
     // UREs for the write access
     PlutoAccess *acc = stmt->writes[0];
-    UREs_tmp = create_drain_UREs(acc, prog, vsa, &num_tmp);
-    UREs = URE_append(UREs, &URE_num, UREs_tmp, num_tmp);
-
-    // update VSA
-    vsa->URE_num = URE_num;
-    vsa->UREs = UREs;
+//    UREs_tmp = create_drain_UREs(stmt, acc, prog, vsa, &num_tmp);
+//    UREs = URE_append(UREs, &URE_num, UREs_tmp, num_tmp);
+//
+//    // update VSA
+//    vsa->URE_num = URE_num;
+//    vsa->UREs = UREs;
+    create_drain_UREs(stmt, acc, prog, vsa);
   }
 }
 
@@ -105,9 +189,18 @@ char *create_URE_name(char **URE_names, int URE_num, char *var_name) {
   for (int i = 0; i < URE_num; i++) {
     char *cur_name = URE_names[i];
     if (strlen(cur_name) >= strlen(var_name)) {
-      char cur_name_prefix[strlen(var_name) + 1];
-      memcpy(cur_name_prefix, cur_name, strlen(var_name) * sizeof(char));
-      cur_name_prefix[strlen(var_name)] = '\0';
+      char cur_name_prefix[strlen(cur_name) + 1];
+      char ch;
+      int loc = 0;
+      while((ch = cur_name[loc]) != '\0') {
+        if (ch == '.')
+          break;
+        else {
+          cur_name_prefix[loc] = cur_name[loc];
+          loc++;
+        }
+      }
+      cur_name_prefix[loc] = '\0';
       if (!strcmp(cur_name_prefix, var_name))
         update_level++;
     }
@@ -127,9 +220,9 @@ char *create_URE_name(char **URE_names, int URE_num, char *var_name) {
   return URE_name;
 }
 
-URE **create_RAR_UREs(PlutoAccess *acc, PlutoProg *prog, VSA *vsa, int *URE_num) {
-  *URE_num = 0;
-  URE **UREs = (URE **)malloc(2 * sizeof(URE *));
+void create_RAR_UREs(Stmt *stmt, PlutoAccess *acc, PlutoProg *prog, VSA *vsa) {
+  int URE_num = vsa->URE_num;
+  // URE **UREs = (URE **)malloc(2 * sizeof(URE *));
 
   // update clause 
   URE* update_URE = (URE *)malloc(sizeof(URE));
@@ -161,8 +254,9 @@ URE **create_RAR_UREs(PlutoAccess *acc, PlutoProg *prog, VSA *vsa, int *URE_num)
 
   char var_ref_RHS[50];
   sprintf(var_ref_RHS, "%s(%s)", var_name, get_iter_str(var_iters_RHS, vsa->t2s_iter_num));
-  update_URE->id = *URE_num;
-  update_URE->name = strdup(var_name);  
+  update_URE->id = vsa->URE_num;
+  //update_URE->name = strdup(var_name);  
+  update_URE->name = create_URE_name(get_vsa_URE_names(vsa->UREs, vsa->URE_num), vsa->URE_num, var_name);
   // generate the text
   char *text = "";
   text = concat(text, var_ref);
@@ -171,27 +265,104 @@ URE **create_RAR_UREs(PlutoAccess *acc, PlutoProg *prog, VSA *vsa, int *URE_num)
   text = concat(text, ";");
   update_URE->text = strdup(text);
 
-  UREs[0] = update_URE;
-  *URE_num = *URE_num + 1;
+  //UREs[0] = update_URE;
+  //*URE_num = *URE_num + 1;
+  vsa->UREs = URE_add(vsa->UREs, &vsa->URE_num, update_URE);
 
   // init clause
-  //URE init_URE;
+  URE *init_URE = (URE *)malloc(sizeof(URE));
+  init_URE->id = vsa->URE_num;
+//  char *URE_name = strdup(var_name);
+//  URE_name = concat(URE_name, ".update(0)");
+//  init_URE->name = strdup(URE_name);
+  init_URE->name = create_URE_name(get_vsa_URE_names(vsa->UREs, vsa->URE_num), vsa->URE_num, var_name);
+  // generate the text
+  // create the new access string e.g., A(t1, t3)
+  char *new_acc_str = create_new_acc_str(stmt, acc, prog, vsa);
+  // create the init domain string 
+  // e.g., t2 == 0 && t1 >= 0 && t1 <= 3 && t3 >= 0 && t3 <= 3
+  // compute the RAR init domain
+  //
+  //char *domain_str = create_domain_str();
+  char *domain_str = "";
 
-  return UREs;
+  text = "";
+  text = concat(text, var_ref);
+  text = concat(text, " = select(");
+  text = concat(text, domain_str);
+  text = concat(text, ", ");
+  text = concat(text, new_acc_str);
+  text = concat(text, ");");
+  init_URE->text = strdup(text);
+
+  //UREs[1] = init_URE;
+  //*URE_num = *URE_num + 1;
+  vsa->UREs = URE_add(vsa->UREs, &vsa->URE_num, init_URE);
+
+  //return UREs;
 }
 
-URE **create_drain_UREs(PlutoAccess *acc, PlutoProg *prog, VSA *vsa, int *URE_num) {
-  *URE_num = 0;
-  return NULL;
+void create_drain_UREs(Stmt *stmt, PlutoAccess *acc, PlutoProg *prog, VSA *vsa) {
+//  *URE_num = 0;
+//  URE **UREs = (URE **)malloc(2 * sizeof(URE *));
+
+  // update caluse
+  URE* update_URE = (URE *)malloc(sizeof(URE));
+  char *var_name = vsa->acc_var_map[acc->sym_id]->var_name;
+  char *var_ref = vsa->acc_var_map[acc->sym_id]->var_ref;
+  IterExp **var_iters = vsa->acc_var_map[acc->sym_id]->var_iters;
+
+  char *dvar_name = vsa->acc_var_map[acc->sym_id]->dvar_name;
+  char *dvar_ref = vsa->acc_var_map[acc->sym_id]->dvar_ref;
+  update_URE->id = vsa->URE_num;
+//  update_URE->name = strdup(dvar_name);
+  update_URE->name = create_URE_name(get_vsa_URE_names(vsa->UREs, vsa->URE_num), vsa->URE_num, dvar_name);
+
+  char *domain_str = "";
+
+  // generate the text
+  char *text = "";
+  text = concat(text, dvar_ref);
+  text = concat(text, " = select(");
+  text = concat(text, domain_str);
+  text = concat(text, ", ");
+  text = concat(text, var_ref);
+  text = concat(text, ");");
+  update_URE->text = strdup(text);
+
+//  UREs[0] = update_URE;
+//  *URE_num = *URE_num + 1;
+  vsa->UREs = URE_add(vsa->UREs, &vsa->URE_num, update_URE);
+
+  // write clause
+  URE *write_URE = (URE *)malloc(sizeof(URE));
+  write_URE->id = vsa->URE_num;
+//  char *URE_name = strdup(dvar_name);
+//  URE_name = concat(URE_name, ".update(0)");
+//  write_URE->name = strdup(URE_name);
+  write_URE->name = create_URE_name(get_vsa_URE_names(vsa->UREs, vsa->URE_num), vsa->URE_num, dvar_name);
+
+  // generate the text
+  char *new_acc_str = create_new_acc_str(stmt, acc, prog, vsa);
+
+  text = "";
+  text = concat(text, new_acc_str);
+  text = concat(text, " = ");
+  text = concat(text, dvar_ref);
+  text = concat(text, "; // delete it in URE list and merge_UREs args during execution");
+  write_URE->text = strdup(text);
+
+//  UREs[1] = write_URE;
+//  *URE_num = *URE_num + 1;
+  vsa->UREs = URE_add(vsa->UREs, &vsa->URE_num, write_URE);
+
+//  return UREs;
 }
 
 /* 
  * Replace the array access with variable references
  */
-URE **stmt_to_UREs(Stmt *stmt, PlutoProg *prog, VSA *vsa, int *URE_num) {
-  *URE_num = 0;
-  URE **UREs = (URE **)malloc(sizeof(URE *));
-
+void stmt_to_UREs(Stmt *stmt, PlutoProg *prog, VSA *vsa) {
   char *new_text = "";
   int wacc_cnt = 0;
   int racc_cnt = 0;
@@ -254,18 +425,12 @@ URE **stmt_to_UREs(Stmt *stmt, PlutoProg *prog, VSA *vsa, int *URE_num) {
   URE *stmt_URE = (URE *)malloc(sizeof(URE));
   stmt_URE->text = strdup(new_text);
   stmt_URE->name = create_URE_name(get_vsa_URE_names(vsa->UREs, vsa->URE_num), vsa->URE_num, var_name);
-  stmt_URE->id = *URE_num;
-  *URE_num = *URE_num + 1;
-  UREs[0] = stmt_URE;
+  stmt_URE->id = vsa->URE_num;
+  //*URE_num = *URE_num + 1;
+  //UREs[0] = stmt_URE;
+  vsa->UREs = URE_add(vsa->UREs, &vsa->URE_num, stmt_URE);
 
-  return UREs;
+//  return UREs;
 }
 
-URE **URE_append(URE **list1, int *num1, URE **list2, int num2) {
-  list1 = realloc(list1, (*num1 + num2) * sizeof(URE*));
-  for (int i = *num1; i < *num1 + num2; i++) {
-    list1[i] = list2[i - *num1];
-  }
-  *num1 = *num1 + num2;
-  return list1;
-}
+

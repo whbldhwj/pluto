@@ -21,7 +21,7 @@ char **get_vsa_URE_texts(URE **UREs, int URE_num) {
 
 /* Print out the URE names as a list */
 char **get_vsa_URE_names(URE **UREs, int URE_num) {
-  if (URE_num < 0)
+  if (URE_num <= 0)
     return NULL;
   char **URE_names = (char **)malloc(URE_num * sizeof(char *));
   for (int i = 0; i < URE_num; i++) {
@@ -1156,9 +1156,9 @@ VSA *vsa_alloc() {
   vsa->array_num = -1;
   vsa->arrays = NULL;
 
-  vsa->URE_num = -1;
+  vsa->URE_num = 0;
   vsa->UREs = NULL;
-  vsa->domain_exp_num = -1;
+  vsa->domain_exp_num = 0;
   vsa->domain_exps = NULL;
 
   return vsa;
