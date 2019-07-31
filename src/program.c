@@ -3691,6 +3691,17 @@ PlutoConstraints *pluto_get_new_domain(const Stmt *stmt) {
   PlutoConstraints *sched;
 
   PlutoConstraints *newdom = pluto_constraints_dup(stmt->domain);
+/* Jie Added - Start */
+//  // free the original names
+//  if (newdom->names) {
+//    for (i = 0; i < newdom->ncols; i++) {
+//      free(newdom->names[i]);      
+//    }
+//    free(newdom->names);
+//    newdom->names = NULL;
+//  }
+/* Jie Added - End */
+
   for (i = 0; i < stmt->trans->nrows; i++) {
     pluto_constraints_add_dim(newdom, 0, NULL);
   }

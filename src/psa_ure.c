@@ -152,34 +152,14 @@ void vsa_URE_extract(PlutoProg *prog, VSA *vsa) {
     for (int i = 0; i < stmt->nreads; i++) {
       PlutoAccess *acc = stmt->reads[i];
       if (vsa->acc_var_map[acc->sym_id]->ei == 0) {
-//        int num_tmp;
-//        URE **UREs_tmp = create_RAR_UREs(stmt, acc, prog, vsa, &num_tmp);        
-//        UREs = URE_append(UREs, &URE_num, UREs_tmp, num_tmp);
-//
-//        // update VSA
-//        vsa->URE_num = URE_num;
-//        vsa->UREs = UREs;
         create_RAR_UREs(stmt, acc, prog, vsa);
       }
     }
     // URE for the stmt
-//    int num_tmp;
-//    URE **UREs_tmp = stmt_to_UREs(stmt, prog, vsa, &num_tmp);
-//    UREs = URE_append(UREs, &URE_num, UREs_tmp, num_tmp);
     stmt_to_UREs(stmt, prog, vsa);
-
-//    // update VSA
-//    vsa->URE_num = URE_num;
-//    vsa->UREs = UREs;
 
     // UREs for the write access
     PlutoAccess *acc = stmt->writes[0];
-//    UREs_tmp = create_drain_UREs(stmt, acc, prog, vsa, &num_tmp);
-//    UREs = URE_append(UREs, &URE_num, UREs_tmp, num_tmp);
-//
-//    // update VSA
-//    vsa->URE_num = URE_num;
-//    vsa->UREs = UREs;
     create_drain_UREs(stmt, acc, prog, vsa);
   }
 }
@@ -218,6 +198,214 @@ char *create_URE_name(char **URE_names, int URE_num, char *var_name) {
   }
 
   return URE_name;
+}
+
+/*
+ * This function builds the iteration domain for loop instances that first read the data
+ * based on the RAR dependence
+ * target_iters = read_iters - (RAR dest_iters);
+ * The iteration domain is printed following the Halide syntax
+ */ 
+char *create_RAR_domain_str(Stmt *stmt, PlutoAccess *acc, PlutoProg *prog, VSA *vsa) {
+  PlutoConstraints *new_domain = pluto_get_new_domain(stmt);
+  PlutoConstraints *full_domain = pluto_constraints_dup(new_domain);
+#ifdef PSA_URE_DEBUG
+//  fprintf(stdout, "[Debug] RAR iteration domain:\n");
+//  pluto_constraints_pretty_print(stdout, new_domain);
+#endif  
+  for (int i = 0; i < prog->ndeps; i++) {
+    Dep *dep = prog->deps[i];
+    if (IS_RAR(dep->type) && dep->src_acc == acc) {
+      Stmt *src_stmt = prog->stmts[dep->src];
+      Stmt *dest_stmt = prog->stmts[dep->dest];
+      PlutoConstraints *tdpoly = pluto_get_transformed_dpoly(dep, src_stmt, dest_stmt);
+      // Project out the src iters
+      pluto_constraints_project_out_isl_single(&tdpoly, 0, src_stmt->trans->nrows);
+#ifdef PSA_URE_DEBUG
+//      fprintf(stdout, "[Debug] RAR poly after projecting out the src iters:\n");
+//      pluto_constraints_pretty_print(stdout, tdpoly);
+#endif     
+      // Subtracting out the iters that read data from other source iters
+      new_domain = pluto_constraints_subtract(new_domain, tdpoly);
+#ifdef PSA_URE_DEBUG
+//      fprintf(stdout, "[Debug] RAR read-in iters:\n");
+//      pluto_constraints_pretty_print(stdout, new_domain);
+#endif     
+      pluto_constraints_free(tdpoly);
+    }
+  }
+
+  // comparing the constraints of RAR read-in iters and the original iters
+  // if there is the same constraint of RAR read-in iters in the original iters, 
+  // eliminate that constraints
+  int new_id, full_id;
+  new_id = 0;
+  while(new_id < new_domain->nrows) {
+    PlutoConstraints *row1 = pluto_constraints_select_row(new_domain, new_id);
+    for (full_id = 0; full_id < full_domain->nrows; full_id++) {
+      PlutoConstraints *row2 = pluto_constraints_select_row(full_domain, full_id);
+      if (pluto_constraints_are_equal(row1, row2)) {
+        pluto_constraints_remove_row(new_domain, new_id);
+        break;
+      }
+    }
+    if (full_id == full_domain->nrows) {
+      new_id++;
+    }
+  }
+#ifdef PSA_URE_DEBUG
+//  fprintf(stdout, "[Debug] RAR read-in iters (opted):\n");
+//  pluto_constraints_pretty_print(stdout, new_domain);
+#endif      
+
+  // print out the constraints in Halide syntax
+  char *const_str = pluto_constraints_to_t2s_format(new_domain, vsa, stmt->trans->nrows, prog->npar, prog->params);
+
+  return const_str;
+}
+
+/* 
+ * This function builds the iteration domain for loop instances that last write the data 
+ * based on the WAW dependence
+ * target_iters = write_iters - (WAW src_iters);
+ * The iteration domain is printed following the Halide syntax
+ */
+char *create_WAW_domain_str(Stmt *stmt, PlutoAccess *acc, PlutoProg *prog, VSA *vsa) {
+  PlutoConstraints *new_domain = pluto_get_new_domain(stmt);
+  PlutoConstraints *full_domain = pluto_constraints_dup(new_domain);
+#ifdef PSA_URE_DEBUG
+//  fprintf(stdout, "[Debug] WAW iteration domain:\n") ;
+//  pluto_constraints_pretty_print(stdout, new_domain);
+#endif
+
+  for (int i = 0; i < prog->ndeps; i++) {
+    Dep *dep = prog->deps[i];
+    if (IS_WAW(dep->type) && dep->src_acc == acc) {
+      Stmt *src_stmt = prog->stmts[dep->src];
+      Stmt *dest_stmt = prog->stmts[dep->dest];
+      PlutoConstraints *tdpoly = pluto_get_transformed_dpoly(dep, src_stmt, dest_stmt);
+      // Project out the dest iters
+      pluto_constraints_project_out_isl_single(&tdpoly, src_stmt->trans->nrows, dest_stmt->trans->nrows);
+#ifdef PSA_URE_DEBUG
+//      fprintf(stdout, "[Debug] WAW poly after projecting out the dest iters:\n");
+//      pluto_constraints_pretty_print(stdout, tdpoly);
+#endif      
+      new_domain = pluto_constraints_subtract(new_domain, tdpoly);
+#ifdef PSA_URE_DEBUG
+//      fprintf(stdout, "[Debug] WAW write-out iters:\n");
+//      pluto_constraints_pretty_print(stdout, new_domain);
+#endif      
+      pluto_constraints_free(tdpoly);
+    }
+  }
+
+#ifdef PSA_URE_DEBUG
+//  fprintf(stdout, "[Debug] Constraints empty: %d", pluto_constraints_is_empty(new_domain));
+#endif  
+
+  if (pluto_constraints_is_empty(new_domain)) {
+    pluto_constraints_free(new_domain);
+    pluto_constraints_free(full_domain);
+    return NULL;
+  } else {
+    // comparing the constraints of WAW write-out iters and the original iters
+    // if there is the same constraint of WAW write-out iters in the original iters,
+    // eliminate that constraints
+    int new_id, full_id;
+    new_id = 0;
+    while(new_id < new_domain->nrows) {
+      PlutoConstraints *row1 = pluto_constraints_select_row(new_domain, new_id);
+      for (full_id = 0; full_id < full_domain->nrows; full_id++) {
+        PlutoConstraints *row2 = pluto_constraints_select_row(full_domain, full_id);
+        if (pluto_constraints_are_equal(row1, row2)) {
+          pluto_constraints_remove_row(new_domain, new_id);
+          break;
+        }
+      }
+      if (full_id == full_domain->nrows) {
+        new_id++;
+      }
+    }
+  }
+
+  char *const_str = pluto_constraints_to_t2s_format(new_domain, vsa, stmt->trans->nrows, prog->npar, prog->params);
+
+  pluto_constraints_free(new_domain);
+  pluto_constraints_free(full_domain);
+
+  return const_str;
+}
+
+/* 
+ * Print out the constraints to Halide format that will be used
+ * in the select condition in T2S
+ */
+char *pluto_constraints_to_t2s_format(const PlutoConstraints *cst, VSA *vsa, int niter, int nparam, char **params) {
+  if (cst->nrows == 0) {
+    return "";
+  } 
+  char *ret_str = "";
+  int nrows = cst->nrows;
+  int ncols = cst->ncols;
+  int iter_num = vsa->t2s_iter_num;
+  char **iters = vsa->t2s_iters;
+  for (int i = 0; i < nrows; i++) {
+    if (i > 0) {
+      ret_str = concat(ret_str, " && ");
+    }
+
+    bool is_first = true;
+    for (int j = 0; j < ncols; j++) {
+      if (cst->val[i][j] != 0) {
+        char exp[20];
+        if (!is_first) {
+          ret_str = concat(ret_str, " + ");
+        }
+        if (j < niter) {
+          if (cst->val[i][j] == 1) {
+            sprintf(exp, "%s", iters[j]);
+            ret_str = concat(ret_str, exp);
+          } else if (cst->val[i][j] == -1) {
+            sprintf(exp, "-%s", iters[j]);
+            ret_str = concat(ret_str, exp);
+          } else {
+            sprintf(exp, "(%d) * %s", cst->val[i][j], iters[j]);
+            ret_str = concat(ret_str, exp);
+          }
+        } else if (j < niter + nparam) {
+          if (cst->val[i][j] == 1) {
+            sprintf(exp, "%s", params[j]);
+            ret_str = concat(ret_str, exp);
+          } else if (cst->val[i][j] == -1) {
+            sprintf(exp, "-%s", params[j]);
+            ret_str = concat(ret_str, exp);
+          } else {
+            sprintf(exp, "(%d) * %s", cst->val[i][j], params[j]);
+            ret_str = concat(ret_str, exp);
+          }         
+        } else {
+          if (cst->val[i][j] == 1) {
+            ret_str = concat(ret_str, "1");
+          } else if (cst->val[i][j] == -1) {
+            ret_str = concat(ret_str, "-1");
+          } else {
+            sprintf(exp, "(%d)", cst->val[i][j]);
+            ret_str = concat(ret_str, exp);
+          }
+        }              
+        if (is_first) {
+          is_first = !is_first;
+        }
+      }      
+    }
+    if (cst->is_eq[i] == 1) {
+      ret_str = concat(ret_str, " == 0");
+    } else {
+      ret_str = concat(ret_str, " >= 0");
+    }
+  }
+
+  return ret_str;
 }
 
 void create_RAR_UREs(Stmt *stmt, PlutoAccess *acc, PlutoProg *prog, VSA *vsa) {
@@ -281,18 +469,23 @@ void create_RAR_UREs(Stmt *stmt, PlutoAccess *acc, PlutoProg *prog, VSA *vsa) {
   char *new_acc_str = create_new_acc_str(stmt, acc, prog, vsa);
   // create the init domain string 
   // e.g., t2 == 0 && t1 >= 0 && t1 <= 3 && t3 >= 0 && t3 <= 3
-  // compute the RAR init domain
-  //
-  //char *domain_str = create_domain_str();
-  char *domain_str = "";
+  // compute the RAR init domain  
+  char *domain_str = create_RAR_domain_str(stmt, acc, prog, vsa);
+  //char *domain_str = "";
 
   text = "";
   text = concat(text, var_ref);
-  text = concat(text, " = select(");
-  text = concat(text, domain_str);
-  text = concat(text, ", ");
-  text = concat(text, new_acc_str);
-  text = concat(text, ");");
+  if (strcmp(domain_str, "")) {
+    text = concat(text, " = select(");
+    text = concat(text, domain_str);
+    text = concat(text, ", ");  
+    text = concat(text, new_acc_str);
+    text = concat(text, ");");
+  } else {
+    text = concat(text, " = ");
+    text = concat(text, new_acc_str);
+    text = concat(text, ";");
+  }
   init_URE->text = strdup(text);
 
   //UREs[1] = init_URE;
@@ -306,57 +499,53 @@ void create_drain_UREs(Stmt *stmt, PlutoAccess *acc, PlutoProg *prog, VSA *vsa) 
 //  *URE_num = 0;
 //  URE **UREs = (URE **)malloc(2 * sizeof(URE *));
 
-  // update caluse
-  URE* update_URE = (URE *)malloc(sizeof(URE));
-  char *var_name = vsa->acc_var_map[acc->sym_id]->var_name;
-  char *var_ref = vsa->acc_var_map[acc->sym_id]->var_ref;
-  IterExp **var_iters = vsa->acc_var_map[acc->sym_id]->var_iters;
+  char *domain_str = create_WAW_domain_str(stmt, acc, prog, vsa);
+  if (domain_str) {
+    // update caluse
+    URE* update_URE = (URE *)malloc(sizeof(URE));
+    char *var_name = vsa->acc_var_map[acc->sym_id]->var_name;
+    char *var_ref = vsa->acc_var_map[acc->sym_id]->var_ref;
+    IterExp **var_iters = vsa->acc_var_map[acc->sym_id]->var_iters;
+  
+    char *dvar_name = vsa->acc_var_map[acc->sym_id]->dvar_name;
+    char *dvar_ref = vsa->acc_var_map[acc->sym_id]->dvar_ref;
+    update_URE->id = vsa->URE_num;
+    update_URE->name = create_URE_name(get_vsa_URE_names(vsa->UREs, vsa->URE_num), vsa->URE_num, dvar_name);
+  
+    // generate the text
+    char *text = "";
+    text = concat(text, dvar_ref);
+    if (strcmp(domain_str, "")) {
+      text = concat(text, " = select(");
+      text = concat(text, domain_str);
+      text = concat(text, ", ");
+      text = concat(text, var_ref);
+      text = concat(text, ");");
+    } else {
+      text = concat(text, " = ");
+      text = concat(text, var_ref);
+      text = concat(text, ";");
+    }
+    update_URE->text = strdup(text);
+  
+    vsa->UREs = URE_add(vsa->UREs, &vsa->URE_num, update_URE);
 
-  char *dvar_name = vsa->acc_var_map[acc->sym_id]->dvar_name;
-  char *dvar_ref = vsa->acc_var_map[acc->sym_id]->dvar_ref;
-  update_URE->id = vsa->URE_num;
-//  update_URE->name = strdup(dvar_name);
-  update_URE->name = create_URE_name(get_vsa_URE_names(vsa->UREs, vsa->URE_num), vsa->URE_num, dvar_name);
+    // write clause
+    URE *write_URE = (URE *)malloc(sizeof(URE));
+    write_URE->id = vsa->URE_num;
+    write_URE->name = create_URE_name(get_vsa_URE_names(vsa->UREs, vsa->URE_num), vsa->URE_num, dvar_name);
 
-  char *domain_str = "";
-
-  // generate the text
-  char *text = "";
-  text = concat(text, dvar_ref);
-  text = concat(text, " = select(");
-  text = concat(text, domain_str);
-  text = concat(text, ", ");
-  text = concat(text, var_ref);
-  text = concat(text, ");");
-  update_URE->text = strdup(text);
-
-//  UREs[0] = update_URE;
-//  *URE_num = *URE_num + 1;
-  vsa->UREs = URE_add(vsa->UREs, &vsa->URE_num, update_URE);
-
-  // write clause
-  URE *write_URE = (URE *)malloc(sizeof(URE));
-  write_URE->id = vsa->URE_num;
-//  char *URE_name = strdup(dvar_name);
-//  URE_name = concat(URE_name, ".update(0)");
-//  write_URE->name = strdup(URE_name);
-  write_URE->name = create_URE_name(get_vsa_URE_names(vsa->UREs, vsa->URE_num), vsa->URE_num, dvar_name);
-
-  // generate the text
-  char *new_acc_str = create_new_acc_str(stmt, acc, prog, vsa);
-
-  text = "";
-  text = concat(text, new_acc_str);
-  text = concat(text, " = ");
-  text = concat(text, dvar_ref);
-  text = concat(text, "; // delete it in URE list and merge_UREs args during execution");
-  write_URE->text = strdup(text);
-
-//  UREs[1] = write_URE;
-//  *URE_num = *URE_num + 1;
-  vsa->UREs = URE_add(vsa->UREs, &vsa->URE_num, write_URE);
-
-//  return UREs;
+    // generate the text
+    char *new_acc_str = create_new_acc_str(stmt, acc, prog, vsa);
+    text = "";
+    text = concat(text, new_acc_str);
+    text = concat(text, " = ");
+    text = concat(text, dvar_ref);
+    text = concat(text, "; // delete it in URE list and merge_UREs args during execution");
+    write_URE->text = strdup(text);
+  
+    vsa->UREs = URE_add(vsa->UREs, &vsa->URE_num, write_URE);
+  } 
 }
 
 /* 
