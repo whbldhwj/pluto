@@ -129,7 +129,24 @@ void psa_t2s_codegen(FILE *fp, const VSA *vsa) {
 
   /* I/O network */
   fprintf(fp, "// Build I/O network\n");
-
+  fprintf(fp, "Func ");
+  for (int i = 0; i < vsa->t2s_IO_func_num; i++) {
+    if (i > 0) {
+      fprintf(fp, ", ");
+    }
+    fprintf(fp, "%s", vsa->t2s_IO_func_names[i]);
+  }
+  fprintf(fp, ";\n");
+  fprintf(fp, "APP");
+  for (int i = 0; i < vsa->t2s_IO_build_num; i++) {
+    if (i == 0) {
+      fprintf(fp, ".%s\n", vsa->t2s_IO_build_calls[i]);
+    } else if (i < vsa->t2s_IO_build_num - 1) {
+      fprintf(fp, "   .%s\n", vsa->t2s_IO_build_calls[i]);
+    } else {
+      fprintf(fp, "   .%s;\n", vsa->t2s_IO_build_calls[i]);
+    }
+  }
   fprintf(fp, "\n");
 
   /* I/O network spec */

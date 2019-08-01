@@ -1,5 +1,83 @@
 #include "psa_ure.h"
 
+/*
+ * This function extracts the I/O network definition for T2S
+ * and the I/O network optimization 
+ */
+void vsa_t2s_IO_extract(PlutoProg *prog, VSA *vsa) {
+//  char ***IO_func_list = NULL; // organized by variable name;
+//  int * num_func_per_var;
+  Graph *adg = prog->adg;
+//  IO_func_list = (char ***)malloc(adg->num_ccs * sizeof(char **));
+//  num_func_per_var = (int *)malloc(adg->num_ccs * sizeof(int));
+  struct var_pair **adg_var_map = vsa->adg_var_map;
+
+  int t2s_IO_func_num = 0;
+  char **t2s_IO_func_names = NULL;
+  int t2s_IO_build_num = 0;
+  char **t2s_IO_build_calls = NULL;
+
+  for (int cc_id = 0; cc_id < adg->num_ccs; cc_id++) {    
+    if (adg_var_map[cc_id]->d) {
+//      IO_func_list[cc_id] = (char **)malloc(4 * sizeof(char *));
+//      num_func_per_var[cc_id] = 4;
+      t2s_IO_func_names = realloc(t2s_IO_func_names, (t2s_IO_func_num + 4) * sizeof(char *));
+      t2s_IO_build_calls = realloc(t2s_IO_build_calls, (t2s_IO_build_num + 1) * sizeof(char *));
+      char *drainer = adg_var_map[cc_id]->var_name;
+      char *collector = adg_var_map[cc_id]->var_name;
+      char *unloader = adg_var_map[cc_id]->var_name;      
+      char *deserializer = adg_var_map[cc_id]->var_name;
+//      sprintf(drainer, "%s_drainer", adg_var_map[cc_id]->var_name);
+//      sprintf(collector, "%s_collector", adg_var_map[cc_id]->var_name);
+//      sprintf(unloader, "%s_unloader", adg_var_map[cc_id]->var_name);
+//      sprintf(deserializer, "%s_deserializer(Place::Host)", adg_var_map[cc_id]->var_name);
+      drainer = concat(drainer, "_drainer");
+      collector = concat(collector, "_collector");
+      unloader = concat(unloader, "_unloader");
+      deserializer = concat(deserializer, "_deserializer");
+      t2s_IO_func_names[t2s_IO_func_num + 0] = strdup(drainer);
+      t2s_IO_func_names[t2s_IO_func_num + 1] = strdup(collector);
+      t2s_IO_func_names[t2s_IO_func_num + 2] = strdup(unloader);
+      t2s_IO_func_names[t2s_IO_func_num + 3] = strdup(concat(deserializer, "(Place::Host)"));     
+      t2s_IO_func_num += 4;
+      char build_API[100];
+      sprintf(build_API, "isolate_producer_chain(%s, %s, %s, %s %s)",
+          adg_var_map[cc_id]->dvar_name,
+          drainer, collector, unloader, deserializer);
+      t2s_IO_build_calls[t2s_IO_build_num] = strdup(build_API);
+      t2s_IO_build_num++;
+    } else {
+//      IO_func_list[cc_id] = (char **)malloc(3 * sizeof(char *));
+//      num_func_per_var[cc_id] = 3;
+      t2s_IO_func_names = realloc(t2s_IO_func_names, (t2s_IO_func_num + 3) * sizeof(char *));
+      char *serializer = adg_var_map[cc_id]->var_name;
+      char *loader = adg_var_map[cc_id]->var_name;
+      char *feeder = adg_var_map[cc_id]->var_name;
+//      sprintf(serializer, "%s_serializer(Place::Host)", adg_var_map[cc_id]->var_name);
+//      sprintf(loader, "%s_loader", adg_var_map[cc_id]->var_name);
+//      sprintf(feeder, "%s_feeder", adg_var_map[cc_id]->var_name);
+      serializer = concat(serializer, "_serializer");
+      loader = concat(loader, "_loader");
+      feeder = concat(feeder, "_feeder");
+      t2s_IO_func_names[t2s_IO_func_num + 0] = strdup(concat(serializer, "(Place::Host)"));
+      t2s_IO_func_names[t2s_IO_func_num + 1] = strdup(loader);
+      t2s_IO_func_names[t2s_IO_func_num + 2] = strdup(feeder);
+      t2s_IO_func_num += 3;
+      char build_API[100];
+      sprintf(build_API, "isolate_consumer_chain(%s, %s, %s, %s)",
+          adg_var_map[cc_id]->var_name,
+          feeder, loader, serializer);
+      t2s_IO_build_calls[t2s_IO_build_num] = strdup(build_API);
+      t2s_IO_build_num++;
+    }
+  }
+  
+  vsa->t2s_IO_func_num = t2s_IO_func_num;
+  vsa->t2s_IO_func_names = t2s_IO_func_names;
+  vsa->t2s_IO_build_num = t2s_IO_build_num;
+  vsa->t2s_IO_build_calls = t2s_IO_build_calls;
+}
+
 /* Append one URE list to another list */
 URE **URE_append(URE **list1, int *num1, URE **list2, int num2) {
   list1 = realloc(list1, (*num1 + num2) * sizeof(URE*));

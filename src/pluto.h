@@ -345,6 +345,13 @@ struct stmt_access_var_pair {
   // int cc_id;
 };
 
+struct var_pair {
+  char *var_name;
+  char *dvar_name;
+  bool ei;
+  bool d;
+};
+
 struct ure {
   // URE text
   char *text;
@@ -895,6 +902,9 @@ struct psaVSA {
 
   /* ACCESS_VARIABLE_MAP */
   struct stmt_access_var_pair **acc_var_map;
+  
+  /* ADG_VARIABLE_MAP */
+  struct var_pair **adg_var_map;
 
   /* T2S_ITERS_NUM */
   int t2s_iter_num;
@@ -922,6 +932,18 @@ struct psaVSA {
 
   /* DOMAIN_EXPS */
   char **domain_exps;
+
+  /* T2S_IO_FUNC_NUM */
+  int t2s_IO_func_num;
+
+  /* T2S_IO_FUNC_NAMES */
+  char **t2s_IO_func_names;
+
+  /* T2S_IO_BUILD_NUM */
+  int t2s_IO_build_num;
+
+  /* T2S_IO_BUILD_CALLS */
+  char **t2s_IO_build_calls;
 };
 typedef struct psaVSA VSA;
 /* Jie Added - End */

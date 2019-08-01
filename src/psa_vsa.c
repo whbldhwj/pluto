@@ -172,7 +172,7 @@ void get_var_iters(int acc_id, struct stmt_access_var_pair **acc_var_map, PlutoP
 /*
  * Use the DFS to update the intermediate variables
  */
-void update_ivar(int acc_id, struct stmt_access_var_pair **acc_var_map, int cc_id, PlutoProg *prog, VSA *vsa) {
+void update_ivar(int acc_id, struct stmt_access_var_pair **acc_var_map, struct var_pair **adg_var_map, int cc_id, PlutoProg *prog, VSA *vsa) {
   int iter_num = vsa->t2s_iter_num;
   char **iters = vsa->t2s_iters;
 
@@ -203,6 +203,9 @@ void update_ivar(int acc_id, struct stmt_access_var_pair **acc_var_map, int cc_i
       
       vsa->ivar_names[vsa->ivar_num - 1] = strdup(var_name);
       acc_var_map[acc_id]->var_name = strdup(var_name);
+      adg_var_map[cc_id]->var_name = strdup(var_name);
+      adg_var_map[cc_id]->ei = 1;
+      adg_var_map[cc_id]->d = 0;
 
       // build the var_ref
       acc_var_map[acc_id]->var_iters = (IterExp **)malloc(iter_num * sizeof(IterExp *));
@@ -228,6 +231,8 @@ void update_ivar(int acc_id, struct stmt_access_var_pair **acc_var_map, int cc_i
 
         vsa->idvar_names[vsa->idvar_num - 1] = strdup(var_name);
         acc_var_map[acc_id]->dvar_name = strdup(var_name);
+        adg_var_map[cc_id]->dvar_name = strdup(var_name);
+        adg_var_map[cc_id]->d = 1;
 
         acc_var_map[acc_id]->dvar_iters = (IterExp **)malloc(iter_num * sizeof(IterExp *));
         for (int iter_id = 0; iter_id < iter_num; iter_id++) {
@@ -249,7 +254,7 @@ void update_ivar(int acc_id, struct stmt_access_var_pair **acc_var_map, int cc_i
       char var_name[50];
       sprintf(var_name, "%s_CC%d_I", arr_name, cc_id);
 
-      acc_var_map[acc_id]->var_name = strdup(var_name);
+      acc_var_map[acc_id]->var_name = strdup(var_name);      
 
       // build the var_ref
       acc_var_map[acc_id]->var_iters = (IterExp **)malloc(iter_num * sizeof(IterExp *));
@@ -260,7 +265,7 @@ void update_ivar(int acc_id, struct stmt_access_var_pair **acc_var_map, int cc_i
 
       char var_ref[50];
       sprintf(var_ref, "%s(%s)", var_name, get_iter_str(acc_var_map[acc_id]->var_iters, iter_num));
-      acc_var_map[acc_id]->var_ref = strdup(var_ref);
+      acc_var_map[acc_id]->var_ref = strdup(var_ref);    
 
       // build the drain variable
       if (acc_var_map[acc_id]->d == 1) {
@@ -268,6 +273,9 @@ void update_ivar(int acc_id, struct stmt_access_var_pair **acc_var_map, int cc_i
         sprintf(var_name, "%s_CC%d_ID", arr_name, cc_id);
 
         acc_var_map[acc_id]->dvar_name = strdup(var_name);
+        adg_var_map[cc_id]->dvar_name = strdup(var_name);
+        adg_var_map[cc_id]->d = 1;
+
         acc_var_map[acc_id]->dvar_iters = (IterExp **)malloc(iter_num * sizeof(IterExp *));
         for (int iter_id = 0; iter_id < iter_num; iter_id++) {
           acc_var_map[acc_id]->dvar_iters[iter_id] = (IterExp *)malloc(sizeof(IterExp));
@@ -288,9 +296,9 @@ void update_ivar(int acc_id, struct stmt_access_var_pair **acc_var_map, int cc_i
       Dep *dep = prog->deps[dep_id];
       if (IS_RAW(dep->type)) {
         if (dep->src_acc == acc) {
-          update_ivar(dep->dest_acc->sym_id, acc_var_map, cc_id, prog, vsa);
+          update_ivar(dep->dest_acc->sym_id, acc_var_map, adg_var_map, cc_id, prog, vsa);
         } else if (dep->dest_acc == acc) {
-          update_ivar(dep->src_acc->sym_id, acc_var_map, cc_id, prog, vsa);
+          update_ivar(dep->src_acc->sym_id, acc_var_map, adg_var_map, cc_id, prog, vsa);
         }
       }
     }
@@ -322,7 +330,8 @@ char *get_iter_str(IterExp **iters, int iter_num) {
 /*
  * Update the var_name, var_ref, var_iters
  */
-void update_var(struct stmt_access_var_pair **acc_var_map, int total_accs, int cc_id, PlutoProg *prog, VSA *vsa) {
+void update_var(struct stmt_access_var_pair **acc_var_map, struct var_pair **adg_var_map,
+    int total_accs, int cc_id, PlutoProg *prog, VSA *vsa) {
   int iter_num = vsa->t2s_iter_num;
   char **iters = vsa->t2s_iters;
 
@@ -345,6 +354,9 @@ void update_var(struct stmt_access_var_pair **acc_var_map, int total_accs, int c
 
         vsa->evar_names[vsa->evar_num - 1] = strdup(var_name);
         acc_var_map[acc_id]->var_name = strdup(var_name);
+        adg_var_map[cc_id]->var_name = strdup(var_name);
+        adg_var_map[cc_id]->ei = 0;
+        adg_var_map[cc_id]->d = 0;
 
         // build the var_ref
         acc_var_map[acc_id]->var_iters = (IterExp **)malloc(iter_num * sizeof(IterExp *));
@@ -370,6 +382,8 @@ void update_var(struct stmt_access_var_pair **acc_var_map, int total_accs, int c
 
           vsa->edvar_names[vsa->edvar_num - 1] = strdup(var_name);
           acc_var_map[acc_id]->dvar_name = strdup(var_name);
+          acc_var_map[cc_id]->dvar_name = strdup(var_name);
+          adg_var_map[cc_id]->d = 1;
 
           acc_var_map[acc_id]->dvar_iters = (IterExp **)malloc(iter_num * sizeof(IterExp *));
           for (int iter_id = 0; iter_id < iter_num; iter_id++) {
@@ -392,7 +406,7 @@ void update_var(struct stmt_access_var_pair **acc_var_map, int total_accs, int c
       Stmt *stmt = acc_var_map[i]->stmt;
       PlutoAccess *acc = acc_var_map[i]->acc;    
       if (acc->cc_id == cc_id) {
-        update_ivar(acc->sym_id, acc_var_map, cc_id, prog, vsa);
+        update_ivar(acc->sym_id, acc_var_map, adg_var_map, cc_id, prog, vsa);
       }
     }
   }
@@ -490,7 +504,19 @@ void vsa_var_extract(PlutoProg *prog, VSA *vsa) {
   Graph *adg = adg_create(prog);
   prog->adg= adg;
   adg_compute_cc(prog);
- 
+
+  // initialize the adg_var_map
+  struct var_pair **adg_var_map = NULL;
+  adg_var_map = (struct var_pair **)malloc(adg->num_ccs * sizeof(struct var_pair *));
+  // initialization
+  for (int i = 0; i < adg->num_ccs; i++) {
+    adg_var_map[i] = (struct var_pair *)malloc(sizeof(struct var_pair));
+    adg_var_map[i]->var_name = NULL;
+    adg_var_map[i]->dvar_name = NULL;
+    adg_var_map[i]->ei = -1;
+    adg_var_map[i]->d = -1;
+  }
+
   for (int i = 0; i < num_read_write_data; i++)
     for (int j = 0; j < num_stmts_per_acc[i]; j++) {
       struct stmt_access_pair *acc_stmt = acc_stmts[i][j];
@@ -515,10 +541,11 @@ void vsa_var_extract(PlutoProg *prog, VSA *vsa) {
   // update the var_name, var_ref, var_iters by DFS in each CC
   for (int i = 0; i < prog->adg->num_ccs; i++) {
     int cc_id = prog->adg->ccs[i].id;
-    update_var(acc_var_map, total_accs, cc_id, prog, vsa);
+    update_var(acc_var_map, adg_var_map, total_accs, cc_id, prog, vsa);
   }
 
   vsa->acc_var_map = acc_var_map;
+  vsa->adg_var_map = adg_var_map;
 #ifdef PSA_VSA_DEBUG
   acc_var_map_pretty_print(acc_var_map, total_accs);
 #endif  
@@ -1158,6 +1185,7 @@ VSA *vsa_alloc() {
   vsa->ivar_refs = NULL;
   vsa->idvar_refs = NULL;
   vsa->acc_var_map = NULL;
+  vsa->adg_var_map = NULL;
   vsa->t2s_iter_num = -1;
   vsa->t2s_iters = NULL;
   vsa->t2s_meta_iters = NULL;
@@ -1168,6 +1196,10 @@ VSA *vsa_alloc() {
   vsa->UREs = NULL;
   vsa->domain_exp_num = 0;
   vsa->domain_exps = NULL;
+  vsa->t2s_IO_func_num = 0;
+  vsa->t2s_IO_func_names = NULL;
+  vsa->t2s_IO_build_num = 0;
+  vsa->t2s_IO_build_calls = NULL;
 
   return vsa;
 }

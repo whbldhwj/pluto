@@ -40,6 +40,10 @@ APP.space_time_transform({t1, t2, t3},
                          Systolic::Async);
 
 // Build I/O network
+Func C_CC0_I_drainer, C_CC0_I_collector, C_CC0_I_unloader, C_CC0_I_deserializer(Place::Host), A_CC1_E_serializer(Place::Host), A_CC1_E_loader, A_CC1_E_feeder, B_CC2_E_serializer(Place::Host), B_CC2_E_loader, B_CC2_E_feeder;
+APP.isolate_producer_chain(C_CC0_ID, C_CC0_I_drainer, C_CC0_I_collector, C_CC0_I_unloader C_CC0_I_deserializer)
+   .isolate_consumer_chain(A_CC1_E, A_CC1_E_feeder, A_CC1_E_loader, A_CC1_E_serializer)
+   .isolate_consumer_chain(B_CC2_E, B_CC2_E_feeder, B_CC2_E_loader, B_CC2_E_serializer);
 
 // Specialize I/O network
 

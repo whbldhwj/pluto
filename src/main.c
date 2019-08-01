@@ -746,7 +746,10 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
     for (prog_id = 0; prog_id < nprogs; prog_id++) {
     //for (prog_id = 0; prog_id < 1; prog_id++) {    
       VSA *psa_vsa = vsa_alloc();    
- 
+
+      prog = progs[prog_id];  
+      pluto_transformations_pretty_print(prog);
+
 #ifdef T2S_CODEGEN
       /* T2S_ITERS */
       vsa_t2s_iter_extract(prog, psa_vsa);
@@ -759,9 +762,6 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
       /* T2S_META_ITERS */
       vsa_t2s_meta_iter_extract(prog, psa_vsa);
 #endif
-
-      prog = progs[prog_id];  
-      pluto_transformations_pretty_print(prog);
 
 //      /* OP_NUM, RES_NUM, OP_DIM, RES_DIM, OP_NAME, RES_NAME */      
 //      vsa_op_res_extract(prog, psa_vsa);
@@ -873,7 +873,8 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
       vsa_band_width_extract(prog, psa_vsa);
       /* T2S_ITERS */
       vsa_t2s_iter_extract(prog, psa_vsa);
-
+      /* T2S_IO */
+      vsa_t2s_IO_extract(prog, psa_vsa);
 //      pluto_prog_to_vsa(prog, psa_vsa);
       FILE *vsa_fp = fopen("vsa.json", "w");
       if (vsa_fp) {
