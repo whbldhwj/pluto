@@ -239,6 +239,106 @@ int generate_declarations(const PlutoProg *prog, FILE *outfp) {
   return 0;
 }
 
+/* Jie Added - Start */
+/* Call cloog and generate AST tree for the transformed program
+ *
+ * cloogf, cloogl: set to -1 if you want the function to decide
+ *
+ * --cloogf, --cloogl overrides everything; next cloogf, cloogl if != -1,
+ *  then the function takes care of the rest
+ */
+struct clast_stmt *psa_create_cloog_ast_tree(const PlutoProg *prog, int cloogf, int cloogl, 
+    FILE *cloogfp, CloogOptions **cloogOptions) {
+  CloogInput *input;
+//  CloogOptions *cloogOptions;
+//  CloogState *state;
+  int i;
+
+  struct clast_stmt *root;
+
+  Stmt **stmts = prog->stmts;
+  int nstmts = prog->nstmts;
+
+//  state = cloog_state_malloc();
+//  *cloogOptions = cloog_options_malloc(state);
+
+  (*cloogOptions)->fs = malloc(nstmts * sizeof(int));
+  (*cloogOptions)->ls = malloc(nstmts * sizeof(int));
+  (*cloogOptions)->fs_ls_size = nstmts;
+
+  for (i = 0; i < nstmts; i++) {
+    (*cloogOptions)->fs[i] = -1;
+    (*cloogOptions)->ls[i] = -1;
+  }
+
+  (*cloogOptions)->name = "CLooG file produced by PLUTO";
+  (*cloogOptions)->compilable = 0;
+  (*cloogOptions)->esp = 1;
+  (*cloogOptions)->strides = 1;
+  (*cloogOptions)->quiet = options->silent;
+
+  /* Generates better code in general */
+  (*cloogOptions)->backtrack = options->cloogbacktrack;
+
+  if (options->cloogf >= 1 && options->cloogl >= 1) {
+    (*cloogOptions)->f = options->cloogf;
+    (*cloogOptions)->l = options->cloogl;
+  } else {
+    if (cloogf >= 1 && cloogl >= 1) {
+      (*cloogOptions)->f = cloogf;
+      (*cloogOptions)->l = cloogl;
+    } else if (options->tile) {
+      for (i = 0; i < nstmts; i++) {
+        (*cloogOptions)->fs[i] = get_first_point_loop(stmts[i], prog) + 1;
+        (*cloogOptions)->ls[i] = prog->num_hyperplanes;
+      }
+    } else {
+      /* Default */
+      (*cloogOptions)->f = 1;
+      /* last level to optimize: number of hyperplanes;
+       * since Pluto provides full-ranked transformations */
+      (*cloogOptions)->l = prog->num_hyperplanes;
+    }
+  }
+
+  if (!options->silent) {
+    if (nstmts >= 1 && (*cloogOptions)->fs[0] >= 1) {
+      printf("[pluto] using statement-wise -fs/-ls options: ");
+      for (i = 0; i < nstmts; i++) {
+        printf("S%d(%d,%d), ", i + 1, (*cloogOptions)->fs[i], (*cloogOptions)->ls[i]);
+      }
+      printf("\n");
+    } else {
+      printf("[pluto] using Cloog -f/-l options: %d %d\n", (*cloogOptions)->f,
+             (*cloogOptions)->l);
+    }
+  }
+
+  // if (options->cloogsh)
+  //   cloogOptions->sh = 1;
+  //cloogOptions->sh = 1;
+
+  (*cloogOptions)->name = "PLUTO-produced CLooG file";
+
+//  fprintf(outfp, "/* Start of CLooG code */\n");
+  /* Get the code from CLooG */
+  IF_DEBUG(printf("[pluto] cloog_input_read\n"));
+  input = cloog_input_read(cloogfp, *cloogOptions);
+  IF_DEBUG(printf("[pluto] cloog_clast_create\n"));
+  root = cloog_clast_create_from_input(input, *cloogOptions);
+
+//  clast_pprint(outfp, root, 0, cloogOptions);
+//  cloog_clast_free(root);
+
+//  fprintf(outfp, "/* End of CLooG code */\n");
+
+//  cloog_options_free(cloogOptions);
+//  cloog_state_free(state);
+
+  return root;
+}
+/* Jie Added - End */
+
 /* Call cloog and generate code for the transformed program
  *
  * cloogf, cloogl: set to -1 if you want the function to decide

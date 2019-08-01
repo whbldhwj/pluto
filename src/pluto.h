@@ -29,6 +29,8 @@
 #include "ddg.h"
 #include "pluto/libpluto.h"
 
+#include <cloog/cloog.h>
+
 #include "osl/extensions/dependence.h"
 
 // -- Jie Added --
@@ -723,6 +725,9 @@ struct iter {
 
   /* Tile size */
   int tile_factor;
+
+  /* Stride */
+  char *stride;
 };
 typedef struct iter Iter;
 
@@ -894,7 +899,10 @@ struct psaVSA {
 
   /* T2S_ITERS */
   char **t2s_iters;
- 
+
+  /* T2S_META_ITERS */
+  Iter **t2s_meta_iters;
+
   /* ARRAY_NUM */
   int array_num;
 
@@ -1064,6 +1072,10 @@ int generate_declarations(const PlutoProg *prog, FILE *outfp);
 int psa_generate_declarations(const PlutoProg *prog, FILE *outfp);
 int pluto_gen_cloog_code(const PlutoProg *prog, int cloogf, int cloogl,
                          FILE *cloogfp, FILE *outfp);
+/* Jie Added - Start */
+struct clast_stmt *psa_create_cloog_ast_tree(const PlutoProg *prog, int cloogf, int cloogl, 
+    FILE *cloogfp, CloogOptions **cloogOptions); 
+/* Jie Added - End */
 void pluto_add_given_stmt(PlutoProg *prog, Stmt *stmt);
 Stmt *pluto_create_stmt(int dim, const PlutoConstraints *domain,
                         const PlutoMatrix *trans, char **iterators,

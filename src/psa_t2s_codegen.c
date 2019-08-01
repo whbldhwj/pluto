@@ -75,20 +75,53 @@ void psa_t2s_codegen(FILE *fp, const VSA *vsa) {
   }
   fprintf(fp, ")\n");
   fprintf(fp, "   .domain(");
-  for (int i = 0; i < vsa->domain_exp_num; i++) {
-    if (i < vsa->domain_exp_num - 1) {
-      fprintf(fp, "%s,\n", vsa->domain_exps[i]);
+//  for (int i = 0; i < vsa->domain_exp_num; i++) {
+//    if (i < vsa->domain_exp_num - 1) {
+//      fprintf(fp, "%s,\n", vsa->domain_exps[i]);
+//    } else {
+//      fprintf(fp, "%s", vsa->domain_exps[i]);
+//    }
+//  }
+  for (int i = 0; i < vsa->t2s_iter_num; i++) {
+    if (i == 0) {
+      fprintf(fp, "%s, %s, %s, %s,\n", 
+          vsa->t2s_meta_iters[i]->iter_name,
+          vsa->t2s_meta_iters[i]->lb,
+          vsa->t2s_meta_iters[i]->ub,
+          vsa->t2s_meta_iters[i]->stride);
+    } else if (i < vsa->t2s_iter_num - 1) {
+      fprintf(fp, "           %s, %s, %s, %s,\n", 
+          vsa->t2s_meta_iters[i]->iter_name,
+          vsa->t2s_meta_iters[i]->lb,
+          vsa->t2s_meta_iters[i]->ub,
+          vsa->t2s_meta_iters[i]->stride);
     } else {
-      fprintf(fp, "%s", vsa->domain_exps[i]);
+      fprintf(fp, "           %s, %s, %s, %s", 
+          vsa->t2s_meta_iters[i]->iter_name,
+          vsa->t2s_meta_iters[i]->lb,
+          vsa->t2s_meta_iters[i]->ub,
+          vsa->t2s_meta_iters[i]->stride);
     }
   }
   fprintf(fp, ");\n\n");
 
   /* Optimization */
-  
+  fprintf(fp, "// Optimization\n") ;
+
+  fprintf(fp, "\n");
+
   /* Space-time transformation */
+  fprintf(fp, "// Space-time transformation\n");
+
+  fprintf(fp, "\n");
 
   /* I/O network */
+  fprintf(fp, "// Build I/O network\n");
+
+  fprintf(fp, "\n");
 
   /* I/O network spec */
+  fprintf(fp, "// Specialize I/O network\n");
+
+  fprintf(fp, "\n");
 }

@@ -16,15 +16,23 @@ Var t1, t2, t3;
 
 // UREs
 C_CC0_I(t1, t2, t3) = 0;
-A_CC1_E(t1, t2, t3) = A_CC1_E(t1, t2 + (-1), t3);
-A_CC1_E(t1, t2, t3) = select(t2 == 0, A(t1, t3));
-B_CC2_E(t1, t2, t3) = B_CC2_E(t1 + (-1), t2, t3);
-B_CC2_E(t1, t2, t3) = select(t1 == 0, B(t3, t2));
+A_CC1_E(t1, t2, t3) = select(t2 == 0, A(t1, t3), A_CC1_E(t1, t2 + (-1), t3));
+B_CC2_E(t1, t2, t3) = select(t1 == 0, B(t3, t2), B_CC2_E(t1 + (-1), t2, t3));
 C_CC0_I(t1, t2, t3 + (1)) = C_CC0_I(t1, t2, t3) + A_CC1_E(t1, t2, t3) * B_CC2_E(t1, t2, t3);
 C_CC0_ID(t1, t2, t3 + (1)) = select(t3 + (-63) == 0, C_CC0_I(t1, t2, t3 + (1)));
 C(t1, t2) = C_CC0_ID(t1, t2, t3 + (1)); // delete it in URE list and merge_UREs args during execution
 
 // Build the initial loop nest
-APP.merge_UREs(C_CC0_I, A_CC1_E, A_CC1_E.update(0), B_CC2_E, B_CC2_E.update(0), C_CC0_I.update(0), C_CC0_ID, C_CC0_ID.update(0))
-   .domain();
+APP.merge_UREs(C_CC0_I, A_CC1_E, B_CC2_E, C_CC0_I.update(0), C_CC0_ID, C_CC0_ID.update(0))
+   .domain(t1, 0, 63, 1,
+           t2, 0, 63, 1,
+           t3, 0, 63, 1);
+
+// Optimization
+
+// Space-time transformation
+
+// Build I/O network
+
+// Specialize I/O network
 

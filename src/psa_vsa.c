@@ -1019,6 +1019,9 @@ void pluto_prog_to_vsa(PlutoProg *prog, VSA *vsa) {
 
   /* URES */
   vsa_URE_extract(prog, vsa);
+
+  /* T2S_META_ITERS */
+  vsa_t2s_meta_iter_extract(prog, vsa);
 }
 
 /*
@@ -1153,6 +1156,7 @@ VSA *vsa_alloc() {
   vsa->acc_var_map = NULL;
   vsa->t2s_iter_num = -1;
   vsa->t2s_iters = NULL;
+  vsa->t2s_meta_iters = NULL;
   vsa->array_num = -1;
   vsa->arrays = NULL;
 

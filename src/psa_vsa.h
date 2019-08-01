@@ -11,6 +11,8 @@
 #include "distmem.h"
 #include "program.h"
 #include "psa_ure.h"
+#include <cloog/cloog.h>
+#include <cloog/clast.h>
 
 void vsa_op_res_extract(PlutoProg *prog, VSA *vsa);
 void vsa_channel_dir_extract(PlutoProg *prog, VSA *vsa);

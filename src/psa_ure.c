@@ -411,7 +411,7 @@ char *pluto_constraints_to_t2s_format(const PlutoConstraints *cst, VSA *vsa, int
 void create_RAR_UREs(Stmt *stmt, PlutoAccess *acc, PlutoProg *prog, VSA *vsa) {
   int URE_num = vsa->URE_num;
   // URE **UREs = (URE **)malloc(2 * sizeof(URE *));
-
+#ifndef URE_MERGE
   // update clause 
   URE* update_URE = (URE *)malloc(sizeof(URE));
   char *var_name = vsa->acc_var_map[acc->sym_id]->var_name;
@@ -491,7 +491,54 @@ void create_RAR_UREs(Stmt *stmt, PlutoAccess *acc, PlutoProg *prog, VSA *vsa) {
   //UREs[1] = init_URE;
   //*URE_num = *URE_num + 1;
   vsa->UREs = URE_add(vsa->UREs, &vsa->URE_num, init_URE);
+#else
+  char *domain_str = create_RAR_domain_str(stmt, acc, prog, vsa);
+  char *var_name = vsa->acc_var_map[acc->sym_id]->var_name;
+  URE *merge_URE = (URE *)malloc(sizeof(URE));
+  merge_URE->id = vsa->URE_num;
+  merge_URE->name = create_URE_name(get_vsa_URE_names(vsa->UREs, vsa->URE_num), vsa->URE_num, var_name);
 
+  char *new_acc_str = create_new_acc_str(stmt, acc, prog, vsa);
+  char *var_ref = vsa->acc_var_map[acc->sym_id]->var_ref;
+  IterExp **var_iters = vsa->acc_var_map[acc->sym_id]->var_iters;
+  
+  IterExp **var_iters_RHS = (IterExp **)malloc(vsa->t2s_iter_num * sizeof(IterExp *));
+  for (int i = 0; i < prog->ndeps; i++) {
+    Dep *dep = prog->deps[i];
+    if (IS_RAR(dep->type)) {
+      if (dep->src_acc == acc || dep->dest_acc == acc) {
+        for (int iter_id = 0; iter_id < vsa->t2s_iter_num; iter_id++) {
+          var_iters_RHS[iter_id] = (IterExp *)malloc(sizeof(IterExp));
+          int diff;
+          if (dep->disvec[iter_id] == DEP_DIS_MINUS_ONE)
+            diff = -1;
+          else if (dep->disvec[iter_id] == DEP_DIS_ZERO)
+            diff = 0;
+          else if (dep->disvec[iter_id] == DEP_DIS_PLUS_ONE)
+            diff = 1;
+
+          var_iters_RHS[iter_id]->iter_name = strdup(var_iters[iter_id]->iter_name);
+          var_iters_RHS[iter_id]->iter_offset = var_iters[iter_id]->iter_offset - diff;
+        }
+      }
+    }
+  }
+  char var_ref_RHS[50];
+  sprintf(var_ref_RHS, "%s(%s)", var_name, get_iter_str(var_iters_RHS, vsa->t2s_iter_num));
+
+  char *text = "";
+  text = concat(text, var_ref);
+  text = concat(text, " = select(");
+  text = concat(text, domain_str);
+  text = concat(text, ", ");
+  text = concat(text, new_acc_str);
+  text = concat(text, ", ");
+  text = concat(text, var_ref_RHS);
+  text = concat(text, ");");
+  merge_URE->text = strdup(text);
+
+  vsa->UREs = URE_add(vsa->UREs, &vsa->URE_num, merge_URE);
+#endif  
   //return UREs;
 }
 
@@ -622,4 +669,307 @@ void stmt_to_UREs(Stmt *stmt, PlutoProg *prog, VSA *vsa) {
 //  return UREs;
 }
 
+/*
+ * This function parses iteration information from the 
+ * CLAST AST tree built by CLooG.
+ * The fields to be fulfilled:
+ * - iter_name
+ * - lb
+ * - ub
+ * - stride
+ */
+void vsa_t2s_meta_iter_extract(PlutoProg *prog, VSA *vsa) {
+  Iter **t2s_meta_iters = (Iter **)malloc(sizeof(Iter *) * vsa->t2s_iter_num);
+  for (int i = 0; i < vsa->t2s_iter_num; i++) {
+    t2s_meta_iters[i] = (Iter *)malloc(sizeof(Iter));
+  }
 
+  // generate temporary CLooG file
+  char *cloog_file_name = ".t2s.tmp.cloog";
+  FILE *cloog_fp;
+  cloog_fp = fopen(cloog_file_name, "w+");
+  if (!cloog_fp) {
+    fprintf(stderr, "[PSA] Can't open .cloog file: '%s'\n", cloog_file_name);
+    free(cloog_file_name);
+    return 0;
+  }
+  pluto_gen_cloog_file(cloog_fp, prog);
+  rewind(cloog_fp);
+  
+  // build the clast AST tree
+  struct clast_stmt *root;
+  CloogOptions *cloogOptions;
+  CloogState *state;
+
+  state = cloog_state_malloc();
+  cloogOptions = cloog_options_malloc(state);
+
+  root = psa_create_cloog_ast_tree(prog, prog->num_hyperplanes, 1, cloog_fp, &cloogOptions);
+  fclose(cloog_fp);
+
+#ifdef PSA_URE_DEBUG
+  FILE *file_debug;
+  file_debug = fopen(".ure_debug", "w");
+  clast_pprint(file_debug, root, 0, cloogOptions);
+  fclose(file_debug);
+#endif
+
+  // parse the AST tree to update the iters
+  int iter_cnt = 0;
+  clast_parse_t2s_meta_iters(t2s_meta_iters, vsa->t2s_iter_num, &iter_cnt, root, cloogOptions);
+
+  cloog_options_free(cloogOptions);
+  cloog_state_free(state);
+
+  vsa->t2s_meta_iters = t2s_meta_iters;
+}
+
+/*
+ * This funtion parse iterator information from the CLAST AST tree.
+ * It will stop after parsting iter_num iterators.
+ */
+void clast_parse_t2s_meta_iters(Iter **iters, int iter_num, int *iter_cnt, struct clast_stmt *root, CloogOptions *options) {
+  iter_parse_stmt_list(options, iters, iter_num, iter_cnt, root);
+}
+
+void iter_parse_stmt_list(struct cloogoptions *options, Iter **iters, int iter_num, int *iter_cnt, struct clast_stmt *s) {
+  if (*iter_cnt < iter_num) {
+    for ( ; s; s = s->next) {
+      if (CLAST_STMT_IS_A(s, stmt_root)) 
+        continue;
+      if (CLAST_STMT_IS_A(s, stmt_ass))
+        iter_parse_assignment(options, iters, iter_num, iter_cnt, (struct clast_assignment *)s);
+      else if (CLAST_STMT_IS_A(s, stmt_user)) 
+        iter_parse_user_stmt(options, iters, iter_num, iter_cnt, (struct clast_user_stmt *)s);
+      else if (CLAST_STMT_IS_A(s, stmt_for))
+        iter_parse_for(options, iters, iter_num, iter_cnt, (struct clast_for *)s);
+      else if (CLAST_STMT_IS_A(s, stmt_guard))
+        iter_parse_guard(options, iters, iter_num, iter_cnt, (struct clast_guard *)s);
+      else if (CLAST_STMT_IS_A(s, stmt_block))
+        iter_parse_stmt_list(options, iters, iter_num, iter_cnt, ((struct clast_block *)s)->body);
+      else {
+        assert(0);
+      }
+    }
+  }
+}
+
+void iter_parse_assignment(struct cloogoptions *options, Iter **iters, int iter_num, int *iter_cnt, struct clast_assignment *a) {
+  return;
+}
+
+void iter_parse_user_stmt(struct cloogoptions *options, Iter **iters, int iter_num, int *iter_cnt, struct clast_user_stmt *a) {
+  return;
+}
+
+void iter_parse_for(struct cloogoptions *options, Iter **iters, int iter_num, int *iter_cnt, struct clast_for *f) {
+  if (*iter_cnt < iter_num) {
+    iters[*iter_cnt]->iter_name = strdup(f->iterator);
+    if (f->LB) {     
+      iters[*iter_cnt]->lb = strdup(clast_expr_to_str(options, f->LB));
+    } 
+    if (f->UB) {
+      iters[*iter_cnt]->ub = strdup(clast_expr_to_str(options, f->UB));
+    }
+    iters[*iter_cnt]->stride = clast_int_to_str(f->stride);
+    *iter_cnt = *iter_cnt + 1;
+    iter_parse_stmt_list(options, iters, iter_num, iter_cnt, f->body);
+  } else {
+    return;
+  }
+}
+
+void iter_parse_guard(struct cloogoptions *options, Iter **iters, int iter_num, int *iter_cnt, struct clast_guard *g) {
+  return;
+}
+
+char *clast_expr_to_str(struct cloogoptions *i, struct clast_expr *e) {
+  if (!e)
+    return;
+  char *str = "";
+  char *tmp_str = NULL;
+  switch (e->type) {
+    case clast_expr_name:
+      tmp_str = clast_name_to_str((struct clast_name *)e);
+      str = concat(str, tmp_str);
+      break;
+    case clast_expr_term:
+      tmp_str = clast_term_to_str(i, (struct clast_term *)e);
+      str = concat(str, tmp_str);
+      break;
+    case clast_expr_red:
+      tmp_str = clast_reduction_to_str(i, (struct clast_reduction *)e);
+      str = concat(str, tmp_str);
+      break;
+    case clast_expr_bin:
+      tmp_str = clast_binary_to_str(i, (struct clast_binary *)e);
+      str = concat(str, tmp_str);
+      break;
+    default:
+      assert(0);
+  }
+  return str;
+}
+
+char *clast_name_to_str(struct clast_name *n) {
+  char *str = "";
+  char str_tmp[100];
+  sprintf(str_tmp, "%s", n->name);
+  str = concat(str, str_tmp);
+  return str;
+}
+
+char *clast_term_to_str(struct cloogoptions *i, struct clast_term *t) {
+  char *str = "";
+  if (t->var) {
+    int group = t->var->type == clast_expr_red &&
+      ((struct clast_reduction*) t->var)->n > 1;
+    if (cloog_int_is_one(t->val))
+      ;
+    else if (cloog_int_is_neg_one(t->val))
+      str = concat(str, "-");
+    else {
+      str = concat(str, clast_int_to_str(t->val));
+      str = concat(str, "*");
+    }
+    if (group)
+      str = concat(str, "(");
+    char *str_tmp = clast_expr_to_str(i, t->var);
+    str = concat(str, str_tmp);
+    if (group)
+      str = concat(str, ")");
+  } else {
+    str = concat(str, clast_int_to_str(t->val));
+  }
+  return str;
+}
+
+char *clast_reduction_to_str(struct cloogoptions *i, struct clast_reduction *r) {
+  char *str = "";
+  char *str_tmp;
+  switch (r->type) {
+    case clast_red_sum:      
+      str_tmp = clast_sum_to_str(i, r);
+      str = concat(str, str_tmp);
+      break;
+    case clast_red_min:
+    case clast_red_max:
+      if (r->n == 1) {
+        str_tmp = clast_expr_to_str(i, r->elts[0]);
+        str = concat(str, str_tmp);
+        break;
+      }
+      if (i->language == CLOOG_LANGUAGE_FORTRAN) {
+        str_tmp = clast_minmax_f_to_str(i, r);
+        str = concat(str, str_tmp);
+      } else {
+        str_tmp = clast_minmax_c_to_str(i, r);
+        str = concat(str, str_tmp);        
+      }
+      break;
+    default:
+      assert(0);
+  }
+  return str;
+}
+
+char *clast_sum_to_str(struct cloogoptions *opt, struct clast_reduction *r) {
+  char *str = "";
+  int i;
+  struct clast_term *t;
+
+  assert(r->n >= 1);
+  assert(r->elts[0]->type == clast_expr_term);
+  t = (struct clast_term *) r->elts[0];
+  char *str_tmp = clast_term_to_str(opt, t);
+  str = concat(str, str_tmp);
+
+  for (i = 1; i < r->n; ++i) {
+    assert(r->elts[i]->type == clast_expr_term);
+    t = (struct clast_term *)r->elts[i];
+    if (cloog_int_is_pos(t->val)) 
+      str = concat(str, "+");
+    char *str_tmp = clast_term_to_str(opt, t);
+    str = concat(str, str_tmp);
+  }
+
+  return str;
+}
+
+char *clast_minmax_f_to_str(struct cloogoptions *info, struct clast_reduction *r) {
+  assert(0);
+  return NULL;
+}
+
+char *clast_minmax_c_to_str(struct cloogoptions *info, struct clast_reduction *r) {
+  char *str = "";
+  int i;
+  for (i = 1; i < r->n; ++i) {
+    str = concat(str, r->type == clast_red_max ? "max(" : "min(");
+  }
+  if (r->n > 0) {
+    str = concat(str, clast_expr_to_str(info, r->elts[0]));
+  }
+  for (i = 1; i < r->n; ++i) {
+    str = concat(str, ",");
+    str = concat(str, clast_expr_to_str(info, r->elts[i]));
+    str = concat(str, ")");
+  }
+  return str;
+}
+
+char *clast_binary_to_str(struct cloogoptions *i, struct clast_binary *b) {
+  char *str = "";
+  const char *s1 = NULL, *s2 = NULL, *s3 = NULL;
+  int group = b->LHS->type == clast_expr_red &&
+    ((struct clast_reduction*) b->LHS)->n > 1;
+  if (i->language == CLOOG_LANGUAGE_FORTRAN) {
+
+  } else {
+    switch (b->type) {
+      case clast_bin_fdiv:
+        s1 = "floord(", s2 = ",", s3 = ")";
+        break;
+      case clast_bin_cdiv:
+        s1 = "ceild(", s2 = ",", s3 = ")";
+        break;
+      case clast_bin_div:
+        if (group)
+          s1 = "(", s2 = ")/", s3 = "";
+        else
+          s1 = "", s2 = "/", s3 = "";
+        break;
+      case clast_bin_mod:
+        if (group)
+          s1 = "(", s2 = ")%", s3 = "";
+        else
+          s1 = "", s2 = "%", s3 = "";
+        break;
+    }    
+  }
+  str = concat(str, s1);
+  str = concat(str, clast_expr_to_str(i, b->LHS));
+  str = concat(str, s2);
+  str = concat(str, clast_int_to_str(b->RHS));
+  str = concat(str, s3);
+
+  return str;
+}
+
+/* Cloog uses GMP library to handle integers */
+char *clast_int_to_str(cloog_int_t t) {
+//  char *str = "";
+//  char str_tmp[100];
+//  sprintf(str_tmp, "%d", t);
+//  str = concat(str, str_tmp);
+//  return str;
+  char *str = "";
+  char *s;
+  cloog_int_print_gmp_free_t gmp_free;
+  s = mpz_get_str(0, 10, t);
+  str = concat(str, s);
+  mp_get_memory_functions(NULL, NULL, &gmp_free);
+  (*gmp_free)(s, strlen(s)+1);
+
+  return str;
+}
