@@ -31,6 +31,13 @@ APP.merge_UREs(C_CC0_I, A_CC1_E, B_CC2_E, C_CC0_I.update(0), C_CC0_ID, C_CC0_ID.
 // Optimization
 
 // Space-time transformation
+APP.space_time_transform({t1, t2, t3},
+                         {t1, t2},
+                         {1, 0, 0,
+                          0, 1, 0},
+                         {t3},
+                         {0, 0, 1},
+                         Systolic::Async);
 
 // Build I/O network
 

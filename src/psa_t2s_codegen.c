@@ -111,9 +111,21 @@ void psa_t2s_codegen(FILE *fp, const VSA *vsa) {
   fprintf(fp, "\n");
 
   /* Space-time transformation */
+  // NOTICE: we will have to call t2s_iter_extract again after the PE optimization
   fprintf(fp, "// Space-time transformation\n");
-
-  fprintf(fp, "\n");
+  fprintf(fp, "APP.space_time_transform(");
+  int line_num = 0;
+  char **lines = t2s_space_time_pprint(vsa, &line_num);
+  for (int i = 0; i < line_num; i++) {
+    if (i == 0) {
+      fprintf(fp, "%s\n", lines[i]);
+    } else if (i < line_num - 1) {
+      fprintf(fp, "                         %s\n", lines[i]);
+    } else {
+      fprintf(fp, "                         %s", lines[i]);
+    }
+  }
+  fprintf(fp, ");\n\n");
 
   /* I/O network */
   fprintf(fp, "// Build I/O network\n");
@@ -124,4 +136,112 @@ void psa_t2s_codegen(FILE *fp, const VSA *vsa) {
   fprintf(fp, "// Specialize I/O network\n");
 
   fprintf(fp, "\n");
+}
+
+/* 
+ * Print out the space_time transform in T2S spec
+ */
+char **t2s_space_time_pprint(VSA *vsa, int *line_num) {
+  // T2S progam only contains one perfectly nested loop
+  int time_band_width = vsa->t2s_iter_num - vsa->array_part_band_width - vsa->space_band_width;
+
+  int total_line_num = 1 + 1 + vsa->space_band_width + 1 
+    + time_band_width + 1;
+  char **lines = (char **)malloc(total_line_num * sizeof(char *));
+  // print the source loops
+  {
+    char *str = "{";
+    for (int i = 0; i < vsa->t2s_iter_num; i++) {
+      if (i > 0) {
+        str = concat(str, ", ");
+      }
+      str = concat(str, vsa->t2s_iters[i]);
+    }
+    str = concat(str, "},");
+    lines[*line_num] = str;
+    *line_num = *line_num + 1;
+  }
+
+  // print the space loops
+  {
+    char *str = "{";
+    for (int i = vsa->array_part_band_width; i < vsa->array_part_band_width + vsa->space_band_width; i++) {
+      if (i - vsa->array_part_band_width > 0) {
+        str = concat(str, ", ");
+      }
+      str = concat(str, vsa->t2s_iters[i]);
+    }
+    str = concat(str, "},");
+    lines[*line_num] = str;
+    *line_num = *line_num + 1;
+  
+    // print the space transform
+    for (int row = 0; row < vsa->space_band_width; row++) {
+      char *str = "";
+      if (row == 0)
+        str = concat(str, "{");
+      else
+        str = concat(str, " ");
+      for (int col = 0; col < vsa->t2s_iter_num; col++) {
+        if (col > 0)
+          str = concat(str, ", ");
+        if (col == vsa->array_part_band_width + row)
+          str = concat(str, "1");
+        else
+          str = concat(str, "0");      
+      }
+      if (row < vsa->space_band_width - 1)
+        str = concat(str, ",");
+      else
+        str = concat(str, "},");
+      lines[*line_num] = str;
+      *line_num = *line_num + 1;
+    }
+  }
+
+  // print the time loops
+  {
+    char *str = "{";
+    for (int i = vsa->array_part_band_width + vsa->space_band_width; i < vsa->array_part_band_width + vsa->space_band_width + time_band_width; i++) {
+      if (i - vsa->array_part_band_width - vsa->space_band_width > 0) {
+        str = concat(str, ", ");
+      }
+      str = concat(str, vsa->t2s_iters[i]);
+    }
+    str = concat(str, "},");
+    lines[*line_num] = str;
+    *line_num = *line_num + 1;
+
+    // print the time transform
+    for (int row = 0; row < time_band_width; row++) {
+      char *str = "";
+      if (row == 0)
+        str = concat(str, "{");
+      else
+        str = concat(str, " ");
+      for (int col = 0; col < vsa->t2s_iter_num; col++) {
+        if (col > 0)
+          str = concat(str, ", ");
+        if (col == vsa->array_part_band_width + vsa->space_band_width + row)
+          str = concat(str, "1");
+        else
+          str = concat(str, "0");
+      }
+      if (row < time_band_width - 1)
+        str = concat(str, ",");
+      else
+        str = concat(str, "},");
+      lines[*line_num] = str;
+      *line_num = *line_num + 1;
+    }
+  }
+
+  // array time
+  {
+    char *str = "Systolic::Async";
+    lines[*line_num] = str;
+    *line_num = *line_num + 1;
+  }
+
+  return lines;
 }

@@ -801,6 +801,8 @@ struct psaVSA {
   /* ITERATORS */
   Iter **iters;
 
+  int iter_num;
+
   /* IL_ENABLE */
   bool il_enable;
 

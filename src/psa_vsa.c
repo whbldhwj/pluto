@@ -109,7 +109,9 @@ void vsa_t2s_iter_extract(PlutoProg *prog, VSA *vsa) {
       }
     }
     if (!loop_hyp) {
+      // scalar hyperplane
       band_width = i;
+      break;
     }
   }
 
@@ -987,9 +989,9 @@ void pluto_prog_to_vsa(PlutoProg *prog, VSA *vsa) {
 //    vsa->fc_simd_factors[i] = 1;
 //  }
 //
-//  /* ARRAY_PART Band Width */
-//  vsa_band_width_extract(prog, vsa);  
-//
+  /* ARRAY_PART_BAND_WIDTH */
+  vsa_band_width_extract(prog, vsa);  
+
 //  /* DF Code */
 //  PlutoProg *new_prog;
 //  new_prog = pluto_prog_dup(prog);
@@ -1031,11 +1033,12 @@ void vsa_band_width_extract(PlutoProg *prog, VSA *vsa) {
   Band **bands;
   int nbands;
   bands = pluto_get_outermost_permutable_bands(prog, &nbands);
+  assert(nbands == 1);
 
   unsigned i, h;
   for (i = 0; i < nbands; i++) {
     Band *band_cur = bands[i];
-    unsigned first_array_part_hyp;
+    unsigned first_array_part_hyp = 0;
     unsigned first_space_hyp, first_time_hyp;
     bool first_array_part_hyp_found = false;
     bool first_space_hyp_found = false;
@@ -1058,44 +1061,44 @@ void vsa_band_width_extract(PlutoProg *prog, VSA *vsa) {
     vsa->array_part_band_width = first_space_hyp - first_array_part_hyp;
     vsa->space_band_width = first_time_hyp - first_space_hyp;
 
-    /* Engine band */
-    //vsa->op_engine_band_width = (int *)malloc(vsa->op_num * sizeof(int));
-    //vsa->res_engine_band_width = (int *)malloc(vsa->res_num * sizeof(int));
-    vsa->engine_band_width = (int *)malloc((vsa->op_num + vsa->res_num) * sizeof(int));
-
-    int array_dim = prog->array_dim;
-    int ref_idx;
-    for (ref_idx = 0; ref_idx < vsa->op_num; ref_idx++) {
-      char *acc_channel_dir = vsa->op_channel_dirs[ref_idx];
-      if (array_dim == 2) {        
-        vsa->engine_band_width[ref_idx] = 1;        
-      } else if (array_dim == 1) {
-        if (!strcmp(acc_channel_dir, "D")) {
-          vsa->engine_band_width[ref_idx] = 1;
-        } else if (!strcmp(acc_channel_dir, "R")) {
-          vsa->engine_band_width[ref_idx] = 0;
-        } else {
-          fprintf(stdout, "[PSA] Error! Not supported!\n");
-          exit(1);
-        }
-      }
-    }
-
-    for (ref_idx = 0; ref_idx < vsa->res_num; ref_idx++) {
-      char *acc_channel_dir = vsa->res_channel_dirs[ref_idx];
-      if (array_dim == 2) {
-        vsa->engine_band_width[ref_idx + vsa->op_num] = 1;
-      } else if (array_dim == 1) {
-        if (!strcmp(acc_channel_dir, "D")) {
-          vsa->engine_band_width[ref_idx + vsa->op_num] = 1;
-        } else if (!strcmp(acc_channel_dir, "R")) {
-          vsa->engine_band_width[ref_idx + vsa->op_num] = 0;
-        } else {
-          fprintf(stdout, "[PSA] Error! Not supported!\n");
-          exit(1);
-        }
-      }
-    }
+//    /* Engine band */
+//    //vsa->op_engine_band_width = (int *)malloc(vsa->op_num * sizeof(int));
+//    //vsa->res_engine_band_width = (int *)malloc(vsa->res_num * sizeof(int));
+//    vsa->engine_band_width = (int *)malloc((vsa->op_num + vsa->res_num) * sizeof(int));
+//
+//    int array_dim = prog->array_dim;
+//    int ref_idx;
+//    for (ref_idx = 0; ref_idx < vsa->op_num; ref_idx++) {
+//      char *acc_channel_dir = vsa->op_channel_dirs[ref_idx];
+//      if (array_dim == 2) {        
+//        vsa->engine_band_width[ref_idx] = 1;        
+//      } else if (array_dim == 1) {
+//        if (!strcmp(acc_channel_dir, "D")) {
+//          vsa->engine_band_width[ref_idx] = 1;
+//        } else if (!strcmp(acc_channel_dir, "R")) {
+//          vsa->engine_band_width[ref_idx] = 0;
+//        } else {
+//          fprintf(stdout, "[PSA] Error! Not supported!\n");
+//          exit(1);
+//        }
+//      }
+//    }
+//
+//    for (ref_idx = 0; ref_idx < vsa->res_num; ref_idx++) {
+//      char *acc_channel_dir = vsa->res_channel_dirs[ref_idx];
+//      if (array_dim == 2) {
+//        vsa->engine_band_width[ref_idx + vsa->op_num] = 1;
+//      } else if (array_dim == 1) {
+//        if (!strcmp(acc_channel_dir, "D")) {
+//          vsa->engine_band_width[ref_idx + vsa->op_num] = 1;
+//        } else if (!strcmp(acc_channel_dir, "R")) {
+//          vsa->engine_band_width[ref_idx + vsa->op_num] = 0;
+//        } else {
+//          fprintf(stdout, "[PSA] Error! Not supported!\n");
+//          exit(1);
+//        }
+//      }
+//    }
   }
 }
 
@@ -1122,6 +1125,7 @@ VSA *vsa_alloc() {
   vsa->fc_group_factors = NULL;
   vsa->fc_simd_factors = NULL;
   vsa->iters = NULL;
+  vsa->iter_num = 0;
   vsa->il_enable = 0;
   vsa->simd_factor = 0;
   vsa->op_num = 0;

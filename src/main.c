@@ -746,7 +746,20 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
     for (prog_id = 0; prog_id < nprogs; prog_id++) {
     //for (prog_id = 0; prog_id < 1; prog_id++) {    
       VSA *psa_vsa = vsa_alloc();    
-  
+ 
+#ifdef T2S_CODEGEN
+      /* T2S_ITERS */
+      vsa_t2s_iter_extract(prog, psa_vsa);
+      /* T2S_VARS */
+      vsa_var_extract(prog, psa_vsa);
+      /* ARRAYS */
+      vsa_array_extract(prog, psa_vsa);
+      /* UREs */
+      vsa_URE_extract(prog, psa_vsa);
+      /* T2S_META_ITERS */
+      vsa_t2s_meta_iter_extract(prog, psa_vsa);
+#endif
+
       prog = progs[prog_id];  
       pluto_transformations_pretty_print(prog);
 
@@ -856,7 +869,12 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
       fprintf(stdout, "[PSA] ***************************************\n");
       fprintf(stdout, "[PSA] Generate Virtual Systolic Array (VSA).\n");    
       /* Complete the rest of VSA fields */
-      pluto_prog_to_vsa(prog, psa_vsa);
+      /* ARRAY_PART_BAND_WIDTH */
+      vsa_band_width_extract(prog, psa_vsa);
+      /* T2S_ITERS */
+      vsa_t2s_iter_extract(prog, psa_vsa);
+
+//      pluto_prog_to_vsa(prog, psa_vsa);
       FILE *vsa_fp = fopen("vsa.json", "w");
       if (vsa_fp) {
         psa_vsa_pretty_print(vsa_fp, psa_vsa);
