@@ -1,0 +1,70 @@
+{
+  "EVAR_NUM": 5,
+  "EDVAR_NUM": 1,
+  "IVAR_NUM": 3,
+  "IDVAR_NUM": 1,
+  "EVAR_NAMES": [
+    "Z_ext_CC0_E",
+    "X_CC1_E",
+    "X_CC3_E",
+    "X_CC5_E",
+    "W_CC6_E"
+  ],
+  "EDVAR_NAMES": [
+    "Z_ext_CC0_ED"
+  ],
+  "EVAR_REFS": [
+    "Z_ext_CC0_E(t1, t2, t3, t4)",
+    "X_CC1_E(t1, t2, t3, t4)",
+    "X_CC3_E(t1, t2, t3, t4)",
+    "X_CC5_E(t1, t2, t3, t4)",
+    "W_CC6_E(t1, t2, t3, t4)"
+  ],
+  "EDVAR_REFS": [
+    "Z_ext_CC0_ED(t1, t2, t3, t4)"
+  ],
+  "IVAR_NAMES": [
+    "W_CC2_I",
+    "Z_ext_CC2_I",
+    "W_CC4_I"
+  ],
+  "IDVAR_NAMES": [
+    "Z_ext_CC2_ID"
+  ],
+  "IVAR_REFS": [
+    "W_CC2_I(t1, t2, t3, t4)",
+    "Z_ext_CC2_I(t1, t2, t3, t4)",
+    "W_CC4_I(t1, t2, t3, t4)"
+  ],
+  "IDVAR_REFS": [
+    "Z_ext_CC2_ID(t1, t2, t3, t4)"
+  ],
+  "T2S_ITER_NUM": 4,
+  "T2S_ITERS": [
+    "t1",
+    "t2",
+    "t3",
+    "t4"
+  ],
+  "ARRAY_NUM": 3,
+  "ARRAYS": [
+    "X",
+    "W",
+    "Z_ext"
+  ],
+  "URE_NUM": 9,
+  "URES": [
+    "X_CC3_E(t1, t2, t3, t4) = select(, X(t2t3, t1(-1) * t3t4(-1)), X_CC3_E(t1, t2, t3, t4));",
+    "Z_ext_CC2_I(t1, t2, t3, t4) = Z_ext_CC2_I(t1, t2, t3 + (-1), t4) + X_CC3_E(t1, t2, t3, t4) * W_CC4_I(t1, t2, t3, t4);",
+    "X_CC1_E(t1, t2, t3, t4) = select(, X(t2t3, t1t4), X_CC1_E(t1, t2, t3, t4));",
+    "Z_ext_CC0_E(t1, t2, t3, t4) = X_CC1_E(t1, t2, t3, t4) * W_CC2_I(t1, t2, t3, t4);",
+    "Z_ext_CC0_ED(t1, t2, t3, t4) = Z_ext_CC0_E(t1, t2, t3, t4);",
+    "Z_ext(t2, t1, t3, t4) = Z_ext_CC0_ED(t1, t2, t3, t4); // delete it in URE list and merge_UREs args during execution",
+    "X_CC5_E(t1, t2, t3, t4) = select(, X(t2t3, t1(-1) * t3t4), X_CC5_E(t1, t2, t3, t4));",
+    "W_CC6_E(t1, t2, t3, t4) = select(, W(t3, (-1) * t3t4), W_CC6_E(t1, t2, t3, t4));",
+    "Z_ext_CC2_I(t1, t2, t3, t4) = Z_ext_CC2_I(t1, t2, t3, t4 + (-1)) + X_CC5_E(t1, t2, t3, t4) * W_CC6_E(t1, t2, t3, t4);"
+  ],
+  "DOMAIN_EXP_NUM": 0,
+  "DOMAIN_EXPS": [
+  ],
+}

@@ -2276,11 +2276,11 @@ void adg_compute_cc(PlutoProg *prog) {
       Stmt *stmt = prog->stmts[j];
       for (int k = 0; k < stmt->nreads; k++) {
         if (stmt->reads[k]->sym_id == acc_id)
-          stmt->reads[k]->cc_id = cc_id;      
+          stmt->reads[k]->cc_id = g->vertices[i].cc_id;      
       }
       for (int k = 0; k < stmt->nwrites; k++) {
         if (stmt->writes[k]->sym_id == acc_id)
-          stmt->writes[k]->cc_id = cc_id;
+          stmt->writes[k]->cc_id = g->vertices[i].cc_id;
       }
     }
   }

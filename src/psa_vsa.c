@@ -503,6 +503,15 @@ void vsa_var_extract(PlutoProg *prog, VSA *vsa) {
 
   Graph *adg = adg_create(prog);
   prog->adg= adg;
+#ifdef PSA_VSA_DEBUG
+  fprintf(stdout, "[Debug] Access dependence graph:\n");
+  for (int i = 0; i < adg->adj->nrows; i++) {
+    for (int j = 0; j < adg->adj->ncols; j++) {
+      fprintf(stdout, "\t%d", adg->adj->val[i][j]);
+    }
+    fprintf(stdout, "\n");
+  }
+#endif
   adg_compute_cc(prog);
 
   // initialize the adg_var_map

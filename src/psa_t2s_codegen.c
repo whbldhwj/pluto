@@ -106,7 +106,7 @@ void psa_t2s_codegen(FILE *fp, const VSA *vsa) {
   fprintf(fp, ");\n\n");
 
   /* Optimization */
-  fprintf(fp, "// Optimization\n") ;
+  fprintf(fp, "// PE Optimization\n") ;
 
   fprintf(fp, "\n");
 
@@ -150,7 +150,7 @@ void psa_t2s_codegen(FILE *fp, const VSA *vsa) {
   fprintf(fp, "\n");
 
   /* I/O network spec */
-  fprintf(fp, "// Specialize I/O network\n");
+  fprintf(fp, "// I/O Optimization\n");
 
   fprintf(fp, "\n");
 }

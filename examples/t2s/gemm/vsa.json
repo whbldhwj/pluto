@@ -1,31 +1,35 @@
 {
-  "EVAR_NUM": 2,
+  "EVAR_NUM": 4,
   "EDVAR_NUM": 0,
   "IVAR_NUM": 1,
   "IDVAR_NUM": 1,
   "EVAR_NAMES": [
+    "B_CC0_E",
     "A_CC1_E",
-    "B_CC2_E"
+    "B_CC3_E",
+    "A_CC4_E"
   ],
   "EDVAR_NAMES": [
   ],
   "EVAR_REFS": [
+    "B_CC0_E(t1, t2, t3)",
     "A_CC1_E(t1, t2, t3)",
-    "B_CC2_E(t1, t2, t3)"
+    "B_CC3_E(t1, t2, t3)",
+    "A_CC4_E(t1, t2, t3)"
   ],
   "EDVAR_REFS": [
   ],
   "IVAR_NAMES": [
-    "C_CC0_I"
+    "C_ext_CC2_I"
   ],
   "IDVAR_NAMES": [
-    "C_CC0_ID"
+    "C_ext_CC2_ID"
   ],
   "IVAR_REFS": [
-    "C_CC0_I(t1, t2, t3)"
+    "C_ext_CC2_I(t1, t2, t3)"
   ],
   "IDVAR_REFS": [
-    "C_CC0_ID(t1, t2, t3)"
+    "C_ext_CC2_ID(t1, t2, t3)"
   ],
   "T2S_ITER_NUM": 3,
   "T2S_ITERS": [
@@ -35,18 +39,22 @@
   ],
   "ARRAY_NUM": 3,
   "ARRAYS": [
-    "C",
+    "B",
     "A",
-    "B"
+    "C_ext"
   ],
-  "URE_NUM": 6,
+  "URE_NUM": 10,
   "URES": [
-    "C_CC0_I(t1, t2, t3) = 0;",
-    "A_CC1_E(t1, t2, t3) = select(t2 == 0, A(t1, t3), A_CC1_E(t1, t2 + (-1), t3));",
-    "B_CC2_E(t1, t2, t3) = select(t1 == 0, B(t3, t2), B_CC2_E(t1 + (-1), t2, t3));",
-    "C_CC0_I(t1, t2, t3 + (1)) = C_CC0_I(t1, t2, t3) + A_CC1_E(t1, t2, t3) * B_CC2_E(t1, t2, t3);",
-    "C_CC0_ID(t1, t2, t3 + (1)) = select(t3 + (-63) == 0, C_CC0_I(t1, t2, t3 + (1)));",
-    "C(t1, t2) = C_CC0_ID(t1, t2, t3 + (1)); // delete it in URE list and merge_UREs args during execution"
+    "B_CC3_E(t1, t2, t3) = select(t1 == 0, B(t3, t2), B_CC3_E(t1 + (-1), t2, t3));",
+    "A_CC4_E(t1, t2, t3) = select(t2 == 0, A(t1, t3), A_CC4_E(t1, t2 + (-1), t3));",
+    "C_ext_CC2_I(t1, t2, t3) = (C_ext[i][j][k - 1] + (A[i][k] * B_CC3_E(t1, t2, t3)));",
+    "C_ext_CC2_ID(t1, t2, t3) = C_ext_CC2_I(t1, t2, t3);",
+    "C_ext(t1, t2, t3) = C_ext_CC2_ID(t1, t2, t3); // delete it in URE list and merge_UREs args during execution",
+    "B_CC0_E(t1, t2, t3) = select(t1 == 0, B(, t2), B_CC0_E(t1 + (-1), t2, t3));",
+    "A_CC1_E(t1, t2, t3) = select(t2 == 0, A(t1, ), A_CC1_E(t1, t2 + (-1), t3));",
+    "C_ext_CC2_I(t1, t2, t3) = (A[i][0] * B_CC0_E(t1, t2, t3));",
+    "C_ext_CC2_ID(t1, t2, t3) = C_ext_CC2_I(t1, t2, t3);",
+    "C_ext(t1, t2, ) = C_ext_CC2_ID(t1, t2, t3); // delete it in URE list and merge_UREs args during execution"
   ],
   "DOMAIN_EXP_NUM": 0,
   "DOMAIN_EXPS": [

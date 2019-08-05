@@ -174,6 +174,8 @@ void usage_message(void) {
   fprintf(stdout, "       --debug                   Verbose/debug output\n");
   fprintf(stdout,
           "       --moredebug               More verbose/debug output\n");
+  fprintf(stdout, "\n   T2S\n");
+  fprintf(stdout, "       --dsa=<level>             DSA form of input\n");
   fprintf(stdout, "\nTo report bugs, please email "
                   "<pluto-development@googlegroups.com>\n\n");
 }
@@ -274,6 +276,7 @@ int main(int argc, char *argv[]) {
     { "noisldepcoalesce", no_argument, &options->isldepcoalesce, 0 },
     { "readscop", no_argument, &options->readscop, 1 },
     { "pipsolve", no_argument, &options->pipsolve, 1 },
+    { "dsa", required_argument, 0, 'd' },
 #ifdef GLPK
     { "glpk", no_argument, &options->glpk, 1 },
 #endif
@@ -324,6 +327,7 @@ int main(int argc, char *argv[]) {
       }
       break;
     case 'd':
+      options->dsa = atoi(optarg);
       break;
     case 'f':
       options->ft = atoi(optarg);
@@ -751,6 +755,7 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
       pluto_transformations_pretty_print(prog);
 
 #ifdef T2S_CODEGEN
+      fprintf(stdout, "[PSA] Input code DSA form: %d\n", options->dsa);
       /* T2S_ITERS */
       vsa_t2s_iter_extract(prog, psa_vsa);
       /* T2S_VARS */

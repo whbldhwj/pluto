@@ -3028,6 +3028,8 @@ PlutoOptions *pluto_options_alloc() {
 
   options->time = 1;
 
+  options->dsa = 0;
+
   return options;
 }
 
@@ -4780,6 +4782,9 @@ static Stmt **pet_to_pluto_stmts(struct pet_scop *pscop,
 
   max_sched_rows = 0;
 
+  /* Jie Added - Start */
+  int acc_sym_id = 0;
+  /* Jie Added - End */
   for (s = 0, t = 0; s < pscop->n_stmt; s++) {
     if (dead[s]) {
       free(pscop->stmts[s]->text);
@@ -4879,6 +4884,16 @@ static Stmt **pet_to_pluto_stmts(struct pet_scop *pscop,
 
     isl_union_map_free(reads);
     isl_union_map_free(writes);
+/* Jie Added - Start */
+    for (j = 0; j < stmt->nreads; j++) {
+      stmt->reads[j]->sym_id = acc_sym_id;
+      acc_sym_id++;
+    }
+    for (j = 0; j < stmt->nwrites; j++) {
+      stmt->writes[j]->sym_id = acc_sym_id;
+      acc_sym_id++;
+    }
+/* Jie Added - End */
 
     stmts[t]->pstmt = pstmt;
     t++;

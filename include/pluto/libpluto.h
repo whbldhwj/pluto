@@ -212,6 +212,9 @@ struct plutoOptions {
 
   /* fast linear independence check */
   int flic;
+  
+  /* Input code form for T2S pass */  
+  int dsa;  
 };
 typedef struct plutoOptions PlutoOptions;
 

@@ -50,6 +50,7 @@ void vsa_t2s_IO_extract(PlutoProg *prog, VSA *vsa) {
 //      IO_func_list[cc_id] = (char **)malloc(3 * sizeof(char *));
 //      num_func_per_var[cc_id] = 3;
       t2s_IO_func_names = realloc(t2s_IO_func_names, (t2s_IO_func_num + 3) * sizeof(char *));
+      t2s_IO_build_calls = realloc(t2s_IO_build_calls, (t2s_IO_build_num + 1) * sizeof(char *));
       char *serializer = adg_var_map[cc_id]->var_name;
       char *loader = adg_var_map[cc_id]->var_name;
       char *feeder = adg_var_map[cc_id]->var_name;
