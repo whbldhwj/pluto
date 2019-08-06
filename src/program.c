@@ -4653,12 +4653,18 @@ static void compute_deps_pet(struct pet_scop *pscop,
     dep_raw = isl_union_map_coalesce(dep_raw);
     dep_war = isl_union_map_coalesce(dep_war);
     dep_waw = isl_union_map_coalesce(dep_waw);
+    if (options->rar) {
+      dep_rar = isl_union_map_coalesce(dep_rar);
+    }
   }
 
   prog->ndeps = 0;
   isl_union_map_foreach_map(dep_raw, &isl_map_count, &prog->ndeps);
   isl_union_map_foreach_map(dep_war, &isl_map_count, &prog->ndeps);
   isl_union_map_foreach_map(dep_waw, &isl_map_count, &prog->ndeps);
+  if (options->rar) {
+    isl_union_map_foreach_map(dep_rar, &isl_map_count, &prog->ndeps);
+  }
 
   prog->deps = (Dep **)malloc(prog->ndeps * sizeof(Dep *));
   for (i = 0; i < prog->ndeps; i++) {
@@ -4671,12 +4677,19 @@ static void compute_deps_pet(struct pet_scop *pscop,
                               OSL_DEPENDENCE_WAR);
   prog->ndeps += extract_deps(prog->deps, prog->ndeps, prog->stmts, dep_waw,
                               OSL_DEPENDENCE_WAW);
+  if (options->rar) {
+    prog->ndeps += extract_deps(prog->deps, prog->ndeps, prog->stmts, dep_rar,
+                              OSL_DEPENDENCE_RAR);
+  }
   prog->transdeps = NULL;
   prog->ntransdeps = 0;
 
   isl_union_map_free(dep_raw);
   isl_union_map_free(dep_war);
   isl_union_map_free(dep_waw);
+  if (options->rar) {
+    isl_union_map_free(dep_rar);
+  }
 
   isl_union_map_free(empty);
   isl_union_map_free(writes);

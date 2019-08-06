@@ -953,7 +953,7 @@ void pluto_constraints_pretty_print(FILE *fp, const PlutoConstraints *cst) {
   int nrows = cst->nrows;
   int ncols = cst->ncols;
 
-  assert(cst->next == NULL);
+//  assert(cst->next == NULL);
 
   if (nrows == 0) {
     printf("Universal polyhedron -- no constraints (%d dims)!\n",

@@ -2705,6 +2705,5 @@ void psa_print_deps(const PlutoProg *prog) {
     PlutoConstraints* dpolytope = dep->dpolytope;
     pluto_constraints_pretty_print(stdout, dpolytope);
     fprintf(stdout, "***********************\n");
-  }
- 
+  } 
 }

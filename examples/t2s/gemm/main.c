@@ -29,7 +29,7 @@ int main(){
       C[i][j] = 0;
 
   // computation
-#pragma scop   
+#pragma scop  
   for (int i = 0; i < I; i++)
     for (int j = 0; j < J; j++) {
 //      C[i][j] = 0;
@@ -37,7 +37,7 @@ int main(){
         C[i][j] += A[i][k] * B[k][j];
       }
     }
-#pragma endscop  
+#pragma endscop
 
   dsa_kernel(A, B, C_dsa);
 

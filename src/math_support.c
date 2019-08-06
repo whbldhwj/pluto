@@ -591,7 +591,7 @@ __isl_keep isl_mat *pluto_matrix_to_isl_mat(PlutoMatrix *pluto_mat) {
       isl_mat_set_element_si(mat, i, j, pluto_mat->val[i][j]);
     }
 
-  isl_ctx_free(ctx);
+//  isl_ctx_free(ctx);
   return mat;
 }
 /* Jie Added - End */

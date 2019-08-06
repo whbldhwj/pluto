@@ -514,6 +514,15 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
     isl_ctx *pctx = isl_ctx_alloc_with_pet_options();
     pscop = pet_scop_extract_from_C_source(pctx, srcFileName, NULL);
 
+/* Jie Added - Start */
+#ifdef PSA_PET_DEBUG
+//    /* Print out the PET scop */
+//    if (pscop) {
+//      pet_scop_emit(stdout, pscop);
+//    }
+#endif
+/* Jie Added - End */
+
     if (!pscop) {
       fprintf(
           stdout,
@@ -602,6 +611,11 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
  * Step: Dependence Analysis
  * *******************************************
  */
+/* Jie Added - Start */
+#ifdef PRINT_DEPS_PREV_TRANSFORM
+//  psa_print_deps(prog);
+#endif
+/* Jie Added - End */
 
 /* Jie Added - Start */  
   fprintf(stdout, "[PSA] Filter out redundant dependences.\n");
@@ -643,15 +657,12 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
   int num_reuse_progs;
   reuse_progs = psa_reuse_analysis(prog, &num_reuse_progs);
   fprintf(stdout, "[PSA] %d programs generated after reuse analysis.\n", num_reuse_progs);
-//  if (pluto_prog_cmp(prog, reuse_progs[0])) {
-//    fprintf(stdout, "[PSA-Debug] new prog is different!\n");
-//  }
-  //prog = reuse_progs[0];
   /* Jie Added - End */
   
 //  for (int reuse_prog_id = 0; reuse_prog_id < num_reuse_progs; reuse_prog_id++) {
   for (int reuse_prog_id = 0; reuse_prog_id < 1; reuse_prog_id++) {
     prog = reuse_progs[reuse_prog_id];
+    
 /*
  * *******************************************
  * Stage: Array Generation

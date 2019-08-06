@@ -556,12 +556,10 @@ void vsa_var_extract(PlutoProg *prog, VSA *vsa) {
       int acc_id = acc->sym_id;
       acc_var_map[acc_id]->stmt = stmt;
       acc_var_map[acc_id]->acc = acc;
-      if (prog->options->dsa == 0) {
-        if (acc_stmt->acc_rw == 1) {
-          acc_var_map[acc_id]->d = 1; // add the drain variable for write access
-        } else {
-          acc_var_map[acc_id]->d = 0; 
-        }
+      if (acc_stmt->acc_rw == 1) {
+        acc_var_map[acc_id]->d = 1; // add the drain variable for write access
+      } else {
+        acc_var_map[acc_id]->d = 0; 
       }
       int cc_id = acc->cc_id;
       if (adg->ccs[cc_id].size == 1) {

@@ -95,6 +95,7 @@
 #define LAZY 1
 
 /* Jie Added - Start */
+#define PSA_PET_DEBUG
 //#define PLUTO_TRANSFORM_DEBUG
 //#define PSA_DEP_DEBUG
 //#define PSA_ARRAY_DEBUG

@@ -69,12 +69,12 @@ void dsa_kernel(data_t X[R + 2][S + 2], data_t W[3][3], data_t Z[R][S]) {
         for (int j = 0; j < 3; j++) {
           if (i == 0 && j == 0) 
             Z_ext[r][s][i][j] = X[r + i][s + j] * W[i][j];
-          else {
-            if (i > 0 && j == 0) {
-              Z_ext[r][s][i][j] = Z_ext[r][s][i - 1][2] + X[r + i][s + j] * W[i][j];
-            } else {
-              Z_ext[r][s][i][j] = Z_ext[r][s][i][j - 1] + X[r + i][s + j] * W[i][j];
-            }          
+          else if (i > 0 && j == 0) {
+            Z_ext[r][s][i][j] = Z_ext[r][s][i - 1][2] + X[r + i][s + j] * W[i][j];
+          } else if (i > 0 && j > 0) {
+            Z_ext[r][s][i][j] = Z_ext[r][s][i][j - 1] + X[r + i][s + j] * W[i][j];
+          } else if (i == 0 && j > 0) {                   
+            Z_ext[r][s][i][j] = Z_ext[r][s][i][j - 1] + X[r + i][s + j] * W[i][j];
           }
         }
     }

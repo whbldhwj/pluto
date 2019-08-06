@@ -407,7 +407,8 @@ char *create_RAR_domain_str(Stmt *stmt, PlutoAccess *acc, PlutoProg *prog, VSA *
 //      pluto_constraints_pretty_print(stdout, tdpoly);
 #endif     
       // Subtracting out the iters that read data from other source iters
-      new_domain = pluto_constraints_subtract(new_domain, tdpoly);
+      //new_domain = pluto_constraints_subtract(new_domain, tdpoly);
+      new_domain = pluto_constraints_difference_isl(new_domain, tdpoly);
 #ifdef PSA_URE_DEBUG
 //      fprintf(stdout, "[Debug] RAR read-in iters:\n");
 //      pluto_constraints_pretty_print(stdout, new_domain);
@@ -443,7 +444,11 @@ char *create_RAR_domain_str(Stmt *stmt, PlutoAccess *acc, PlutoProg *prog, VSA *
   }
 #ifdef PSA_URE_DEBUG
 //  fprintf(stdout, "[Debug] RAR read-in iters (opted):\n");
-//  pluto_constraints_pretty_print(stdout, new_domain);
+//  PlutoConstraints *cst_print = new_domain;
+//  while(cst_print != NULL) {
+//    pluto_constraints_pretty_print(stdout, cst_print);
+//    cst_print = cst_print->next;
+//  }
 #endif      
 
   // print out the constraints in Halide syntax
@@ -532,66 +537,107 @@ char *create_WAW_domain_str(Stmt *stmt, PlutoAccess *acc, PlutoProg *prog, VSA *
 char *pluto_constraints_to_t2s_format(const PlutoConstraints *cst, VSA *vsa, int niter, int nparam, char **params) {
   if (cst->nrows == 0) {
     return "";
-  } 
+  }
+
   char *ret_str = "";
-  int nrows = cst->nrows;
-  int ncols = cst->ncols;
-  int iter_num = vsa->t2s_iter_num;
-  char **iters = vsa->t2s_iters;
-  for (int i = 0; i < nrows; i++) {
-    if (i > 0) {
-      ret_str = concat(ret_str, " && ");
+  int cst_num = 0;
+  PlutoConstraints *cur_cst = cst;
+  while(cur_cst != NULL) {
+    cst_num++;
+    cur_cst = cur_cst->next;
+  }
+
+  cur_cst = cst;
+  for (int cst_id = 0; cst_id < cst_num; cst_id++) {
+    if (cst_num > 0 && cst_id > 0)
+      ret_str = concat(ret_str, " || ");
+    if (cst_num > 0) 
+      ret_str = concat(ret_str, "(");
+
+    int nrows = cur_cst->nrows;
+    int ncols = cur_cst->ncols;
+    int iter_num = vsa->t2s_iter_num;
+    /* Scalar hyperplane dimensions */
+    int nscalar_iter = niter - iter_num;
+  
+    char **iters = vsa->t2s_iters;
+    bool is_first_cst = true;
+    for (int i = 0; i < nrows; i++) {
+      // Test if this is the constraints on the scalar hyp
+      bool is_scalar_hyp_cst = false;
+      for (int j = iter_num; j < niter; j++) {
+        if (cur_cst->val[i][j] != 0) {
+          is_scalar_hyp_cst = true;
+          break;
+        }
+      }
+      if (is_scalar_hyp_cst)
+        continue;
+  
+      if (i > 0 && !is_first_cst) {
+        ret_str = concat(ret_str, " && ");
+      }
+  
+      if (is_first_cst)
+        is_first_cst = !is_first_cst;
+
+      bool is_first = true;
+      for (int j = 0; j < ncols; j++) {
+        if (cur_cst->val[i][j] != 0) {
+          char exp[20];
+          if (!is_first) {
+            ret_str = concat(ret_str, " + ");
+          }
+          if (j < iter_num) {
+            if (cur_cst->val[i][j] == 1) {
+              sprintf(exp, "%s", iters[j]);
+              ret_str = concat(ret_str, exp);
+            } else if (cur_cst->val[i][j] == -1) {
+              sprintf(exp, "-%s", iters[j]);
+              ret_str = concat(ret_str, exp);
+            } else {
+              sprintf(exp, "(%d) * %s", cur_cst->val[i][j], iters[j]);
+              ret_str = concat(ret_str, exp);
+            }
+          } else if (j < niter){
+            continue;
+          } else if (j < niter + nparam) {
+            if (cur_cst->val[i][j] == 1) {
+              sprintf(exp, "%s", params[j]);
+              ret_str = concat(ret_str, exp);
+            } else if (cur_cst->val[i][j] == -1) {
+              sprintf(exp, "-%s", params[j]);
+              ret_str = concat(ret_str, exp);
+            } else {
+              sprintf(exp, "(%d) * %s", cur_cst->val[i][j], params[j]);
+              ret_str = concat(ret_str, exp);
+            }         
+          } else {
+            if (cur_cst->val[i][j] == 1) {
+              ret_str = concat(ret_str, "1");
+            } else if (cur_cst->val[i][j] == -1) {
+              ret_str = concat(ret_str, "-1");
+            } else {
+              sprintf(exp, "(%d)", cur_cst->val[i][j]);
+              ret_str = concat(ret_str, exp);
+            }
+          }              
+          if (is_first) {
+            is_first = !is_first;
+          }
+        }      
+      }
+      if (cur_cst->is_eq[i] == 1) {
+        ret_str = concat(ret_str, " == 0");
+      } else {
+        ret_str = concat(ret_str, " >= 0");
+      }
     }
 
-    bool is_first = true;
-    for (int j = 0; j < ncols; j++) {
-      if (cst->val[i][j] != 0) {
-        char exp[20];
-        if (!is_first) {
-          ret_str = concat(ret_str, " + ");
-        }
-        if (j < niter) {
-          if (cst->val[i][j] == 1) {
-            sprintf(exp, "%s", iters[j]);
-            ret_str = concat(ret_str, exp);
-          } else if (cst->val[i][j] == -1) {
-            sprintf(exp, "-%s", iters[j]);
-            ret_str = concat(ret_str, exp);
-          } else {
-            sprintf(exp, "(%d) * %s", cst->val[i][j], iters[j]);
-            ret_str = concat(ret_str, exp);
-          }
-        } else if (j < niter + nparam) {
-          if (cst->val[i][j] == 1) {
-            sprintf(exp, "%s", params[j]);
-            ret_str = concat(ret_str, exp);
-          } else if (cst->val[i][j] == -1) {
-            sprintf(exp, "-%s", params[j]);
-            ret_str = concat(ret_str, exp);
-          } else {
-            sprintf(exp, "(%d) * %s", cst->val[i][j], params[j]);
-            ret_str = concat(ret_str, exp);
-          }         
-        } else {
-          if (cst->val[i][j] == 1) {
-            ret_str = concat(ret_str, "1");
-          } else if (cst->val[i][j] == -1) {
-            ret_str = concat(ret_str, "-1");
-          } else {
-            sprintf(exp, "(%d)", cst->val[i][j]);
-            ret_str = concat(ret_str, exp);
-          }
-        }              
-        if (is_first) {
-          is_first = !is_first;
-        }
-      }      
-    }
-    if (cst->is_eq[i] == 1) {
-      ret_str = concat(ret_str, " == 0");
-    } else {
-      ret_str = concat(ret_str, " >= 0");
-    }
+    if (cst_num > 0) 
+      ret_str = concat(ret_str, ")");
+
+    cur_cst = cst->next;
   }
 
   return ret_str;
@@ -874,7 +920,7 @@ void stmt_to_UREs(Stmt *stmt, PlutoProg *prog, VSA *vsa) {
   }
 
 #ifdef PSA_URE_DEBUG  
-  fprintf(stdout, "[Debug] %s\n", new_text);
+//  fprintf(stdout, "[Debug] %s\n", new_text);
 #endif  
 
   char *var_name = vsa->acc_var_map[stmt->writes[0]->sym_id]->var_name;
@@ -899,6 +945,24 @@ void stmt_to_UREs(Stmt *stmt, PlutoProg *prog, VSA *vsa) {
  * - stride
  */
 void vsa_t2s_meta_iter_extract(PlutoProg *prog, VSA *vsa) {
+  // Build the anchor statement
+  // The anchor statement is with maximum dimension, and the iteration
+  // domain is the union of all the statements
+  Stmt *anchor_stmt = get_new_anchor_stmt(prog->stmts, prog->nstmts);
+
+  // Generate a temporary program
+  PlutoProg *print_prog = pluto_prog_alloc();
+  for (int i = 0; i < prog->npar; i++) {
+    pluto_prog_add_param(print_prog, prog->params[i], print_prog->npar);
+  }
+  for (int i = 0; i < anchor_stmt->dim; i++) {
+    pluto_prog_add_hyperplane(print_prog, 0, H_UNKNOWN, PSA_H_UNKNOWN);
+  }
+  print_prog->stmts = (Stmt **)malloc(sizeof(Stmt *));
+  print_prog->nstmts = 1;
+  print_prog->stmts[0] = anchor_stmt;
+
+  // initialize the meta iterators
   Iter **t2s_meta_iters = (Iter **)malloc(sizeof(Iter *) * vsa->t2s_iter_num);
   for (int i = 0; i < vsa->t2s_iter_num; i++) {
     t2s_meta_iters[i] = (Iter *)malloc(sizeof(Iter));
@@ -913,7 +977,7 @@ void vsa_t2s_meta_iter_extract(PlutoProg *prog, VSA *vsa) {
     free(cloog_file_name);
     return 0;
   }
-  pluto_gen_cloog_file(cloog_fp, prog);
+  pluto_gen_cloog_file(cloog_fp, print_prog);
   rewind(cloog_fp);
   
   // build the clast AST tree
@@ -924,7 +988,7 @@ void vsa_t2s_meta_iter_extract(PlutoProg *prog, VSA *vsa) {
   state = cloog_state_malloc();
   cloogOptions = cloog_options_malloc(state);
 
-  root = psa_create_cloog_ast_tree(prog, prog->num_hyperplanes, 1, cloog_fp, &cloogOptions);
+  root = psa_create_cloog_ast_tree(print_prog, print_prog->num_hyperplanes, 1, cloog_fp, &cloogOptions);
   fclose(cloog_fp);
 
 #ifdef PSA_URE_DEBUG
@@ -942,6 +1006,8 @@ void vsa_t2s_meta_iter_extract(PlutoProg *prog, VSA *vsa) {
   cloog_state_free(state);
 
   vsa->t2s_meta_iters = t2s_meta_iters;
+
+  pluto_prog_free(print_prog);
 }
 
 /*
