@@ -31,7 +31,7 @@ void psa_t2s_codegen(FILE *fp, const VSA *vsa) {
   int func_num = vsa->evar_num + vsa->edvar_num + vsa->ivar_num + vsa->idvar_num + 1;
   for (int i = 0; i < vsa->evar_num; i++) {
     fprintf(fp, " %s,", vsa->evar_names[i]);
-  }
+  }  
   for (int i = 0; i < vsa->edvar_num; i++) {
     fprintf(fp, " %s,", vsa->edvar_names[i]);
   }

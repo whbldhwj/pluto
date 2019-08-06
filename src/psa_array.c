@@ -178,6 +178,9 @@ PlutoOptions *pluto_options_dup(const PlutoOptions *options) {
   noptions->readscop = options->readscop;
   noptions->pipsolve = options->pipsolve;
   noptions->islsolve = options->islsolve;
+/* Jie Added - Start */  
+  noptions->dsa = options->dsa;
+/* Jie Added - End */
 #ifdef GLPK  
   noptions->glpk = options->glpk;
 #endif

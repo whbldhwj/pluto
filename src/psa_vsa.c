@@ -216,7 +216,12 @@ void update_ivar(int acc_id, struct stmt_access_var_pair **acc_var_map, struct v
       }
 
       char var_ref[50];
-      sprintf(var_ref, "%s(%s)", var_name, get_iter_str(acc_var_map[acc_id]->var_iters, iter_num));
+      if (prog->options->dsa == 0)
+        sprintf(var_ref, "%s(%s)", var_name, get_iter_str(acc_var_map[acc_id]->var_iters, iter_num));
+      else if (prog->options->dsa > 0) {
+        // TODO
+        sprintf(var_ref, "%s(%s)", var_name, create_new_acc_ref_str(stmt, acc, prog, vsa));
+      }
 
       vsa->ivar_refs[vsa->ivar_num - 1] = strdup(var_ref);
       acc_var_map[acc_id]->var_ref = strdup(var_ref);
@@ -242,7 +247,12 @@ void update_ivar(int acc_id, struct stmt_access_var_pair **acc_var_map, struct v
         }
 
         char var_ref[50];
-        sprintf(var_ref, "%s(%s)", var_name, get_iter_str(acc_var_map[acc_id]->dvar_iters, iter_num));
+        if (prog->options->dsa == 0)
+          sprintf(var_ref, "%s(%s)", var_name, get_iter_str(acc_var_map[acc_id]->dvar_iters, iter_num));
+        else if (prog->options->dsa > 0) {
+          // TODO
+          sprintf(var_ref, "%s(%s)", var_name, create_new_acc_ref_str(stmt, acc, prog, vsa));
+        }
 
         vsa->idvar_refs[vsa->idvar_num - 1] = strdup(var_ref);
         acc_var_map[acc_id]->dvar_ref = strdup(var_ref);
@@ -264,7 +274,13 @@ void update_ivar(int acc_id, struct stmt_access_var_pair **acc_var_map, struct v
       get_var_iters(acc_id, acc_var_map, prog, vsa);
 
       char var_ref[50];
-      sprintf(var_ref, "%s(%s)", var_name, get_iter_str(acc_var_map[acc_id]->var_iters, iter_num));
+      if (prog->options->dsa == 0)
+        sprintf(var_ref, "%s(%s)", var_name, get_iter_str(acc_var_map[acc_id]->var_iters, iter_num));
+      else if (prog->options->dsa > 0) {
+        // TODO
+        sprintf(var_ref, "%s(%s)", var_name, create_new_acc_ref_str(stmt, acc, prog, vsa));
+      }
+
       acc_var_map[acc_id]->var_ref = strdup(var_ref);    
 
       // build the drain variable
@@ -287,7 +303,13 @@ void update_ivar(int acc_id, struct stmt_access_var_pair **acc_var_map, struct v
         }
 
         char var_ref[50];
-        sprintf(var_ref, "%s(%s)", var_name, get_iter_str(acc_var_map[acc_id]->dvar_iters, iter_num));
+        if (prog->options->dsa == 0)
+          sprintf(var_ref, "%s(%s)", var_name, get_iter_str(acc_var_map[acc_id]->dvar_iters, iter_num));
+        else if (prog->options->dsa > 0) {
+          // TODO
+          sprintf(var_ref, "%s(%s)", var_name, create_new_acc_ref_str(stmt, acc, prog, vsa));
+        }
+
         acc_var_map[acc_id]->dvar_ref = strdup(var_ref);
       }      
     }
@@ -463,7 +485,7 @@ void vsa_var_extract(PlutoProg *prog, VSA *vsa) {
   for (int i = 0; i < total_accs; i++) {
     acc_var_map[i] = (struct stmt_access_var_pair *)malloc(sizeof(struct stmt_access_var_pair));
     acc_var_map[i]->ei = -1;
-    acc_var_map[i]->d = -1;
+    acc_var_map[i]->d = 0;
     acc_var_map[i]->var_name = NULL;
     acc_var_map[i]->var_ref = NULL;
     acc_var_map[i]->var_iters = NULL;
@@ -504,13 +526,13 @@ void vsa_var_extract(PlutoProg *prog, VSA *vsa) {
   Graph *adg = adg_create(prog);
   prog->adg= adg;
 #ifdef PSA_VSA_DEBUG
-  fprintf(stdout, "[Debug] Access dependence graph:\n");
-  for (int i = 0; i < adg->adj->nrows; i++) {
-    for (int j = 0; j < adg->adj->ncols; j++) {
-      fprintf(stdout, "\t%d", adg->adj->val[i][j]);
-    }
-    fprintf(stdout, "\n");
-  }
+//  fprintf(stdout, "[Debug] Access dependence graph:\n");
+//  for (int i = 0; i < adg->adj->nrows; i++) {
+//    for (int j = 0; j < adg->adj->ncols; j++) {
+//      fprintf(stdout, "\t%d", adg->adj->val[i][j]);
+//    }
+//    fprintf(stdout, "\n");
+//  }
 #endif
   adg_compute_cc(prog);
 
@@ -523,7 +545,7 @@ void vsa_var_extract(PlutoProg *prog, VSA *vsa) {
     adg_var_map[i]->var_name = NULL;
     adg_var_map[i]->dvar_name = NULL;
     adg_var_map[i]->ei = -1;
-    adg_var_map[i]->d = -1;
+    adg_var_map[i]->d = 0;
   }
 
   for (int i = 0; i < num_read_write_data; i++)
@@ -534,10 +556,12 @@ void vsa_var_extract(PlutoProg *prog, VSA *vsa) {
       int acc_id = acc->sym_id;
       acc_var_map[acc_id]->stmt = stmt;
       acc_var_map[acc_id]->acc = acc;
-      if (acc_stmt->acc_rw == 1) {
-        acc_var_map[acc_id]->d = 1; // add the drain variable for write access
-      } else {
-        acc_var_map[acc_id]->d = 0; 
+      if (prog->options->dsa == 0) {
+        if (acc_stmt->acc_rw == 1) {
+          acc_var_map[acc_id]->d = 1; // add the drain variable for write access
+        } else {
+          acc_var_map[acc_id]->d = 0; 
+        }
       }
       int cc_id = acc->cc_id;
       if (adg->ccs[cc_id].size == 1) {
