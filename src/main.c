@@ -655,7 +655,13 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
   /* Analyze the data reuse and add RAR dependences */
   PlutoProg **reuse_progs;
   int num_reuse_progs;
-  reuse_progs = psa_reuse_analysis(prog, &num_reuse_progs);
+  if (options->dsa != 2) {
+    reuse_progs = psa_reuse_analysis(prog, &num_reuse_progs);
+  } else {
+    reuse_progs = (PlutoProg **)malloc(1 * sizeof(PlutoProg *));
+    reuse_progs[0] = prog;
+    num_reuse_progs = 1;
+  }
   fprintf(stdout, "[PSA] %d programs generated after reuse analysis.\n", num_reuse_progs);
   /* Jie Added - End */
   

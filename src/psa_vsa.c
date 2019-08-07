@@ -219,7 +219,6 @@ void update_ivar(int acc_id, struct stmt_access_var_pair **acc_var_map, struct v
       if (prog->options->dsa == 0)
         sprintf(var_ref, "%s(%s)", var_name, get_iter_str(acc_var_map[acc_id]->var_iters, iter_num));
       else if (prog->options->dsa > 0) {
-        // TODO
         sprintf(var_ref, "%s(%s)", var_name, create_new_acc_ref_str(stmt, acc, prog, vsa));
       }
 
@@ -250,7 +249,6 @@ void update_ivar(int acc_id, struct stmt_access_var_pair **acc_var_map, struct v
         if (prog->options->dsa == 0)
           sprintf(var_ref, "%s(%s)", var_name, get_iter_str(acc_var_map[acc_id]->dvar_iters, iter_num));
         else if (prog->options->dsa > 0) {
-          // TODO
           sprintf(var_ref, "%s(%s)", var_name, create_new_acc_ref_str(stmt, acc, prog, vsa));
         }
 
@@ -277,7 +275,6 @@ void update_ivar(int acc_id, struct stmt_access_var_pair **acc_var_map, struct v
       if (prog->options->dsa == 0)
         sprintf(var_ref, "%s(%s)", var_name, get_iter_str(acc_var_map[acc_id]->var_iters, iter_num));
       else if (prog->options->dsa > 0) {
-        // TODO
         sprintf(var_ref, "%s(%s)", var_name, create_new_acc_ref_str(stmt, acc, prog, vsa));
       }
 
@@ -306,7 +303,6 @@ void update_ivar(int acc_id, struct stmt_access_var_pair **acc_var_map, struct v
         if (prog->options->dsa == 0)
           sprintf(var_ref, "%s(%s)", var_name, get_iter_str(acc_var_map[acc_id]->dvar_iters, iter_num));
         else if (prog->options->dsa > 0) {
-          // TODO
           sprintf(var_ref, "%s(%s)", var_name, create_new_acc_ref_str(stmt, acc, prog, vsa));
         }
 

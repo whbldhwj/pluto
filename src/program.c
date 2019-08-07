@@ -4758,7 +4758,18 @@ static Stmt **pet_to_pluto_stmts(struct pet_scop *pscop,
   /* This takes cares of marking trivial statements such as original iterator
    * assignments and increments as dead code */
   int dead[pscop->n_stmt];
-  remove_trivial_dead_code(pscop, dead);
+  /* Jie Added - Start */
+  bzero(dead, sizeof(int) * pscop->n_stmt);
+  for (unsigned s = 0; s < pscop->n_stmt; s++) {
+    struct pet_stmt *pstmt = pscop->stmts[s];
+    if (!pet_stmt_is_kill(pstmt)) {
+      continue;
+    }
+    dead[s] = 1;
+  }
+  /* Jie Added - End */
+  if (options->dsa != 2)
+    remove_trivial_dead_code(pscop, dead);
 
   if (*nstmts == 0)
     return NULL;
@@ -5241,6 +5252,13 @@ PlutoProg *pet_to_pluto_prog(struct pet_scop *pscop, isl_ctx *ctx,
   isl_printer_free(p);
 
   prog->stmts = pet_to_pluto_stmts(pscop, NULL, &prog->nstmts);
+
+/* Jie Added - Start */
+//  for (int n = 0; n < pscop->n_stmt; n++) {
+//    struct pet_stmt *pstmt = pscop->stmts[i];
+//    fprintf(stdout, "[DEBUG] PET stmt text: %s\n", pstmt->text);
+//  }
+/* Jie Added - End */
 
   /* Compute dependences */
   compute_deps_pet(pscop, NULL, prog, options);

@@ -316,10 +316,12 @@ void vsa_URE_extract(PlutoProg *prog, VSA *vsa) {
     Stmt *stmt = prog->stmts[stmt_id];
     // UREs for the read access
     // TODO: For now, we assume all read accesses come with RAR, will extend it later
-    for (int i = 0; i < stmt->nreads; i++) {
-      PlutoAccess *acc = stmt->reads[i];
-      if (vsa->acc_var_map[acc->sym_id]->ei == 0) {
-        create_RAR_UREs(stmt, acc, prog, vsa);
+    if (prog->options->dsa != 2) {
+      for (int i = 0; i < stmt->nreads; i++) {
+        PlutoAccess *acc = stmt->reads[i];
+        if (vsa->acc_var_map[acc->sym_id]->ei == 0) {
+          create_RAR_UREs(stmt, acc, prog, vsa);
+        }
       }
     }
     // URE for the stmt
