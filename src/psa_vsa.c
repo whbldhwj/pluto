@@ -1232,7 +1232,8 @@ VSA *vsa_alloc() {
 }
 
 void vsa_free(VSA *vsa) {
-
+  // TODO
+  free(vsa);
 }
 
 void psa_print_string_with_indent(FILE *fp, int indent, char *to_print) {
@@ -1478,8 +1479,15 @@ void psa_vsa_pretty_print(FILE *fp, const VSA *vsa) {
 
   /* URES */
   psa_print_string_with_indent(fp, 2, "\"URES\": [\n");
-  psa_print_string_list_with_indent(fp, 4, get_vsa_URE_texts(vsa->UREs, vsa->URE_num), vsa->URE_num);
+  char **URE_texts = get_vsa_URE_texts(vsa->UREs, vsa->URE_num);
+  psa_print_string_list_with_indent(fp, 4, URE_texts, vsa->URE_num);
   psa_print_string_with_indent(fp, 2, "],\n");
+  /* Memory Free */
+  for (int i = 0; i < vsa->URE_num; i++) {
+    free(URE_texts[i]);
+  };
+  free(URE_texts);
+  /* Memory Free */
 
   /* DOMAIN_EXP_NUM */
   psa_print_string_with_indent(fp, 2, "\"DOMAIN_EXP_NUM\": ");

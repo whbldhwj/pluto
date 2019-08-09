@@ -289,8 +289,6 @@ int psa_latency_hiding_optimize_band(Band *band, PlutoProg *prog) {
       }
     } 
 
-    free(parallel_time_loops);
-    free(parallel_space_loops);
     return PSA_SUCCESS;
   } else if (num_parallel_space_loop) {
     /* Tile the sync-free space loop and permute them innermost */
@@ -348,7 +346,16 @@ int psa_latency_hiding_optimize_band(Band *band, PlutoProg *prog) {
   } else {
     /* No opportunity for task interleaving */
     return PSA_FAILURE;
-  }  
+  } 
+
+  /* Free Memory */
+  for (int i = 0; i < nloops; i++) {
+    pluto_loop_free(loops[i]);
+  }
+  free(loops);
+  free(parallel_time_loops);
+  free(parallel_space_loops);
+  /* Free Memory */
 }
 
 bool is_stride_zero_one(Stmt *stmt, PlutoAccess *acc, int depth, int *is_transform, int *transform_dim) {

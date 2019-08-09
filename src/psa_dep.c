@@ -109,6 +109,9 @@ bool systolic_array_dep_checker(PlutoProg *prog) {
         }
       }
     }
+    /* Free Memory */
+    pluto_constraints_free(tdpoly);
+    /* Free Memory */
   }
   return true;
 }
@@ -258,6 +261,12 @@ PlutoProg **psa_reuse_analysis(PlutoProg *prog, int *num_reuse_progs) {
       isl_mat *isl_null_mat = isl_mat_right_kernel(isl_acc_mat); // compute the right kernel of the matrix
       PlutoMatrix *null_space = pluto_matrix_from_isl_mat(isl_null_mat);
 
+      /* Free Memory */
+      isl_ctx *ctx = isl_mat_get_ctx(isl_null_mat);
+      isl_mat_free(isl_null_mat);
+      isl_ctx_free(ctx);
+      /* Free Memory */
+
 #ifdef PSA_DEP_DEBUG
       fprintf(stdout, "curr ref: %s\n", acc->name);
       fprintf(stdout, "access function:\n");
@@ -275,8 +284,26 @@ PlutoProg **psa_reuse_analysis(PlutoProg *prog, int *num_reuse_progs) {
         ndep_per_racc = (int *)realloc(ndep_per_racc, num_reuse_operand * sizeof(int));
         ndep_per_racc[num_reuse_operand - 1] = nsol;
       }
+
+      /* Free Memory */
+      pluto_matrix_free(null_space);
+      /* Free Memory */
     }
   }
+
+  /* Free Memory */
+  for (int i = 0; i < num_read_data; i++) {
+    for (int j = 0; j < num_stmts_per_racc[i]; j++) {
+      free(racc_stmts[i][j]);
+    }
+    free(racc_stmts[i]);
+  }
+  free(racc_stmts);
+  racc_stmts = NULL;
+
+  free(num_stmts_per_racc);
+  num_stmts_per_racc = NULL;
+  /* Free Memory */
 
 #ifdef PSA_DEP_DEBUG
   fprintf(stdout, "printing out added RAR deps\n");
@@ -341,7 +368,7 @@ PlutoProg **psa_reuse_analysis(PlutoProg *prog, int *num_reuse_progs) {
       rep_times *= ndep_per_racc[i];
     }
   
-    new_progs = (PlutoProg *)malloc(prog_num * sizeof(PlutoProg *));
+    new_progs = (PlutoProg **)malloc(prog_num * sizeof(PlutoProg *));
     for (int i = 0; i < prog_num; i++) {
       new_progs[i] = pluto_prog_dup(prog);
       new_progs[i]->deps = realloc(new_progs[i]->deps, (new_progs[i]->ndeps + num_reuse_operand) * sizeof(Dep *));
@@ -385,11 +412,30 @@ PlutoProg **psa_reuse_analysis(PlutoProg *prog, int *num_reuse_progs) {
 #endif
   
     *num_reuse_progs = prog_num;
+
+    /* Free Memory */
+    for (int i = 0; i < prog_num; i++) {
+      free(rar_dep_list[i]);
+    }
+    free(rar_dep_list);
+    rar_dep_list = NULL;
+    /* Free Memory */
   } else {
-    new_progs = (PlutoProg *)malloc(prog_num * sizeof(PlutoProg *));
+    new_progs = (PlutoProg **)malloc(prog_num * sizeof(PlutoProg *));
     new_progs[0] = prog;
     *num_reuse_progs = prog_num;
   }
+
+  /* Free Memory */
+  for (int i = 0; i < num_reuse_operand; i++) {
+    for (int j = 0; j < ndep_per_racc[i]; j++) {
+      pluto_dep_free(rar_deps[i][j]);
+    }
+    free(rar_deps[i]);
+  }
+  free(rar_deps);
+  free(ndep_per_racc);
+  /* Free Memory */
 
   return new_progs;
 }
@@ -428,6 +474,11 @@ PlutoConstraints *construct_rar_dep_polytope(PlutoMatrix *null_space, int idx, S
 
   // simplify the pluto constraint
   pluto_constraints_simplify(new_polytope);
+
+  /* Free Memory */
+  pluto_constraints_free(src_domain);
+  pluto_constraints_free(dest_domain);
+  /* Free Memory */
 
   return new_polytope;
 }
@@ -573,7 +624,8 @@ void rar_scalar_filter(PlutoProg *prog) {
   /* clean up */
   free(is_scalar_dep);
   for (i = 0; i < ndeps; i++) {
-    free(deps[i]);
+    pluto_dep_free(deps[i]);
+//    free(deps[i]);
   }
   free(deps);
 }
@@ -592,20 +644,27 @@ void reassociate_dep_stmt_acc(PlutoProg *prog) {
     PlutoAccess *dest_acc = dep->dest_acc;
     int src_stmt_id = dep->src;
     int dest_stmt_id = dep->dest;
+    
+    bool src_detected = false;
+    bool dest_detected = false;
+
     for (int j = 0; j < prog->stmts[src_stmt_id]->nreads; j++) {
       if (!pluto_access_cmp(src_acc, prog->stmts[src_stmt_id]->reads[j]) 
           && src_acc != prog->stmts[src_stmt_id]->reads[j]) {
         pluto_access_free(src_acc);
         dep->src_acc = prog->stmts[src_stmt_id]->reads[j];
+        src_detected = true;
         break;
       }
     }
-    for (int j = 0; j < prog->stmts[src_stmt_id]->nwrites; j++) {
-      if (!pluto_access_cmp(src_acc, prog->stmts[src_stmt_id]->writes[j])
-          && src_acc != prog->stmts[src_stmt_id]->writes[j]) {
-        pluto_access_free(src_acc);
-        dep->src_acc = prog->stmts[src_stmt_id]->writes[j];
-        break;
+    if (!src_detected) {
+      for (int j = 0; j < prog->stmts[src_stmt_id]->nwrites; j++) {
+        if (!pluto_access_cmp(src_acc, prog->stmts[src_stmt_id]->writes[j])
+            && src_acc != prog->stmts[src_stmt_id]->writes[j]) {
+          pluto_access_free(src_acc);
+          dep->src_acc = prog->stmts[src_stmt_id]->writes[j];
+          break;
+        }
       }
     }
     for (int j = 0; j < prog->stmts[dest_stmt_id]->nreads; j++) {
@@ -613,17 +672,20 @@ void reassociate_dep_stmt_acc(PlutoProg *prog) {
           && dest_acc != prog->stmts[dest_stmt_id]->reads[j]) {
         pluto_access_free(dest_acc);
         dep->dest_acc = prog->stmts[dest_stmt_id]->reads[j];
+        dest_detected = true;
         break;
       }
     }
-    for (int j = 0; j < prog->stmts[dest_stmt_id]->nwrites; j++) {
-      if (!pluto_access_cmp(dest_acc, prog->stmts[dest_stmt_id]->writes[j])
-          && dest_acc != prog->stmts[dest_stmt_id]->writes[j]) {
-        pluto_access_free(dest_acc);
-        dep->dest_acc = prog->stmts[dest_stmt_id]->writes[j];
-        break;
-      }
-    }  
+    if (!dest_detected) {
+      for (int j = 0; j < prog->stmts[dest_stmt_id]->nwrites; j++) {
+        if (!pluto_access_cmp(dest_acc, prog->stmts[dest_stmt_id]->writes[j])
+            && dest_acc != prog->stmts[dest_stmt_id]->writes[j]) {
+          pluto_access_free(dest_acc);
+          dep->dest_acc = prog->stmts[dest_stmt_id]->writes[j];
+          break;
+        }
+      }  
+    }
   }
 
   /* transitive dependences */
@@ -633,20 +695,27 @@ void reassociate_dep_stmt_acc(PlutoProg *prog) {
     PlutoAccess *dest_acc = dep->dest_acc;
     int src_stmt_id = dep->src;
     int dest_stmt_id = dep->dest;
+
+    bool src_detected = false;
+    bool dest_detected = false;
+
     for (int j = 0; j < prog->stmts[src_stmt_id]->nreads; j++) {
       if (!pluto_access_cmp(src_acc, prog->stmts[src_stmt_id]->reads[j]) 
           && src_acc != prog->stmts[src_stmt_id]->reads[j]) {
         pluto_access_free(src_acc);
         dep->src_acc = prog->stmts[src_stmt_id]->reads[j];
+        src_detected = true;
         break;
       }
     }
-    for (int j = 0; j < prog->stmts[src_stmt_id]->nwrites; j++) {
-      if (!pluto_access_cmp(src_acc, prog->stmts[src_stmt_id]->writes[j])
-          && src_acc != prog->stmts[src_stmt_id]->writes[j]) {
-        pluto_access_free(src_acc);
-        dep->src_acc = prog->stmts[src_stmt_id]->writes[j];
-        break;
+    if (!src_detected) {
+      for (int j = 0; j < prog->stmts[src_stmt_id]->nwrites; j++) {
+        if (!pluto_access_cmp(src_acc, prog->stmts[src_stmt_id]->writes[j])
+            && src_acc != prog->stmts[src_stmt_id]->writes[j]) {
+          pluto_access_free(src_acc);
+          dep->src_acc = prog->stmts[src_stmt_id]->writes[j];
+          break;
+        }
       }
     }
     for (int j = 0; j < prog->stmts[dest_stmt_id]->nreads; j++) {
@@ -654,17 +723,20 @@ void reassociate_dep_stmt_acc(PlutoProg *prog) {
           && dest_acc != prog->stmts[dest_stmt_id]->reads[j]) {
         pluto_access_free(dest_acc);
         dep->dest_acc = prog->stmts[dest_stmt_id]->reads[j];
+        dest_detected = true;
         break;
       }
     }
-    for (int j = 0; j < prog->stmts[dest_stmt_id]->nwrites; j++) {
-      if (!pluto_access_cmp(dest_acc, prog->stmts[dest_stmt_id]->writes[j])
-          && dest_acc != prog->stmts[dest_stmt_id]->writes[j]) {
-        pluto_access_free(dest_acc);
-        dep->dest_acc = prog->stmts[dest_stmt_id]->writes[j];
-        break;
-      }
-    }  
+    if (!dest_detected) {
+      for (int j = 0; j < prog->stmts[dest_stmt_id]->nwrites; j++) {
+        if (!pluto_access_cmp(dest_acc, prog->stmts[dest_stmt_id]->writes[j])
+            && dest_acc != prog->stmts[dest_stmt_id]->writes[j]) {
+          pluto_access_free(dest_acc);
+          dep->dest_acc = prog->stmts[dest_stmt_id]->writes[j];
+          break;
+        }
+      }  
+    }
   }
  
 }
@@ -706,7 +778,7 @@ void rar_filter(PlutoProg *prog) {
   /* clean up */
   free(is_rar_dep);
   for (i = 0; i < ndeps; i++) {
-    free(deps[i]);
+    pluto_dep_free(deps[i]);
   }
   free(deps);
 
@@ -740,7 +812,7 @@ void rar_filter(PlutoProg *prog) {
   /* clean up */
   free(is_rar_dep);
   for (i = 0; i < ndeps; i++) {
-    free(deps[i]);
+    pluto_dep_free(deps[i]);
   }
   free(deps);
  

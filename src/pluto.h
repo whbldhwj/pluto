@@ -21,6 +21,7 @@
 #define _PLUTO_H_
 
 #include <stdbool.h>
+#include <libgen.h>
 
 #include "osl/scop.h"
 

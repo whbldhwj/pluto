@@ -127,6 +127,7 @@ void pluto_constraints_free(PlutoConstraints *cst) {
 
   free(cst->buf);
   free(cst->val);
+
   free(cst->is_eq);
   if (cst->names) {
     for (i = 0; i < cst->ncols - 1; i++) {

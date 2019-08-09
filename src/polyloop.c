@@ -123,7 +123,7 @@ Ploop **psa_get_loops_in_band(Band *band, const PlutoProg *prog, unsigned *num) 
   int lastD = firstD + band->width - 1;
   int depth = firstD;
 
-  Ploop *loop = band->loop;
+  Ploop *loop = pluto_loop_dup(band->loop);
   num_loops++;
 
   all_loops = realloc(all_loops, num_loops * sizeof(Ploop *));
@@ -137,6 +137,10 @@ Ploop **psa_get_loops_in_band(Band *band, const PlutoProg *prog, unsigned *num) 
     num_loops += num_nxt_loops;
 
     depth++;
+
+    /* Free Memory */
+    free(nxt_loops);
+    /* Free Memory */
   }
 
   *num = num_loops;
@@ -790,6 +794,9 @@ Band **pluto_get_dominator_bands(Band **bands, unsigned nbands,
       Band *dup = pluto_band_dup(bands[i]);
       dom_bands = pluto_bands_cat(&dom_bands, ndbands, &dup, 1);
       ndbands++;
+      /* Free Memory */
+
+      /* Free Memory */
     }
   }
   *ndom_bands = ndbands;

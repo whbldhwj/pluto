@@ -613,7 +613,7 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
  */
 /* Jie Added - Start */
 #ifdef PRINT_DEPS_PREV_TRANSFORM
-//  psa_print_deps(prog);
+  psa_print_deps(prog);
 #endif
 /* Jie Added - End */
 
@@ -654,6 +654,7 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
   /* Jie Added - Start */
   /* Analyze the data reuse and add RAR dependences */
   PlutoProg **reuse_progs;
+  PlutoProg *reuse_prog;
   int num_reuse_progs;
   if (options->dsa != 2) {
     reuse_progs = psa_reuse_analysis(prog, &num_reuse_progs);
@@ -663,11 +664,11 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
     num_reuse_progs = 1;
   }
   fprintf(stdout, "[PSA] %d programs generated after reuse analysis.\n", num_reuse_progs);
-  /* Jie Added - End */
-  
+  /* Jie Added - End */ 
+
 //  for (int reuse_prog_id = 0; reuse_prog_id < num_reuse_progs; reuse_prog_id++) {
   for (int reuse_prog_id = 0; reuse_prog_id < 1; reuse_prog_id++) {
-    prog = reuse_progs[reuse_prog_id];
+    reuse_prog = reuse_progs[reuse_prog_id];
     
 /*
  * *******************************************
@@ -680,7 +681,7 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
           stdout,
           "[pluto] Original scheduling [<iter coeff's> <param> <const>]\n\n");
       /* Print out transformations */
-      pluto_transformations_pretty_print(prog);
+      pluto_transformations_pretty_print(reuse_prog);
     }
   
     t_start = rtclock();
@@ -688,25 +689,25 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
     fprintf(stdout, "[PSA] Run Pluto's Algorithm.\n");
     /* Auto transformation */
     if (!options->identity) {
-      pluto_auto_transform(prog);
+      pluto_auto_transform(reuse_prog);
     }
     t_t = rtclock() - t_start;
   
-    pluto_compute_dep_directions(prog);
-    pluto_compute_dep_satisfaction(prog);
+    pluto_compute_dep_directions(reuse_prog);
+    pluto_compute_dep_satisfaction(reuse_prog);
   
     if (!options->silent) {
       fprintf(
           stdout,
           "[pluto] Affine transformations [<iter coeff's> <param> <const>]\n\n");
       /* Print out transformations */
-      pluto_transformations_pretty_print(prog);
+      pluto_transformations_pretty_print(reuse_prog);
     }
   
     /* Jie Added - Start */
 #ifdef PRINT_PLUTO_TRANS_PROGRAM
     fprintf(stdout, "[PSA] Dump out the transformed program after Pluto's algorithm.\n");
-    pluto_print_program(prog, srcFileName, "pluto_transform");
+    pluto_print_program(reuse_prog, srcFileName, "pluto_transform");
 #endif
     /* Jie Added - End */
   
@@ -714,7 +715,7 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
     /* Dependence Checker for Systolic Array */
     // TODO: Move this part to post-auto-transform phase
 #ifdef PRINT_DEPS_POST_TRANSFORM
-    psa_print_deps(prog);
+    psa_print_deps(reuse_prog);
 #endif
  
 /*
@@ -725,7 +726,7 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
  */
 #ifdef UNIFORMITY_CHECK
     fprintf(stdout, "[PSA] Check uniformity of the design.\n");
-    bool is_uniform = systolic_array_dep_checker(prog);
+    bool is_uniform = systolic_array_dep_checker(reuse_prog);
     if (!is_uniform) {
       fprintf(stdout, "[PSA] Non-uniform dependence detected.\n");
       // return 1;
@@ -745,7 +746,7 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
     fprintf(stdout, "[PSA] Explore different systolic array candidates.\n");
     PlutoProg** progs;
     int nprogs;
-    progs = sa_candidates_generation(prog, &nprogs);
+    progs = sa_candidates_generation(reuse_prog, &nprogs);
     fprintf(stdout, "[PSA] Number of array candidates: %d\n", nprogs);
 #endif
   
@@ -757,7 +758,7 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
     sa_candidates_smart_pick(progs, nprogs);     
     for (int i = 1; i < nprogs; i++) {
       pluto_prog_free(progs[i]);
-      progs[i] = NULL;
+      progs[i] = NULL;      
     }
     nprogs = 1;
     pluto_print_program(progs[0], srcFileName, "smart_pick");
@@ -765,24 +766,24 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
 
     unsigned prog_id;
     for (prog_id = 0; prog_id < nprogs; prog_id++) {
-    //for (prog_id = 0; prog_id < 1; prog_id++) {    
+    /* for (prog_id = 0; prog_id < 1; prog_id++) { */
       VSA *psa_vsa = vsa_alloc();    
 
-      prog = progs[prog_id];  
-      pluto_transformations_pretty_print(prog);
+      PlutoProg *array_prog = progs[prog_id];  
+      pluto_transformations_pretty_print(array_prog);
 
 #ifdef T2S_CODEGEN
       fprintf(stdout, "[PSA] Input code DSA form: %d\n", options->dsa);
       /* T2S_ITERS */
-      vsa_t2s_iter_extract(prog, psa_vsa);
+      vsa_t2s_iter_extract(array_prog, psa_vsa);
       /* T2S_VARS */
-      vsa_var_extract(prog, psa_vsa);
+      vsa_var_extract(array_prog, psa_vsa);
       /* ARRAYS */
-      vsa_array_extract(prog, psa_vsa);
+      vsa_array_extract(array_prog, psa_vsa);
       /* UREs */
-      vsa_URE_extract(prog, psa_vsa);
+      vsa_URE_extract(array_prog, psa_vsa);
       /* T2S_META_ITERS */
-      vsa_t2s_meta_iter_extract(prog, psa_vsa);
+      vsa_t2s_meta_iter_extract(array_prog, psa_vsa);
 #endif
 
 //      /* OP_NUM, RES_NUM, OP_DIM, RES_DIM, OP_NAME, RES_NAME */      
@@ -810,22 +811,22 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
       if (options->tile) {
         fprintf(stdout, "[PSA] ****************************\n");
         fprintf(stdout, "[PSA] Apply latency hiding.\n");
-        int ret = psa_latency_hiding_optimize(prog, psa_vsa);
+        int ret = psa_latency_hiding_optimize(array_prog, psa_vsa);
         if (IS_PSA_SUCCESS(ret)) {
           fprintf(stdout, "[PSA] Completed latency hiding.\n");
           /* Print out transformations */
-          pluto_transformations_pretty_print(prog);
+          pluto_transformations_pretty_print(array_prog);
 
           /* Update the fields of VSA */
-          prog->array_il_enable = 1;
+          array_prog->array_il_enable = 1;
         } else {
           fprintf(stdout, "[PSA] Failed latency hiding.\n");
-          prog->array_il_enable = 0;
+          array_prog->array_il_enable = 0;
         }
       }
   #ifdef PRINT_LATENCY_HIDING_TRANS_PROGRAM
       fprintf(stdout, "[PSA] Dump out the transformed program after latency hiding.\n");
-      pluto_print_program(prog, srcFileName, "latency_hiding");
+      pluto_print_program(array_prog, srcFileName, "latency_hiding");
   #endif
 #endif    
 
@@ -839,11 +840,11 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
       if (options->tile) {
         fprintf(stdout, "[PSA] ****************************\n");
         fprintf(stdout, "[PSA] Apply SIMD vectorization.\n");
-        int ret = psa_simd_vectorization_optimize(prog, psa_vsa);
+        int ret = psa_simd_vectorization_optimize(array_prog, psa_vsa);
         if (IS_PSA_SUCCESS(ret)) {
           fprintf(stdout, "[PSA] Completed SIMD vectorization.\n");
           /* Print out transformations */
-          pluto_transformations_pretty_print(prog);
+          pluto_transformations_pretty_print(array_prog);
           
         } else {
           fprintf(stdout, "[PSA] Failed SIMD vectorization.\n");
@@ -851,7 +852,7 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
       }
   #ifdef PRINT_SIMD_VECTORIZATION_TRANS_PROGRAM
       fprintf(stdout, "[PSA] Dump out the transformed program after SIMD vectorization.\n");
-      pluto_print_program(prog, srcFileName, "SIMD");
+      pluto_print_program(array_prog, srcFileName, "SIMD");
   #endif
 #endif      
   
@@ -865,18 +866,18 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
       if (options->tile) {
         fprintf(stdout, "[PSA] ****************************\n");
         fprintf(stdout, "[PSA] Apply array partitioning.\n");
-        int ret = psa_array_partition_optimize(prog, psa_vsa);
+        int ret = psa_array_partition_optimize(array_prog, psa_vsa);
         if (IS_PSA_SUCCESS(ret)) {
           fprintf(stdout, "[PSA] Completed array partitioning.\n");
           /* Print out transformations */
-          pluto_transformations_pretty_print(prog);
+          pluto_transformations_pretty_print(array_prog);
         } else {
           fprintf(stdout, "[PSA] Failed array partitioning.\n");
         }
       }
   #ifdef PRINT_ARRAY_PARTITIONING_TRANS_PROGRAM
       fprintf(stdout, "[PSA] Dump out the transformed program after array partitioning.\n");
-      pluto_print_program(prog, srcFileName, "array_part");
+      pluto_print_program(array_prog, srcFileName, "array_part");
   #endif
 #endif    
      
@@ -892,11 +893,13 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
       fprintf(stdout, "[PSA] Generate Virtual Systolic Array (VSA).\n");    
       /* Complete the rest of VSA fields */
       /* ARRAY_PART_BAND_WIDTH */
-      vsa_band_width_extract(prog, psa_vsa);
+      vsa_band_width_extract(array_prog, psa_vsa);
+#ifdef T2S_CODEGEN
       /* T2S_ITERS */
-      vsa_t2s_iter_extract(prog, psa_vsa);
+      vsa_t2s_iter_extract(array_prog, psa_vsa);
       /* T2S_IO */
-      vsa_t2s_IO_extract(prog, psa_vsa);
+      vsa_t2s_IO_extract(array_prog, psa_vsa);
+#endif
 //      pluto_prog_to_vsa(prog, psa_vsa);
       FILE *vsa_fp = fopen("vsa.json", "w");
       if (vsa_fp) {
@@ -938,6 +941,10 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
         return 1;
       }
       fclose(t2s_fp);
+      /* Free Memory */
+      free(basec);
+      free(dumpFileName);
+      /* Free Memory */
 #endif
 
 /*
@@ -947,7 +954,33 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
  * *******************************************
  */
 #ifdef INTEL_CODEGEN
+      fprintf(stdout, "[PSA] ***********************\n");
+      fprintf(stdout, "[PSA] Generate Intel OpenCL inputs.\n");
+      /* Get basenames */
+      char *basec, *bname;
+      basec = strdup(srcFileName);
+      bname = basename(basec);
 
+      char *dumpFileName;
+      dumpFileName = malloc(strlen(bname) - 2 + strlen(".") + strlen("intel_opencl") + strlen(".cl") + 1);
+      strncpy(dumpFileName, bname, strlen(bname) - 2);
+      dumpFileName[strlen(bname) - 2] = '\0';
+      strcat(dumpFileName, ".");
+      strcat(dumpFileName, "intel_opencl");
+      strcat(dumpFileName, ".c");
+
+      FILE *intel_fp = fopen(dumpFileName, "w");
+      if (intel_fp) {
+        psa_intel_codegen(intel_fp, psa_vsa);
+      } else {
+        fprintf(stdout, "[PSA] ERROR! File %s can't be opened!\n", "intel_opencl.cl");
+        return 1;
+      }
+      fclose(intel_fp);
+      /* Free Memory */
+      free(basec);
+      free(dumpFileName);
+      /* Free Memory */
 #endif
 
 /*
@@ -957,7 +990,33 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
  * *******************************************
  */
 #ifdef XILINX_CODEGEN
+      fprintf(stdout, "[PSA] ***********************\n");
+      fpritnf(stdout, "[PSA] Generate Xilinx HLS inputs.\n");
+      /* Get basenames */
+      char *basec, *bname;
+      basec = strdup(srcFileName);
+      bname = basename(basec);
 
+      char *dumpFileName;
+      dumpFileName = malloc(strlen(bname) - 2 + strlen(".") + strlen("xilinx_hls") + strlen(".c") + 1);
+      strncpy(dumpFileName, bname, strlen(bname) - 2);
+      dumpFileName[strlen(bname) - 2] = '\0';
+      strcat(dumpFileName, ".");
+      strcat(dumpFileName, "xilinx_hls");
+      strcat(dumpFileName, ".c");
+
+      FILE *xilinx_fp = fopen(dumpFileName, "w");
+      if (xilinx_fp) {
+        psa_xlinx_codegen(xilinx_fp, psa_vsa);
+      } else {
+        fprintf(stdout, "[PSA] ERROR! File %s can't be opened!\n", "xilinx_hls.c");
+        return 1;
+      }
+      fclose(xilinx_fp);
+      /* Free Memory */
+      free(basec);
+      free(dumpFileName);
+      /* Free Memory */
 #endif
 
       /* Jie Added - End */
@@ -1014,7 +1073,7 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
 #ifdef CPU_CODEGEN 
       if (!options->pet && !strcmp(srcFileName, "stdin")) {
         // input stdin == output stdout
-        pluto_populate_scop(scop, prog, options);
+        pluto_populate_scop(scop, array_prog, options);
         osl_scop_print(stdout, scop);
       } else { // do the usual Pluto stuff
 //        /* NO MORE TRANSFORMATIONS BEYOND THIS POINT */
@@ -1024,43 +1083,26 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
 //        gen_unroll_file(prog);
         fprintf(stdout, "[PSA] ************************\n");
         fprintf(stdout, "[PSA] Generate CPU program.\n");
-        pluto_print_program(prog, srcFileName, "cpu");
+        fflush(stdout);
+        pluto_print_program(array_prog, srcFileName, "cpu");
       }
 #endif
-
-//      t_all = rtclock() - t_start_all;
-//    
-//      if (options->time && !options->silent) {
-//        printf("\n[pluto] Timing statistics\n[pluto] SCoP extraction + dependence "
-//               "analysis time: %0.6lfs\n",
-//               t_d);
-//        printf("[pluto] Auto-transformation time: %0.6lfs\n", t_t);
-//        if (options->dfp) {
-//          printf("[pluto] \t\tTotal FCG Construction Time: %0.6lfs\n",
-//                 prog->fcg_const_time);
-//          printf("[pluto] \t\tTotal FCG Colouring Time: %0.6lfs\n",
-//                 prog->fcg_colour_time);
-//          printf("[pluto] \t\tTotal Scaling + Shifting time: %0.6lfs\n",
-//                 prog->fcg_dims_scale_time);
-//          printf("[pluto] \t\tTotal Skewing time: %0.6lfs\n", prog->skew_time);
-//        }
-//        printf("[pluto] \t\tTotal constraint solving time (LP/MIP/ILP) time: "
-//               "%0.6lfs\n",
-//               prog->mipTime);
-//        printf("[pluto] Code generation time: %0.6lfs\n", t_c);
-//        printf("[pluto] Other/Misc time: %0.6lfs\n", t_all - t_c - t_t - t_d);
-//        printf("[pluto] Total time: %0.6lfs\n", t_all);
-//        printf("[pluto] All times: %0.6lf %0.6lf %.6lf %.6lf\n", t_d, t_t, t_c,
-//               t_all - t_c - t_t - t_d);
-//      }
     
-      pluto_prog_free(prog);
-      prog = NULL;      
+      pluto_prog_free(array_prog);
+      array_prog = NULL;     
+      vsa_free(psa_vsa);
     }
+    /* Free Memory */    
+    free(progs);
+    pluto_prog_free(reuse_prog);
+    /* Free Memory */
   }
-  pluto_options_free(options);
-
+  /* Free Memory */
+//  pluto_options_free(options);  
   osl_scop_free(scop);
+  free(reuse_progs);
+  pluto_prog_free(prog);
+  /* Free Memory */
 
   return 0;
 }

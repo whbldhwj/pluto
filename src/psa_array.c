@@ -404,8 +404,11 @@ PlutoProg *pluto_prog_dup(const PlutoProg *prog) {
   /* Param context */
   if (prog->context != NULL)
     new_prog->context = pluto_constraints_dup(prog->context);
-  if (prog->decls != NULL)
+  if (prog->decls != NULL) {
+    if (new_prog->decls != NULL)
+      free(new_prog->decls);
     new_prog->decls = strdup(prog->decls);
+  }
 // #ifdef JIE_DEBUG
 //   fprintf(stdout, "[Debug] Stop 8.\n");
 // #endif
@@ -691,6 +694,7 @@ DepDis get_dep_distance(const Dep *dep, const PlutoProg *prog, int level) {
     }        
   }  
 
+  pluto_constraints_free(cst);
   /* Neither ZERO, nor PLUS ONE, nor MINUS ONE, has to be STAR */
   return DEP_STAR;    
 }
@@ -788,11 +792,11 @@ PlutoProg **sa_candidates_generation_band(Band *band, int array_dim,
 
         /* Add the new invariant to the list */
         if (progs) {
-          progs = (PlutoProg **)realloc(progs, (*nprogs + 1) * sizeof(PlutoProg));
+          progs = (PlutoProg **)realloc(progs, (*nprogs + 1) * sizeof(PlutoProg *));
           progs[*nprogs] = new_prog;
           *nprogs = *nprogs + 1;
         } else {
-          progs = (PlutoProg **)malloc((*nprogs + 1) * sizeof(PlutoProg));
+          progs = (PlutoProg **)malloc((*nprogs + 1) * sizeof(PlutoProg *));
           progs[*nprogs] = new_prog;
           *nprogs = *nprogs + 1;
         }
@@ -833,11 +837,11 @@ PlutoProg **sa_candidates_generation_band(Band *band, int array_dim,
 
             /* Add the new invariant to the list */
             if (progs) {
-              progs = (PlutoProg **)realloc(progs, (*nprogs + 1) * sizeof(PlutoProg));
+              progs = (PlutoProg **)realloc(progs, (*nprogs + 1) * sizeof(PlutoProg *));
               progs[*nprogs] = new_prog;
               *nprogs = *nprogs + 1;
             } else {
-              progs = (PlutoProg **)malloc((*nprogs + 1) * sizeof(PlutoProg));
+              progs = (PlutoProg **)malloc((*nprogs + 1) * sizeof(PlutoProg *));
               progs[*nprogs] = new_prog;
               *nprogs = *nprogs + 1;
             }
@@ -885,11 +889,11 @@ PlutoProg **sa_candidates_generation_band(Band *band, int array_dim,
     
                 /* Add the new invariant to the list */
                 if (progs) {
-                  progs = (PlutoProg **)realloc(progs, (*nprogs + 1) * sizeof(PlutoProg));
+                  progs = (PlutoProg **)realloc(progs, (*nprogs + 1) * sizeof(PlutoProg *));
                   progs[*nprogs] = new_prog;
                   *nprogs = *nprogs + 1;
                 } else {
-                  progs = (PlutoProg **)malloc((*nprogs + 1) * sizeof(PlutoProg));
+                  progs = (PlutoProg **)malloc((*nprogs + 1) * sizeof(PlutoProg *));
                   progs[*nprogs] = new_prog;
                   *nprogs = *nprogs + 1;
                 }
@@ -951,16 +955,22 @@ PlutoProg **sa_candidates_generation(PlutoProg *prog, int *nprogs_p) {
 //       fprintf(stdout, "[Debug] in 1D branch.\n");
 //       fprintf(stdout, "[Debug] number of 1D systolic array: %d\n", new_nprogs);
 // #endif      
-      nprogs += new_nprogs;
-      progs = new_progs;
+      progs = (PlutoProg **)malloc((nprogs + new_nprogs) * sizeof(PlutoProg *));
+      for (i = nprogs; i < nprogs + new_nprogs; i++) {
+        progs[i] = new_progs[i - nprogs];
+      }
+      nprogs += new_nprogs;      
     } else {
-      progs = (PlutoProg **)realloc(progs, (nprogs + new_nprogs) * sizeof(PlutoProg **));
+      progs = (PlutoProg **)realloc(progs, (nprogs + new_nprogs) * sizeof(PlutoProg *));
       for (i = nprogs; i < nprogs + new_nprogs; i++) {
         progs[i] = new_progs[i - nprogs];
       }      
       nprogs += new_nprogs;
     }
     fprintf(stdout, "%d variants found.\n", new_nprogs);
+    /* Free Memory */
+    free(new_progs);
+    /* Free Memory */
   }
 #endif
 #if SA_DIM_UB >= 2
@@ -985,16 +995,22 @@ PlutoProg **sa_candidates_generation(PlutoProg *prog, int *nprogs_p) {
 //     fprintf(stdout, "[Debug] number of 2D systolic array: %d\n", new_nprogs);
 // #endif    
     if (!progs) {
-      nprogs += new_nprogs;
-      progs = new_progs;
+      progs = (PlutoProg **)malloc((nprogs + new_nprogs) * sizeof(PlutoProg *));
+      for (i = nprogs; i < nprogs + new_nprogs; i++) {
+        progs[i] = new_progs[i - nprogs];
+      }
+      nprogs += new_nprogs;      
     } else {
-      progs = (PlutoProg **)realloc(progs, (nprogs + new_nprogs) * sizeof(PlutoProg **));
+      progs = (PlutoProg **)realloc(progs, (nprogs + new_nprogs) * sizeof(PlutoProg *));
       for (i = nprogs; i < nprogs + new_nprogs; i++) {
         progs[i] = new_progs[i - nprogs];
       }
       nprogs += new_nprogs;
     }
     fprintf(stdout, "%d variants found.\n", new_nprogs);
+    /* Free Memory */
+    free(new_progs);
+    /* Free Memory */  
   }
 #endif
 #if SA_DIM_UB >= 3
@@ -1005,16 +1021,22 @@ PlutoProg **sa_candidates_generation(PlutoProg *prog, int *nprogs_p) {
     int new_nprogs = 0;
     new_progs = sa_candidates_generation_band(bands[0], 3, prog, &new_nprogs);
     if (!progs) {
-      nprogs += new_nprogs;
-      progs = new_progs;
+      progs = (PlutoProg **)malloc((nprogs + new_nprogs) * sizeof(PlutoProg *));
+      for (i = nprogs; i < nprogs + new_nprogs; i++) {
+        progs[i] = new_progs[i - nprogs];
+      }
+      nprogs += new_nprogs;      
     } else {
-      progs = (PlutoProg **)realloc(progs, (nprogs + new_nprogs) * sizeof(PlutoProg **));
+      progs = (PlutoProg **)realloc(progs, (nprogs + new_nprogs) * sizeof(PlutoProg *));
       for (i = nprogs; i < nprogs + new_nprogs; i++) {
         progs[i] = new_progs[i - nprogs];
       }
       nprogs += new_nprogs;
     }
     fprintf(stdout, "%d variants found.\n", new_nprogs);
+    /* Free Memory */
+    free(new_progs);
+    /* Free Memory */   
   } 
 #endif
 

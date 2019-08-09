@@ -408,6 +408,14 @@ int psa_array_partition_optimize_band(PlutoProg *prog, Band *band) {
     prog->array_ncol = tile_sizes[1];
   }
 
+  /* Free Memory */
+  for (i = 0; i < nloops; i++) {
+    pluto_loop_free(loops[i]);
+  }
+  free(loops);
+  free(array_part_loops);
+  /* Free Memory */
+
   return num_tiled_loops;
 }
 

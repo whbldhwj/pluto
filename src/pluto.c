@@ -2590,11 +2590,22 @@ int is_access_scalar(PlutoAccess *access) {
 }
 
 /* Print out the Pluto program */
-void pluto_print_program(const PlutoProg *prog, char *srcFileName, char *suffix) {
+void pluto_print_program(const PlutoProg *prog, const char *srcFileName, char *suffix) {
   /* Get basename */
   char *basec, *bname;
   basec = strdup(srcFileName);
   bname = basename(basec);
+
+//  char *bname = "";
+//  char ch;
+//  int loc = 0;
+//  while((ch = srcFileName[loc]) != '.') {
+//    char tmp[2];
+//    tmp[0] = ch;
+//    tmp[1] = '\0';
+//    bname = concat(bname, tmp);
+//    loc++;
+//  }
 
   char *dumpFileName;
 //  dumpFileName = malloc(strlen(bname) - 2 + strlen(".pluto_transform.c") + 1);
@@ -2613,7 +2624,7 @@ void pluto_print_program(const PlutoProg *prog, char *srcFileName, char *suffix)
   strcat(cloogFileName, ".");
   strcat(cloogFileName, suffix);
   strcat(cloogFileName, ".cloog");
-  free(basec);
+//  free(basec);
 
   // Write Cloog File
   FILE *cloogfp, *outfp;
@@ -2653,6 +2664,7 @@ void pluto_print_program(const PlutoProg *prog, char *srcFileName, char *suffix)
   pluto_gen_cloog_code(prog, prog->num_hyperplanes, 1, cloogfp, outfp);
 
   free(dumpFileName);
+  free(bname);
   fclose(cloogfp);
   fclose(outfp);
 }

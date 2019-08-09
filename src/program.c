@@ -2727,11 +2727,12 @@ PlutoProg *pluto_prog_alloc() {
   /* Jie Added - End */
   prog->hProps = NULL;
   prog->num_hyperplanes = 0;
-  prog->decls = malloc(16384 * 9);
+//  prog->decls = (char *)malloc(16384 * 9);
+  prog->decls = strdup("");
   prog->data_names = NULL;
   prog->num_data = 0;
 
-  strcpy(prog->decls, "");
+//  strcpy(prog->decls, "");
 
   prog->globcst = NULL;
 
@@ -2924,6 +2925,9 @@ void pluto_prog_free(PlutoProg *prog) {
   /* Jie Added - Start */
   free(prog->array_il_factor);
   /* Jie Added - End */
+
+  /* Options */
+  pluto_options_free(prog->options);
 
   free(prog);
 }
@@ -3649,6 +3653,9 @@ void pluto_stmt_free(Stmt *stmt) {
   pluto_matrix_free(stmt->trans);
 
   free(stmt->hyp_types);
+  /* Jie Added - Start */
+  free(stmt->psa_hyp_types);
+  /* Jie Added - End */
 
   if (stmt->text != NULL) {
     free(stmt->text);
@@ -4568,10 +4575,11 @@ static void compute_deps_pet(struct pet_scop *pscop,
 
   isl_space *space = isl_set_get_space(pscop->context);
   empty = isl_union_map_empty(isl_space_copy(space));
-
   reads = isl_union_map_copy(empty);
   writes = isl_union_map_copy(empty);
   schedule = isl_union_map_copy(empty);
+  if (!options->rar)
+    dep_rar = isl_union_map_copy(empty);
 
   isl_union_map *schedules = isl_schedule_get_map(pscop->schedule);
 
@@ -4888,14 +4896,14 @@ static Stmt **pet_to_pluto_stmts(struct pet_scop *pscop,
       &stmt->writes, 0, stmt->dim, npar
     };
 
-    if (stmt->nreads >= 1) {
+//    if (stmt->nreads >= 1) {
       stmt->reads =
           (PlutoAccess **)malloc(stmt->nreads * sizeof(PlutoAccess *));
-    }
-    if (stmt->nwrites >= 1) {
+//    }
+//    if (stmt->nwrites >= 1) {
       stmt->writes =
           (PlutoAccess **)malloc(stmt->nwrites * sizeof(PlutoAccess *));
-    }
+//    }
     for (j = 0; j < stmt->nreads; j++) {
       stmt->reads[j] = NULL;
     }
