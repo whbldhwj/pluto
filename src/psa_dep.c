@@ -265,6 +265,7 @@ PlutoProg **psa_reuse_analysis(PlutoProg *prog, int *num_reuse_progs) {
       isl_ctx *ctx = isl_mat_get_ctx(isl_null_mat);
       isl_mat_free(isl_null_mat);
       isl_ctx_free(ctx);
+      pluto_matrix_free(trunc_acc_mat);
       /* Free Memory */
 
 #ifdef PSA_DEP_DEBUG
@@ -478,6 +479,7 @@ PlutoConstraints *construct_rar_dep_polytope(PlutoMatrix *null_space, int idx, S
   /* Free Memory */
   pluto_constraints_free(src_domain);
   pluto_constraints_free(dest_domain);
+  pluto_matrix_free(dep_mat);
   /* Free Memory */
 
   return new_polytope;

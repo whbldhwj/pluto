@@ -229,6 +229,8 @@ Graph *graph_dup(const Graph *graph) {
   ngraph->num_coloured_vertices = graph->num_coloured_vertices;
 
   /* Adjacency matrix */
+  if (ngraph->adj)
+    pluto_matrix_free(ngraph->adj);
   ngraph->adj = pluto_matrix_dup(graph->adj);
 // #ifdef JIE_DEBUG
 //   fprintf(stdout, "[Debug] Stop 1.3.\n");
@@ -370,8 +372,11 @@ PlutoProg *pluto_prog_dup(const PlutoProg *prog) {
   else
     new_prog->fcg = NULL;
 
-  if (prog->adg != NULL)
+  if (prog->adg != NULL) {
+    if (new_prog->adg)
+      graph_free(new_prog->adg);
     new_prog->adg = graph_dup(prog->adg);
+  }
   else
     new_prog->adg = NULL;
 
@@ -402,8 +407,11 @@ PlutoProg *pluto_prog_dup(const PlutoProg *prog) {
   new_prog->nvar = prog->nvar;
 
   /* Param context */
-  if (prog->context != NULL)
+  if (prog->context != NULL) {
+    if (new_prog->context != NULL)
+      pluto_constraints_free(new_prog->context);
     new_prog->context = pluto_constraints_dup(prog->context);
+  }
   if (prog->decls != NULL) {
     if (new_prog->decls != NULL)
       free(new_prog->decls);
@@ -413,8 +421,11 @@ PlutoProg *pluto_prog_dup(const PlutoProg *prog) {
 //   fprintf(stdout, "[Debug] Stop 8.\n");
 // #endif
   /* Codegen context */
-  if (prog->codegen_context != NULL)
+  if (prog->codegen_context != NULL) {
+    if (new_prog->codegen_context != NULL)
+      pluto_constraints_free(new_prog->codegen_context);
     new_prog->codegen_context = pluto_constraints_dup(prog->codegen_context);
+  }
 // #ifdef JIE_DEBUG
 //   fprintf(stdout, "[Debug] Stop 9.\n");
 // #endif
@@ -767,11 +778,11 @@ PlutoProg **sa_candidates_generation_band(Band *band, int array_dim,
       if (is_space_loop[i - firstD]) {
         PlutoProg *new_prog = pluto_prog_dup(prog);
         /* As new prog is generated, we will need to generate new bands correspondingly */
-        Band **new_bands;
-        unsigned new_nbands;
-        new_bands = pluto_get_outermost_permutable_bands(new_prog, &new_nbands);
+        //Band **new_bands;
+        //unsigned new_nbands;
+        //new_bands = pluto_get_outermost_permutable_bands(new_prog, &new_nbands);
 
-        Ploop *loop = new_bands[0]->loop;
+        //Ploop *loop = new_bands[0]->loop;
         /* Make the loop i the outermost loop */
         unsigned d;
         for (d = i; d > firstD; d--) {
@@ -809,11 +820,11 @@ PlutoProg **sa_candidates_generation_band(Band *band, int array_dim,
           if (is_space_loop[j]) {
             PlutoProg *new_prog = pluto_prog_dup(prog);
             /* As new prog is generated, we will need to generate new bands correspondingly */
-            Band **new_bands;
-            unsigned new_nbands;
-            new_bands = pluto_get_outermost_permutable_bands(new_prog, &new_nbands);
+            //Band **new_bands;
+            //unsigned new_nbands;
+            //new_bands = pluto_get_outermost_permutable_bands(new_prog, &new_nbands);
 
-            Ploop *loop = new_bands[0]->loop;
+            //Ploop *loop = new_bands[0]->loop;
             /* Make the loop i, j the outermost loops */
             unsigned d;
             for (d = j; d > firstD; d--) {
@@ -858,11 +869,11 @@ PlutoProg **sa_candidates_generation_band(Band *band, int array_dim,
               if (is_space_loop[k]) {
                 PlutoProg *new_prog = pluto_prog_dup(prog);
                 /* As new prog is generated, we will need to generate new bands correspondingly */
-                Band **new_bands;
-                unsigned new_nbands;
-                new_bands = pluto_get_outermost_permutable_bands(new_prog, &new_nbands);
+                //Band **new_bands;
+                //unsigned new_nbands;
+                //new_bands = pluto_get_outermost_permutable_bands(new_prog, &new_nbands);
     
-                Ploop *loop = new_bands[0]->loop;
+                //Ploop *loop = new_bands[0]->loop;
                 /* Make the loop i, j, k the outermost loops */
                 unsigned d;
                 for (d = k; d > firstD; d--) {
@@ -1049,6 +1060,10 @@ PlutoProg **sa_candidates_generation(PlutoProg *prog, int *nprogs_p) {
 	// for (i = 0; i < nprogs; i++) {
 	// 	progs[i] = pluto_prog_dup(prog);
 	// }
+
+  /* Free Memory */
+  pluto_bands_free(bands, nbands);
+  /* Free Memory */
 
 	return progs;
 }

@@ -660,7 +660,7 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
     reuse_progs = psa_reuse_analysis(prog, &num_reuse_progs);
   } else {
     reuse_progs = (PlutoProg **)malloc(1 * sizeof(PlutoProg *));
-    reuse_progs[0] = prog;
+    reuse_progs[0] = pluto_prog_dup(prog);
     num_reuse_progs = 1;
   }
   fprintf(stdout, "[PSA] %d programs generated after reuse analysis.\n", num_reuse_progs);

@@ -32,7 +32,7 @@ char **get_vsa_URE_names(URE **UREs, int URE_num) {
 
 /* Print out the array names as a list */
 char **get_vsa_array_names(Array **arrays, int array_num) {
-  char **array_names = (char **)malloc(array_num * sizeof(char *));
+  char **array_names = (char **)malloc(PLMAX(0, array_num) * sizeof(char *));
   for (int i = 0; i < array_num; i++) {
     array_names[i] = strdup(arrays[i]->text);
   }
@@ -1154,6 +1154,10 @@ void vsa_band_width_extract(PlutoProg *prog, VSA *vsa) {
 //      }
 //    }
   }
+
+  /* Free Memory */
+  pluto_bands_free(bands, nbands);
+  /* Free Memory */
 }
 
 VSA *vsa_alloc() {
@@ -1469,8 +1473,15 @@ void psa_vsa_pretty_print(FILE *fp, const VSA *vsa) {
 
   /* ARRAYS */
   psa_print_string_with_indent(fp, 2, "\"ARRAYS\": [\n");
-  psa_print_string_list_with_indent(fp, 4, get_vsa_array_names(vsa->arrays, vsa->array_num), vsa->array_num);
+  char **array_names = get_vsa_array_names(vsa->arrays, vsa->array_num);
+  psa_print_string_list_with_indent(fp, 4, array_names, vsa->array_num);
   psa_print_string_with_indent(fp, 2, "],\n");
+  /* Memory Free */
+  for (int i = 0; i < vsa->array_num; i++) {
+    free(array_names[i]);
+  }
+  free(array_names);
+  /* Memory Free */
 
   /* URE_NUM */
   psa_print_string_with_indent(fp, 2, "\"URE_NUM\": ");

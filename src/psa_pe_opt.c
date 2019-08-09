@@ -288,6 +288,14 @@ int psa_latency_hiding_optimize_band(Band *band, PlutoProg *prog) {
         stmt->psa_hyp_types[last_depth] = PSA_H_TASK_INTER_LOOP;
       }
     } 
+    /* Free Memory */
+    for (int i = 0; i < nloops; i++) {
+      pluto_loop_free(loops[i]);
+    }
+    free(loops);
+    free(parallel_time_loops);
+    free(parallel_space_loops);
+    /* Free Memory */
 
     return PSA_SUCCESS;
   } else if (num_parallel_space_loop) {
@@ -340,22 +348,35 @@ int psa_latency_hiding_optimize_band(Band *band, PlutoProg *prog) {
         Stmt *stmt = loop->stmts[j];
         stmt->psa_hyp_types[last_depth] = PSA_H_TASK_INTER_LOOP;
       }
+
+      /* Free Memory */
+      pluto_loops_free(intra_tile_loops, num_intra_tile_loops);        
+      /* Free Memory */
     }        
+
+    /* Free Memory */
+    for (int i = 0; i < nloops; i++) {
+      pluto_loop_free(loops[i]);
+    }
+    free(loops);
+    free(parallel_time_loops);
+    free(parallel_space_loops);
+    /* Free Memory */
 
     return PSA_SUCCESS;
   } else {
     /* No opportunity for task interleaving */
+
+    /* Free Memory */
+    for (int i = 0; i < nloops; i++) {
+      pluto_loop_free(loops[i]);
+    }
+    free(loops);
+    free(parallel_time_loops);
+    free(parallel_space_loops);
+    /* Free Memory */
     return PSA_FAILURE;
   } 
-
-  /* Free Memory */
-  for (int i = 0; i < nloops; i++) {
-    pluto_loop_free(loops[i]);
-  }
-  free(loops);
-  free(parallel_time_loops);
-  free(parallel_space_loops);
-  /* Free Memory */
 }
 
 bool is_stride_zero_one(Stmt *stmt, PlutoAccess *acc, int depth, int *is_transform, int *transform_dim) {

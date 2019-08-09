@@ -786,8 +786,7 @@ PlutoConstraints *pluto_get_transformed_dpoly(const Dep *dep, Stmt *src,
   //                              dest->dim);
   pluto_constraints_project_out_isl_single(&dpoly, src->trans->nrows, src->dim);
 
-  pluto_constraints_project_out_isl_single(&dpoly, src->trans->nrows + dest->trans->nrows,
-                                  dest->dim);
+  pluto_constraints_project_out_isl_single(&dpoly, src->trans->nrows + dest->trans->nrows, dest->dim);
 
   // IF_DEBUG(printf("New domain is \n"););
   // IF_DEBUG(pluto_constraints_print(stdout, newdom););
