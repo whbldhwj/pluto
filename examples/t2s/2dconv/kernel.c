@@ -3,45 +3,50 @@
 /* DSA Form 0 */
 // change paramters to constants
 // avoid using +=
-void dsa_kernel(data_t X[R + 2][S + 2], data_t W[3][3], data_t Z[R][S]) {
-#pragma scop  
-  for (int r = 0; r < 32; r++)
-    for (int s = 0; s < 32; s++) {
-      Z[r][s] = 0;
-      for (int i = 0; i < 3; i++)
-        for (int j = 0; j < 3; j++) {
-          Z[r][s] = Z[r][s] + X[r + i][s + j] * W[i][j];
-        }
-    }
-#pragma endscop  
-}
-
-/* DSA Form 1 */
 //void dsa_kernel(data_t X[R + 2][S + 2], data_t W[3][3], data_t Z[R][S]) {
-//  data_t Z_ext[R][S][3][3];
 //#pragma scop  
 //  for (int r = 0; r < 32; r++)
 //    for (int s = 0; s < 32; s++) {
+//      Z[r][s] = 0;
 //      for (int i = 0; i < 3; i++)
 //        for (int j = 0; j < 3; j++) {
-//          if (i == 0 && j == 0) 
-//            Z_ext[r][s][i][j] = X[r + i][s + j] * W[i][j];
-//          else if (i > 0 && j == 0) {
-//            Z_ext[r][s][i][j] = Z_ext[r][s][i - 1][2] + X[r + i][s + j] * W[i][j];
-//          } else if (i > 0 && j > 0) {
-//            Z_ext[r][s][i][j] = Z_ext[r][s][i][j - 1] + X[r + i][s + j] * W[i][j];
-//          } else if (i == 0 && j > 0) {                   
-//            Z_ext[r][s][i][j] = Z_ext[r][s][i][j - 1] + X[r + i][s + j] * W[i][j];
-//          }
+//          Z[r][s] = Z[r][s] + X[r + i][s + j] * W[i][j];
 //        }
 //    }
 //#pragma endscop  
-//
-//  for (int r = 0; r < 32; r++)
-//    for (int s = 0; s < 32; s++) {
-//      Z[r][s] = Z_ext[r][s][2][2];
-//    }
 //}
+
+/* DSA Form 1 */
+void dsa_kernel(data_t X[R + 2][S + 2], data_t W[3][3], data_t Z[R][S]) {
+  data_t Z_ext[R][S][3][3];
+#pragma scop  
+  for (int r = 0; r < 32; r++)
+    for (int s = 0; s < 32; s++) {
+      for (int i = 0; i < 3; i++) {
+        for (int j = 0; j < 3; j++) {
+          if (i == 0 && j == 0) 
+            Z_ext[r][s][i][j] = X[r + i][s + j] * W[i][j];
+          else if (i > 0 && j == 0) {
+            Z_ext[r][s][i][j] = Z_ext[r][s][i - 1][2] + X[r + i][s + j] * W[i][j];
+          } else if (i > 0 && j > 0) {
+            Z_ext[r][s][i][j] = Z_ext[r][s][i][j - 1] + X[r + i][s + j] * W[i][j];
+          } else if (i == 0 && j > 0) {                   
+            Z_ext[r][s][i][j] = Z_ext[r][s][i][j - 1] + X[r + i][s + j] * W[i][j];
+          }
+
+          if (i == 2 && j == 2) {
+            Z[r][s] = Z_ext[r][s][2][2];
+          }
+        }
+      }
+    }
+#pragma endscop  
+
+  for (int r = 0; r < 32; r++)
+    for (int s = 0; s < 32; s++) {
+      Z[r][s] = Z_ext[r][s][2][2];
+    }
+}
 
 /* DSA From 2 */
 //void dsa_kernel(data_t X[R + 2][S + 2], data_t W[3][3], data_t Z[R][S]) {

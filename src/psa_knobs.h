@@ -49,14 +49,14 @@
  * Stage: PE Optimization
  * *****************************
  */ 
-// perform latency hiding optimization 
-#define LATENCY_HIDING
-
-// print out the transformed code after latency hiding
-#define PRINT_LATENCY_HIDING_TRANS_PROGRAM
-
-// dump out latency hiding candidates
-#define PRINT_LATENCY_HIDING_MISC
+//// perform latency hiding optimization 
+//#define LATENCY_HIDING
+//
+//// print out the transformed code after latency hiding
+//#define PRINT_LATENCY_HIDING_TRANS_PROGRAM
+//
+//// dump out latency hiding candidates
+//#define PRINT_LATENCY_HIDING_MISC
 
 //// perfrom SIMD vectorization
 //#define SIMD_VECTORIZATION
@@ -67,14 +67,14 @@
 //// dump out SIMD vectorization candidates
 //#define PRINT_SIMD_VECTORIZATION_MISC
 
-// perfom array partitioning optimization
-#define ARRAY_PARTITIONING
-
-// print out the transformed code after array partitioning
-#define PRINT_ARRAY_PARTITIONING_TRANS_PROGRAM
-
-// dump out array partitioning candidates
-#define PRINT_ARRAY_PARTITIONING_MISC
+//// perfom array partitioning optimization
+//#define ARRAY_PARTITIONING
+//
+//// print out the transformed code after array partitioning
+//#define PRINT_ARRAY_PARTITIONING_TRANS_PROGRAM
+//
+//// dump out array partitioning candidates
+//#define PRINT_ARRAY_PARTITIONING_MISC
 
 /*
  * ************************************
@@ -92,9 +92,9 @@
 // print out the final transformed CPU code
 #define CPU_CODEGEN
 // generate T2S code
-//#define T2S_CODEGEN
+#define T2S_CODEGEN
 //// generate Intel OpenCL code
-#define INTEL_CODEGEN
+//#define INTEL_CODEGEN
 //// generate Xilinx HLS code
 //#define XILINX_CODEGEN
 

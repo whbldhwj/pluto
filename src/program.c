@@ -2927,7 +2927,8 @@ void pluto_prog_free(PlutoProg *prog) {
   /* Jie Added - End */
 
   /* Options */
-  pluto_options_free(prog->options);
+  if (prog->options)
+    pluto_options_free(prog->options);
 
   free(prog);
 }

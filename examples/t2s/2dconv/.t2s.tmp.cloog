@@ -1,4 +1,4 @@
-# CLooG script generated automatically by PLUTO 0.11.4-566-ge7c3ace
+# CLooG script generated automatically by PLUTO 0.11.4-573-gf663872
 # language: C
 c
 
@@ -53,13 +53,14 @@ c
 1
 
 # T(S1)
-5 11
-0 1 0 0 0 0 0 -1 0 0 0 
-0 0 1 0 0 0 0 0 -1 0 0 
-0 0 0 1 0 0 -1 0 0 0 0 
-0 0 0 0 1 0 0 0 0 -1 0 
-0 0 0 0 0 1 0 0 0 0 -1 
+6 12
+0 1 0 0 0 0 0 0 -1 0 0 0 
+0 0 1 0 0 0 0 0 0 -1 0 0 
+0 0 0 1 0 0 0 -1 0 0 0 0 
+0 0 0 0 1 0 0 0 0 0 -1 0 
+0 0 0 0 0 1 0 0 0 0 0 -1 
+0 0 0 0 0 0 1 0 0 0 0 -1 
 
 # we will set the scattering dimension names
-5
-t1 t2 t3 t4 t5 
+6
+t1 t2 t3 t4 t5 t6 
