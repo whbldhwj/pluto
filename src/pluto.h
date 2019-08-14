@@ -321,6 +321,12 @@ struct statement {
 };
 typedef struct statement Stmt;
 
+struct vec {
+  int length;
+  int *val;
+};
+typedef struct vec Vec;
+
 struct stmt_access_pair {
   PlutoAccess *acc;
   Stmt *stmt;
@@ -346,6 +352,18 @@ struct stmt_access_var_pair {
   bool d; // 0 - not drain 1 - drain
   // int cc_id;
 };
+
+typedef enum transbound {
+  IN_BOUND,
+  OUT_BOUND,
+  UNKNOWN_BOUND
+} TransBound;
+
+typedef enum transtype {
+  EMBEDDED,
+  SEPARATE,
+  UNKNOWN_TYPE
+} TransType;
 
 struct var_pair {
   char *var_name;
@@ -534,6 +552,22 @@ struct dependence {
   /* Jie Added - End */
 };
 typedef struct dependence Dep;
+
+struct stmt_access_io_pair {
+  Stmt *stmt;
+  PlutoAccess *acc;
+  Dep *dep;
+  TransBound L1_trans_bound; 
+  TransType L1_trans_type;
+  Vec *L1_trans_dir;
+  TransBound L2_trans_bound;
+  TransType L2_trans_type;
+  Vec *L2_trans_dir;
+  TransBound L3_trans_bound;
+  TransType L3_trans_type;
+  Vec *L3_trans_dir;
+  int trans_set;
+};
 
 typedef enum unrollType {
   NO_UNROLL,
@@ -862,6 +896,17 @@ struct psaVSA {
   //int *op_engine_band_width;
   //int *res_engine_band_width;
   int *engine_band_width;
+
+  /* ACC_DATA_TRANS_SETS */
+  int **acc_data_trans_sets;
+  /* NUM_ACC_PER_DATA_TRANS_SETS */
+  int *num_acc_per_data_trans_sets;
+  /* NUM_DATA_TRANS_SETSa */
+  int num_data_trans_sets;
+
+  /* ACC_IO_MAP */
+  struct stmt_access_io_pair **io_map;
+  int io_map_num_entries;
 
   /*************************************/
   /* Below are fields added for T2S */

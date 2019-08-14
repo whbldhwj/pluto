@@ -3,39 +3,39 @@
 /* DSA Form 0 */
 // change parameters to constants
 // avoid using +=
-//void dsa_kernel(data_t A[I][K], data_t B[K][J], data_t C[I][J]) {
-//#pragma scop
-//  for (int i = 0; i < 64; i++)
-//    for (int j = 0; j < 64; j++) {
-//      C[i][j] = 0;
-//      for (int k = 0; k < 64; k++) {
-//        C[i][j] += A[i][k] * B[k][j];
-//      }
-//    }
-//#pragma endscop
-//}
-
-/* DSA Form 1 */
 void dsa_kernel(data_t A[I][K], data_t B[K][J], data_t C[I][J]) {
-  data_t C_ext[64][64][64];
 #pragma scop
-  for (int i = 0; i < 64;i ++)
-    for (int j = 0; j < 64; j++)
-      for (int k = 0; k < 64; k++) {
-        if (k == 0)
-          C_ext[i][j][k] = A[i][k] * B[k][j];
-        else
-          C_ext[i][j][k] = C_ext[i][j][k - 1] + A[i][k] * B[k][j];
-        if (k == 63)
-          C[i][j] = C_ext[i][j][63];
-      }
-#pragma endscop  
-  
   for (int i = 0; i < 64; i++)
     for (int j = 0; j < 64; j++) {
-      C[i][j] = C_ext[i][j][63];
+      C[i][j] = 0;
+      for (int k = 0; k < 64; k++) {
+        C[i][j] += A[i][k] * B[k][j];
+      }
     }
+#pragma endscop
 }
+
+///* DSA Form 1 */
+//void dsa_kernel(data_t A[I][K], data_t B[K][J], data_t C[I][J]) {
+//  data_t C_ext[64][64][64];
+//#pragma scop
+//  for (int i = 0; i < 64;i ++)
+//    for (int j = 0; j < 64; j++)
+//      for (int k = 0; k < 64; k++) {
+//        if (k == 0)
+//          C_ext[i][j][k] = A[i][k] * B[k][j];
+//        else
+//          C_ext[i][j][k] = C_ext[i][j][k - 1] + A[i][k] * B[k][j];
+//        if (k == 63)
+//          C[i][j] = C_ext[i][j][63];
+//      }
+//#pragma endscop  
+//  
+//  for (int i = 0; i < 64; i++)
+//    for (int j = 0; j < 64; j++) {
+//      C[i][j] = C_ext[i][j][63];
+//    }
+//}
 
 /* DSA Form 2 */
 //void dsa_kernel(data_t A[I][K], data_t B[K][J], data_t C[I][J]) {

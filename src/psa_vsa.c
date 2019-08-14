@@ -172,7 +172,7 @@ void get_var_iters(int acc_id, struct stmt_access_var_pair **acc_var_map, PlutoP
 /*
  * Use the DFS to update the intermediate variables
  */
-void update_ivar(int acc_id, struct stmt_access_var_pair **acc_var_map, struct var_pair **adg_var_map, int cc_id, PlutoProg *prog, VSA *vsa) {
+void update_t2s_ivar(int acc_id, struct stmt_access_var_pair **acc_var_map, struct var_pair **adg_var_map, int cc_id, PlutoProg *prog, VSA *vsa) {
   int iter_num = vsa->t2s_iter_num;
   char **iters = vsa->t2s_iters;
 
@@ -256,7 +256,7 @@ void update_ivar(int acc_id, struct stmt_access_var_pair **acc_var_map, struct v
         acc_var_map[acc_id]->dvar_ref = strdup(var_ref);
       }
     } else {
-      Stmt **stmt = acc_var_map[acc_id]->stmt;
+      Stmt *stmt = acc_var_map[acc_id]->stmt;
       PlutoAccess *acc = acc_var_map[acc_id]->acc;
       char *arr_name = acc->name;
       char var_name[50];
@@ -314,9 +314,9 @@ void update_ivar(int acc_id, struct stmt_access_var_pair **acc_var_map, struct v
       Dep *dep = prog->deps[dep_id];
       if (IS_RAW(dep->type)) {
         if (dep->src_acc == acc) {
-          update_ivar(dep->dest_acc->sym_id, acc_var_map, adg_var_map, cc_id, prog, vsa);
+          update_t2s_ivar(dep->dest_acc->sym_id, acc_var_map, adg_var_map, cc_id, prog, vsa);
         } else if (dep->dest_acc == acc) {
-          update_ivar(dep->src_acc->sym_id, acc_var_map, adg_var_map, cc_id, prog, vsa);
+          update_t2s_ivar(dep->src_acc->sym_id, acc_var_map, adg_var_map, cc_id, prog, vsa);
         }
       }
     }
@@ -348,7 +348,7 @@ char *get_iter_str(IterExp **iters, int iter_num) {
 /*
  * Update the var_name, var_ref, var_iters
  */
-void update_var(struct stmt_access_var_pair **acc_var_map, struct var_pair **adg_var_map,
+void update_t2s_var(struct stmt_access_var_pair **acc_var_map, struct var_pair **adg_var_map,
     int total_accs, int cc_id, PlutoProg *prog, VSA *vsa) {
   int iter_num = vsa->t2s_iter_num;
   char **iters = vsa->t2s_iters;
@@ -424,7 +424,7 @@ void update_var(struct stmt_access_var_pair **acc_var_map, struct var_pair **adg
       Stmt *stmt = acc_var_map[i]->stmt;
       PlutoAccess *acc = acc_var_map[i]->acc;    
       if (acc->cc_id == cc_id) {
-        update_ivar(acc->sym_id, acc_var_map, adg_var_map, cc_id, prog, vsa);
+        update_t2s_ivar(acc->sym_id, acc_var_map, adg_var_map, cc_id, prog, vsa);
       }
     }
   }
@@ -460,7 +460,7 @@ void acc_var_map_pretty_print(struct stmt_access_var_pair **acc_var_map, int num
  * - ivar_names
  * - idvar_names
  */
-void vsa_var_extract(PlutoProg *prog, VSA *vsa) {
+void vsa_t2s_var_extract(PlutoProg *prog, VSA *vsa) {
   int *num_stmts_per_acc; // indexed by data variables
   int num_read_write_data;
   struct stmt_access_pair ***acc_stmts; // indexed by data variable
@@ -568,7 +568,7 @@ void vsa_var_extract(PlutoProg *prog, VSA *vsa) {
   // update the var_name, var_ref, var_iters by DFS in each CC
   for (int i = 0; i < prog->adg->num_ccs; i++) {
     int cc_id = prog->adg->ccs[i].id;
-    update_var(acc_var_map, adg_var_map, total_accs, cc_id, prog, vsa);
+    update_t2s_var(acc_var_map, adg_var_map, total_accs, cc_id, prog, vsa);
   }
 
   vsa->acc_var_map = acc_var_map;
@@ -1068,7 +1068,7 @@ void pluto_prog_to_vsa(PlutoProg *prog, VSA *vsa) {
   vsa_t2s_iter_extract(prog, vsa);
 
   /* T2S_VARS */
-  vsa_var_extract(prog, vsa);
+  vsa_t2s_var_extract(prog, vsa);
 
   /* ARRAYS */
   vsa_array_extract(prog, vsa);
@@ -1201,6 +1201,12 @@ VSA *vsa_alloc() {
   vsa->array_part_band_width = 0;
   vsa->space_band_width = 0;
   vsa->engine_band_width = NULL;  
+
+  vsa->acc_data_trans_sets = NULL;
+  vsa->num_acc_per_data_trans_sets = NULL;
+  vsa->num_data_trans_sets = 0;
+  vsa->io_map = NULL;
+  vsa->io_map_num_entries = 0;
 
   /* T2S */
   vsa->evar_num = 0;

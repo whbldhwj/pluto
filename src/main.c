@@ -777,14 +777,16 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
       /* T2S_ITERS */
       vsa_t2s_iter_extract(array_prog, psa_vsa);
       /* T2S_VARS */
-      vsa_var_extract(array_prog, psa_vsa);
+      vsa_t2s_var_extract(array_prog, psa_vsa);
       /* ARRAYS */
       vsa_array_extract(array_prog, psa_vsa);
       /* UREs */
       vsa_URE_extract(array_prog, psa_vsa);
       /* T2S_META_ITERS */
       vsa_t2s_meta_iter_extract(array_prog, psa_vsa);
-#endif
+#else
+
+#endif      
 
 //      /* OP_NUM, RES_NUM, OP_DIM, RES_DIM, OP_NAME, RES_NAME */      
 //      vsa_op_res_extract(prog, psa_vsa);
@@ -899,7 +901,10 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
       vsa_t2s_iter_extract(array_prog, psa_vsa);
       /* T2S_IO */
       vsa_t2s_IO_extract(array_prog, psa_vsa);
-#endif
+#else 
+      /* IO */
+      vsa_IO_extract(array_prog, psa_vsa); 
+#endif      
 //      pluto_prog_to_vsa(prog, psa_vsa);
       FILE *vsa_fp = fopen("vsa.json", "w");
       if (vsa_fp) {

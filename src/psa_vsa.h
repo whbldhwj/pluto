@@ -30,7 +30,7 @@ void psa_print_int_list_with_indent(FILE *fp, int indent, int *list, int len);
 void psa_vsa_pretty_print(FILE *fp, const VSA *vsa);
 /* T2S Added */
 void vsa_array_extract(PlutoProg *prog, VSA *vsa);
-void vsa_var_extract(PlutoProg *prog, VSA *vsa);
+void vsa_t2s_var_extract(PlutoProg *prog, VSA *vsa);
 void psa_t2s_codegen(FILE *fp, const VSA *vsa);
 char **t2s_space_time_pprint(VSA *vsa, int *line_num);
 char **get_vsa_array_names(Array **arrays, int array_num);
@@ -39,8 +39,8 @@ char **get_vsa_URE_names(URE **UREs, int URE_num);
 void vsa_URE_extract(PlutoProg *prog, VSA *vsa);
 void vsa_t2s_iter_extract(PlutoProg *prog, VSA *vsa);
 void get_var_iters(int acc_id, struct stmt_access_var_pair **acc_var_map, PlutoProg *prog, VSA *vsa);
-void update_ivar(int acc_id, struct stmt_access_var_pair **acc_var_map, struct var_pair **adg_var_map, int cc_id, PlutoProg *prog, VSA *vsa);
+void update_t2s_ivar(int acc_id, struct stmt_access_var_pair **acc_var_map, struct var_pair **adg_var_map, int cc_id, PlutoProg *prog, VSA *vsa);
 char *get_iter_str(IterExp **iters, int iter_num);
-void update_var(struct stmt_access_var_pair **acc_var_map, struct var_pair **adg_var_map, int total_accs, int cc_id, PlutoProg *prog, VSA *vsa);
+void update_t2s_var(struct stmt_access_var_pair **acc_var_map, struct var_pair **adg_var_map, int total_accs, int cc_id, PlutoProg *prog, VSA *vsa);
 void vsa_t2s_IO_extract(PlutoProg *prog, VSA *vsa);
 #endif

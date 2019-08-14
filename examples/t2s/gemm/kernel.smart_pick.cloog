@@ -1,4 +1,4 @@
-# CLooG script generated automatically by PLUTO 0.11.4-573-gf663872
+# CLooG script generated automatically by PLUTO 0.11.4-576-gd62df42
 # language: C
 c
 
@@ -8,57 +8,41 @@ c
 
 
 # Number of statements
-3
+2
 
-# S1 (C_ext[i][j][0] = (A[i][0] * B[0][j]);)
-5 5
-0 0 0 1 0 
-1 1 0 0 0 
-1 -1 0 0 63 
-1 0 1 0 0 
-1 0 -1 0 63 
+# S1 (C[i][j] = 0;)
+5 4
+1 1 0 0 
+1 -1 0 63 
+1 0 -1 63 
+1 0 1 0 
+0 0 0 0 
 0 0 0
 
-# S2 (C_ext[i][j][k] = (C_ext[i][j][k - 1] + (A[i][k] * B[k][j]));)
+# S2 (C[i][j] += (A[i][k] * B[k][j]);)
 6 5
 1 1 0 0 0 
 1 -1 0 0 63 
 1 0 1 0 0 
 1 0 -1 0 63 
-1 0 0 1 -1 
 1 0 0 -1 63 
-0 0 0
-
-# S3 (C[i][j] = C_ext[i][j][63];)
-5 5
-0 0 0 1 -63 
-1 1 0 0 0 
-1 -1 0 0 63 
-1 0 1 0 0 
-1 0 -1 0 63 
+1 0 0 1 0 
 0 0 0
 
 # we want cloog to set the iterator names
 0
 
 # Number of scattering functions
-3
+2
 
 # T(S1)
-4 9
-0 1 0 0 0 -1 0 0 0 
-0 0 1 0 0 0 -1 0 0 
-0 0 0 1 0 0 0 -1 0 
-0 0 0 0 1 0 0 0 -1 
+4 8
+0 1 0 0 0 -1 0 0 
+0 0 1 0 0 0 -1 0 
+0 0 0 1 0 0 0 0 
+0 0 0 0 1 0 0 0 
 
 # T(S2)
-4 9
-0 1 0 0 0 -1 0 0 0 
-0 0 1 0 0 0 -1 0 0 
-0 0 0 1 0 0 0 -1 0 
-0 0 0 0 1 0 0 0 0 
-
-# T(S3)
 4 9
 0 1 0 0 0 -1 0 0 0 
 0 0 1 0 0 0 -1 0 0 
