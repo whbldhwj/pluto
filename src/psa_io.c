@@ -176,7 +176,6 @@ void vsa_IO_extract(PlutoProg *prog, VSA *vsa) {
  * All the access functions in the same tranasfer set share one common set of data transfer modules (including FIFOs)
  * The access functions are grouped into one set if:
  * - They share the same array name
- * - They share the same trans bound
  * - They share the same trans direction
  */
 int **get_acc_data_trans_sets(struct stmt_access_io_pair **acc_io_map, int num_accs, int *num_sets, int **num_acc_per_set) {
@@ -227,19 +226,11 @@ int **get_acc_data_trans_sets(struct stmt_access_io_pair **acc_io_map, int num_a
  * This function examines if two accesses belong to the same transfer_set
  * The criteria are:
  * - The same array name
- * - The same trans bound
  * - The same trans direction
  */
 bool is_in_same_acc_trans_set(struct stmt_access_io_pair **acc_io_map, const PlutoAccess *acc1, const PlutoAccess *acc2) {
   /* Array name */
   if (strcmp(acc1->name, acc2->name)) 
-    return 0;
-  /* Trans bound */
-  if (acc_io_map[acc1->sym_id]->L1_trans_bound != acc_io_map[acc2->sym_id]->L1_trans_bound)
-    return 0;
-  if (acc_io_map[acc1->sym_id]->L2_trans_bound != acc_io_map[acc2->sym_id]->L2_trans_bound)
-    return 0;
-  if (acc_io_map[acc1->sym_id]->L3_trans_bound != acc_io_map[acc2->sym_id]->L3_trans_bound)
     return 0;
   /* Trans direction */
   if (!is_vec_equal(acc_io_map[acc1->sym_id]->L1_trans_dir, acc_io_map[acc2->sym_id]->L1_trans_dir))

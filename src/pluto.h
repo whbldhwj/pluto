@@ -790,6 +790,9 @@ struct psaVSA {
   /* ARRAY_SIZE */
   int *array_sizes;
 
+  /* ARRAY_DIM */
+  int array_dim;
+
   /* DFC_HEAD_BUF_SIZE */
   int *dfc_head_buf_sizes;
 

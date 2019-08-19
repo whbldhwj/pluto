@@ -19,7 +19,50 @@
 #include "isl/space.h"
 #include "isl/val_gmp.h"
 
+/* Jie Added - Start */
+/* This function calculates a fixed hull for the constraints.
+ * If the input dim is zero, the pluto constraints a simple isl_set, and will need to be extended
+ * to a isl_map.
+ */
+isl_fixed_box *pluto_constraints_box_hull_isl(PlutoConstraints *cst, int nin, int nout, int npar) {
+  isl_ctx *ctx = isl_ctx_alloc();
+  if (nin == 0) {
+    /* Add input dimensions into the pluto_constraints */
+    pluto_constraints_add_dim(cst, nout, NULL);
+    pluto_constraints_add_equality(cst);
+    cst->val[cst->nrows - 1][nout] = 1;
+    nin = 1;
+  }
 
+//  pluto_constraints_pretty_print(stdout, cst);
+
+  isl_basic_map *bmap = isl_basic_map_from_pluto_constraints(ctx, cst, nin, nout, npar);
+  isl_map *map = isl_map_from_basic_map(bmap);
+
+//  isl_printer *printer = isl_printer_to_file(ctx, stdout);
+//  isl_printer_print_map(printer, map);
+//  printf("\n");
+
+  isl_fixed_box *box = isl_map_get_range_simple_fixed_box_hull(map);
+
+//  isl_printer_print_multi_aff(printer, isl_fixed_box_get_offset(box));
+//  printf("\n");
+//  isl_printer_print_multi_val(printer, isl_fixed_box_get_size(box));
+//  printf("\n");
+
+//  isl_basic_map_free(bmap);
+  isl_map_free(map);
+
+//  isl_printer_print_multi_aff(printer, isl_fixed_box_get_offset(box));
+//  printf("\n");
+//  isl_printer_print_multi_val(printer, isl_fixed_box_get_size(box));
+//  printf("\n");
+
+//  isl_printer_free(printer);
+
+  return box;
+}
+/* Jie Added - End */
 
 /* start: 0-indexed */
 void pluto_constraints_project_out_isl(PlutoConstraints *cst, int start,
@@ -246,7 +289,31 @@ isl_basic_map_from_pluto_constraints(isl_ctx *ctx, const PlutoConstraints *cst,
   bmap = isl_basic_map_from_constraint_matrices(space, eq, ineq, isl_dim_out,
                                                 isl_dim_in, isl_dim_div,
                                                 isl_dim_param, isl_dim_cst);
+
+//  isl_mat_free(eq);
+//  isl_mat_free(ineq);
+//  isl_space_free(space);
+
   return bmap;
+}
+
+/*
+ * Construct a non-parametric map from the constraints in cst
+ */
+__isl_give isl_map *isl_map_from_pluto_constraints(const PlutoConstraints *cst, 
+                                                   isl_ctx *ctx, int n_in, int n_out, int n_par) {
+  isl_map *map;
+
+  isl_space *dim = isl_space_alloc(ctx, n_par, n_in, n_out);
+  map = isl_map_empty(dim);
+
+  while (cst != NULL) {
+    isl_basic_map *bmap = isl_basic_map_from_pluto_constraints(ctx, cst, n_in, n_out, n_par);
+    map = isl_map_union(map, isl_map_from_basic_map(bmap));
+    cst = cst->next;
+  }
+
+  return map;
 }
 
 /*

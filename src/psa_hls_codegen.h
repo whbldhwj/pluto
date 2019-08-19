@@ -9,7 +9,12 @@
 #include "pluto.h"
 #include "assert.h"
 
-void psa_intel_codegen(FILE *fp, const VSA *vsa);
-void psa_xilinx_codegen(FILE *fp, const VSA *vsa);
+void psa_intel_codegen(PlutoProg *prog, VSA *vsa, char *src_file_name);
+void psa_xilinx_codegen(PlutoProg *prog, VSA *vsa, char *src_file_name);
+
+void psa_data_trans_codegen(PlutoProg *prog, VSA *vsa, char *src_file_name, int target);
+void psa_top_kernel_codegen(PlutoProg *prog, VSA *vsa, char *src_file_name, int target);
+void psa_PE_codegen(PlutoProg *prog, VSA *vsa, char *src_file_name, int target);
+void psa_header_codegen(PlutoProg *prog, VSA *vsa, char *src_file_name, int target);
 
 #endif

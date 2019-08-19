@@ -24,7 +24,13 @@
 #include <glpk.h>
 #endif
 
+#include "isl/aff.h"
+#include "isl/ctx.h"
+#include "isl/map.h"
 #include "isl/set.h"
+#include "isl/space.h"
+#include "isl/val_gmp.h"
+
 #include "math_support.h"
 
 #define int64 long long int
@@ -141,6 +147,7 @@ void pluto_constraints_project_out_isl_single(PlutoConstraints **cst, int start,
 /* Jie Added - Start */                                              
 PlutoConstraints *pluto_constraints_difference_isl(const PlutoConstraints *cst1,
                                                    const PlutoConstraints *cst2);
+isl_fixed_box *pluto_constraints_box_hull_isl(PlutoConstraints *cst, int nin, int nout, int npar);
 /* Jie Added - End */                                                   
 
 int pluto_constraints_num_in_list(const PlutoConstraints *const cst);
@@ -193,6 +200,10 @@ __isl_give isl_set *isl_set_from_pluto_constraints(const PlutoConstraints *cst,
 PlutoConstraints *isl_set_to_pluto_constraints(__isl_keep isl_set *set);
 __isl_give isl_basic_set *
 isl_basic_set_from_pluto_constraints(isl_ctx *ctx, const PlutoConstraints *cst);
+/* Jie Added - Start */
+__isl_give isl_map *isl_map_from_pluto_constraints(const PlutoConstraints *cst,
+    isl_ctx *ctx, int n_in, int n_out, int n_par);
+/* Jie Added - End */
 PlutoConstraints *
 isl_basic_set_to_pluto_constraints(__isl_keep isl_basic_set *bset);
 PlutoConstraints *

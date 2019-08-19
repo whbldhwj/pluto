@@ -903,7 +903,9 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
       vsa_t2s_IO_extract(array_prog, psa_vsa);
 #else 
       /* IO */
-      vsa_IO_extract(array_prog, psa_vsa); 
+      vsa_IO_extract(array_prog, psa_vsa);
+      /* ARRAY_SHAPE */
+      vsa_array_shape_extract(array_prog, psa_vsa);
 #endif      
 //      pluto_prog_to_vsa(prog, psa_vsa);
       FILE *vsa_fp = fopen("vsa.json", "w");
@@ -961,31 +963,7 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
 #ifdef INTEL_CODEGEN
       fprintf(stdout, "[PSA] ***********************\n");
       fprintf(stdout, "[PSA] Generate Intel OpenCL inputs.\n");
-      /* Get basenames */
-      char *basec, *bname;
-      basec = strdup(srcFileName);
-      bname = basename(basec);
-
-      char *dumpFileName;
-      dumpFileName = malloc(strlen(bname) - 2 + strlen(".") + strlen("intel_opencl") + strlen(".cl") + 1);
-      strncpy(dumpFileName, bname, strlen(bname) - 2);
-      dumpFileName[strlen(bname) - 2] = '\0';
-      strcat(dumpFileName, ".");
-      strcat(dumpFileName, "intel_opencl");
-      strcat(dumpFileName, ".c");
-
-      FILE *intel_fp = fopen(dumpFileName, "w");
-      if (intel_fp) {
-        psa_intel_codegen(intel_fp, psa_vsa);
-      } else {
-        fprintf(stdout, "[PSA] ERROR! File %s can't be opened!\n", "intel_opencl.cl");
-        return 1;
-      }
-      fclose(intel_fp);
-      /* Free Memory */
-      free(basec);
-      free(dumpFileName);
-      /* Free Memory */
+      psa_intel_codegen(array_prog, psa_vsa, srcFileName);
 #endif
 
 /*
@@ -997,31 +975,7 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
 #ifdef XILINX_CODEGEN
       fprintf(stdout, "[PSA] ***********************\n");
       fpritnf(stdout, "[PSA] Generate Xilinx HLS inputs.\n");
-      /* Get basenames */
-      char *basec, *bname;
-      basec = strdup(srcFileName);
-      bname = basename(basec);
-
-      char *dumpFileName;
-      dumpFileName = malloc(strlen(bname) - 2 + strlen(".") + strlen("xilinx_hls") + strlen(".c") + 1);
-      strncpy(dumpFileName, bname, strlen(bname) - 2);
-      dumpFileName[strlen(bname) - 2] = '\0';
-      strcat(dumpFileName, ".");
-      strcat(dumpFileName, "xilinx_hls");
-      strcat(dumpFileName, ".c");
-
-      FILE *xilinx_fp = fopen(dumpFileName, "w");
-      if (xilinx_fp) {
-        psa_xlinx_codegen(xilinx_fp, psa_vsa);
-      } else {
-        fprintf(stdout, "[PSA] ERROR! File %s can't be opened!\n", "xilinx_hls.c");
-        return 1;
-      }
-      fclose(xilinx_fp);
-      /* Free Memory */
-      free(basec);
-      free(dumpFileName);
-      /* Free Memory */
+      psa_xlinx_codegen(array_prog, psa_vsa, srcFileName);
 #endif
 
       /* Jie Added - End */

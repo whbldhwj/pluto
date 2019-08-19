@@ -1,0 +1,2 @@
+#define SYS_ARRAY_NUM_ROWS 64
+$define SYS_ARRAY_NUM_COLS 64

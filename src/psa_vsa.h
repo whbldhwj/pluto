@@ -20,6 +20,7 @@ void vsa_engine_num_extract(PlutoProg *prog, VSA *vsa);
 void vsa_type_extract(PlutoProg *prog, VSA *vsa);        
 void vsa_band_width_extract(PlutoProg *prog, VSA *vsa);
 void vsa_iter_extract(PlutoProg *prog, VSA *vsa);
+void vsa_array_shape_extract(PlutoProg *prog, VSA *vsa);
 void pluto_prog_to_vsa(PlutoProg *prog, VSA *vsa);
 VSA *vsa_alloc();
 void vsa_free(VSA *vsa);

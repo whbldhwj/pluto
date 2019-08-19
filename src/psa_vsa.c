@@ -992,6 +992,64 @@ void vsa_type_extract(PlutoProg *prog, VSA *vsa) {
   }  
 }
 
+/*
+ * Extract the number of rows and cols of the systolic array
+ * For each statement, project out all other hyperplanes except the space hyperplanes
+ * Union all of the iteration domains
+ * Comptue the rectangualar hull of such domain
+ * Then obtain the height and width of the domain as array_nrows and array_ncols
+ */ 
+void vsa_array_shape_extract(PlutoProg *prog, VSA *vsa) {
+  PlutoConstraints *space_domain = NULL;
+  for (int i = 0; i < prog->nstmts; i++) {
+    Stmt *stmt = prog->stmts[i];    
+    PlutoConstraints *new_stmt_domain = pluto_get_new_domain(stmt);
+    // Project out all hyperplanes except the space loops
+    int array_part_band_width = vsa->array_part_band_width;
+    int space_band_width = vsa->space_band_width;
+    pluto_constraints_project_out_isl_single(&new_stmt_domain, 0, array_part_band_width);
+    pluto_constraints_project_out_isl_single(&new_stmt_domain, space_band_width, stmt->trans->nrows - array_part_band_width - space_band_width);
+    if (i == 0) {
+      space_domain = pluto_constraints_dup(new_stmt_domain);
+    } else {
+      pluto_constraints_unionize(space_domain, new_stmt_domain);    
+    }
+    pluto_constraints_free(new_stmt_domain);
+  }
+
+//  pluto_constraints_pretty_print(stdout, space_domain);
+
+  // compute the rectangular hull
+  isl_fixed_box *box = pluto_constraints_box_hull_isl(space_domain, 0, space_domain->ncols - prog->npar - 1, prog->npar);
+  isl_ctx *ctx = isl_fixed_box_get_ctx(box);
+
+  if (isl_fixed_box_is_valid(box)) {
+    isl_multi_val *array_sizes = isl_fixed_box_get_size(box);
+    int array_dim = isl_multi_val_dim(array_sizes, isl_dim_set);
+    vsa->array_dim = array_dim;
+    vsa->array_sizes = (int *)malloc(sizeof(int) * array_dim);
+    for (int i = 0; i < array_dim; i++) {
+      isl_val *val = isl_multi_val_get_val(array_sizes, i);
+      vsa->array_sizes[i] = isl_val_get_num_si(val);
+      isl_val_free(val);
+    }
+    isl_multi_val_free(array_sizes);
+  }
+
+  if (vsa->array_dim == 1) {
+    vsa->sa_rows = 1;
+    vsa->sa_cols = vsa->array_sizes[0];
+  } else {
+    vsa->sa_rows = vsa->array_sizes[0];
+    vsa->sa_cols = vsa->array_sizes[1];
+  }
+
+  isl_fixed_box_free(box);
+  isl_ctx_free(ctx);
+
+  pluto_constraints_free(space_domain);
+}
+
 /* 
  * Extract necessary information from PlutoProg to complete the fields of VSA.
  */
@@ -1168,6 +1226,7 @@ VSA *vsa_alloc() {
   vsa->dc_collect_counter_code = NULL;
   vsa->dc_collect_addr_cal_code = NULL;
   vsa->array_sizes = NULL;
+  vsa->array_dim = 0;
   vsa->dfc_head_buf_sizes = NULL;
   vsa->op_names = NULL;
   vsa->res_names = NULL;
