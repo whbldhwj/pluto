@@ -127,11 +127,15 @@ int pluto_prog_get_largest_const_in_domains(const PlutoProg *prog);
 static __isl_give isl_space *set_names(__isl_take isl_space *space,
                                        enum isl_dim_type type, char **names);
 /* Jie Added - Start */
-Stmt *psa_create_helper_stmt(const Stmt *anchor_stmt, unsigned level, const char *text,
-                             PlutoStmtType type, PSAStmtType psa_type, int ploop_num);
-Stmt *psa_create_helper_stmt_raw(
+//Stmt *psa_create_helper_stmt(const Stmt *anchor_stmt, unsigned level, const char *text,
+//                             PlutoStmtType type, PSAStmtType psa_type, int ploop_num);
+Stmt *psa_create_helper_stmt_with_anchor(const Stmt *anchor_stmt, unsigned level, const char *text,
+                             PlutoStmtType type, PSAStmtType psa_type);                           
+Stmt *psa_create_helper_stmt_with_anchor_raw(
   unsigned level, PlutoConstraints *domain,
-  const char *text, PlutoStmtType type, PSAStmtType psa_type,
-  int ploop_num);                             
+  const char *text, PlutoStmtType type, PSAStmtType psa_type);                             
+Stmt *psa_create_helper_stmt(
+    int level, PlutoConstraints *domain, char *text, 
+    PlutoStmtType type, PSAStmtType psa_type);
 /* Jie Added - End */
 #endif

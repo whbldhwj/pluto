@@ -8,6 +8,7 @@
 
 #include "pluto.h"
 #include "assert.h"
+#include "psa_hls_codegen_helpers.h"
 
 void psa_intel_codegen(PlutoProg *prog, VSA *vsa, char *src_file_name);
 void psa_xilinx_codegen(PlutoProg *prog, VSA *vsa, char *src_file_name);

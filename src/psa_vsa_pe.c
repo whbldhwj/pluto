@@ -320,8 +320,7 @@ Stmt **psa_gen_compute_code(
     // create the statement
     Stmt *op_transfer_stmt = psa_create_helper_stmt(
           anchor_stmt, copy_level, stmt_text,
-          STMT_UNKNOWN, PSA_PE_OP_TRANSFER, loop_num
-          );
+          STMT_UNKNOWN, PSA_STMT_UNKNOWN);
 
     pluto_constraints_intersect(op_transfer_stmt->domain, read_in);
 
@@ -402,8 +401,7 @@ Stmt **psa_gen_compute_code(
     // create the statement
     Stmt *res_transfer_stmt = psa_create_helper_stmt(
           anchor_stmt, copy_level, stmt_text,
-          STMT_UNKNOWN, PSA_PE_RES_TRANSFER, loop_num
-          );    
+          STMT_UNKNOWN, PSA_STMT_UNKNOWN);    
 
     pluto_constraints_intersect(res_transfer_stmt->domain, write_out);
 

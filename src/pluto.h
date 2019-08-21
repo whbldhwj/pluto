@@ -167,6 +167,12 @@ typedef enum psahyptype {
 #define IS_PSA_FAILURE(ret) (ret == PSA_FAILURE)
 /* Jie Added - End */
 
+/* Jie Added - Start */
+/* CodeGen Platform */
+#define INTEL_TARGET 0
+#define XILINX_TARGET 1
+/* Jie Added - End */
+
 typedef enum looptype {
   UNKNOWN = 0,
   PARALLEL,
@@ -201,16 +207,12 @@ typedef enum stmttype {
 
 typedef enum psastmttype {
   PSA_ORIG = 0,
-  PSA_PE_OP_TRANSFER,
-  PSA_PE_RES_TRANSFER,
-  PSA_DF_LOADER_READ,
-  PSA_DF_LOADER_FEED,
-  PSA_DC_LOADER_WRITE,
-  PSA_DC_LOADER_COLLECT,
-  PSA_DF_ENGINE_READ,
-  PSA_DF_ENGINE_FEED,
-  PSA_DC_ENGINE_WRITE,
-  PSA_DC_ENGINE_COLLECT,
+  PSA_L1_TRANS_IN,
+  PSA_L1_TRANS_OUT,
+  PSA_L2_TRANS_IN,
+  PSA_L2_TRANS_OUT,
+  PSA_L3_TRANS_IN,
+  PSA_L3_TRANS_OUT,
   PSA_STMT_UNKNOWN
 } PSAStmtType;
 
@@ -307,6 +309,8 @@ struct statement {
 
   PlutoStmtType type;
 
+  PSAStmtType psa_type;
+
   /* ID of the domain parallel loop that the statement belongs to */
   int ploop_id;
 
@@ -356,6 +360,7 @@ struct stmt_access_var_pair {
 typedef enum transbound {
   IN_BOUND,
   OUT_BOUND,
+  NO_BOUND,
   UNKNOWN_BOUND
 } TransBound;
 
@@ -565,8 +570,9 @@ struct stmt_access_io_pair {
   Vec *L2_trans_dir;
   TransBound L3_trans_bound;
   TransType L3_trans_type;
-  Vec *L3_trans_dir;
+  Vec *L3_trans_dir;  
   int trans_set;
+  PlutoConstraints *domain;
 };
 
 typedef enum unrollType {
@@ -1143,7 +1149,10 @@ PlutoConstraints *pluto_compute_region_data(const Stmt *stmt,
                                             const PlutoProg *prog);
 
 int generate_declarations(const PlutoProg *prog, FILE *outfp);
+/* Jie Added - Start */
 int psa_generate_declarations(const PlutoProg *prog, FILE *outfp);
+void gen_stmt_macro(const Stmt *stmt, FILE *outfp);
+/* Jie Added - End */
 int pluto_gen_cloog_code(const PlutoProg *prog, int cloogf, int cloogl,
                          FILE *cloogfp, FILE *outfp);
 /* Jie Added - Start */
@@ -1158,6 +1167,14 @@ Stmt *pluto_create_stmt(int dim, const PlutoConstraints *domain,
 PlutoConstraints *compute_flow_in_of_dep(Dep *dep, int copy_level,
                                          PlutoProg *prog,
                                          int use_src_unique_dpolytope);
+/* Jie Added - Start */
+PlutoConstraints *psa_compute_flow_in(Stmt *stmt, PlutoAccess *acc, Dep *dep,
+    int copy_level, PlutoProg *prog);
+PlutoConstraints *psa_compute_flow_out(Stmt *stmt, PlutoAccess *acc, Dep *dep,
+    int copy_level, PlutoProg *prog);
+PlutoConstraints *psa_compute_write_out(Stmt *stmt, PlutoAccess *acc, Dep *dep,
+    int copy_level, PlutoProg *prog);
+/* Jie Added - End */
 PlutoConstraints *compute_flow_in(struct stmt_access_pair *wacc_stmt,
                                   int copy_level, PlutoProg *prog);
 PlutoConstraints *compute_flow_out_of_dep(Dep *dep, int src_copy_level,

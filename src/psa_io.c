@@ -67,6 +67,9 @@ void vsa_IO_extract(PlutoProg *prog, VSA *vsa) {
               io_map[io_map_num_entries - 1]->L3_trans_type = SEPARATE;
               io_map[io_map_num_entries - 1]->L3_trans_dir = get_L3_trans_dir(prog, dep, vsa, io_map[io_map_num_entries - 1]);
             }
+
+            // the domain is the same as the statement domain 
+            io_map[io_map_num_entries - 1]->domain = pluto_get_new_domain(stmt);
           }
         }
         /* RAW */
@@ -90,6 +93,11 @@ void vsa_IO_extract(PlutoProg *prog, VSA *vsa) {
               io_map[io_map_num_entries - 1]->L3_trans_bound = OUT_BOUND;
               io_map[io_map_num_entries - 1]->L3_trans_type = SEPARATE;
               io_map[io_map_num_entries - 1]->L3_trans_dir = get_L3_trans_dir(prog, dep, vsa, io_map[io_map_num_entries - 1]);
+
+              // compute the flow-out set + write-out set      
+              // Flow-out set: (array_part + space) not equal src iter
+              // Write-out set: waccc iter - WAW src iter
+              io_map[io_map_num_entries - 1]->domain = NULL; 
             } else if (is_dep_carried_at_time_band(prog, dep)) {
               io_map[io_map_num_entries - 1]->L1_trans_bound = OUT_BOUND;
               io_map[io_map_num_entries - 1]->L1_trans_type = SEPARATE;
@@ -100,6 +108,9 @@ void vsa_IO_extract(PlutoProg *prog, VSA *vsa) {
               io_map[io_map_num_entries - 1]->L3_trans_bound = OUT_BOUND;
               io_map[io_map_num_entries - 1]->L3_trans_type = SEPARATE;
               io_map[io_map_num_entries - 1]->L3_trans_dir = get_L3_trans_dir(prog, dep, vsa, io_map[io_map_num_entries - 1]);
+
+              // compute the flow-out set + write-out set 
+              io_map[io_map_num_entries - 1]->domain = NULL;
             }
           } else if (dep->dest_acc == acc){
             /* Read access */
@@ -121,10 +132,17 @@ void vsa_IO_extract(PlutoProg *prog, VSA *vsa) {
                 io_map[io_map_num_entries - 1]->L3_trans_bound = IN_BOUND;
                 io_map[io_map_num_entries - 1]->L3_trans_type = SEPARATE;
                 io_map[io_map_num_entries - 1]->L3_trans_dir = get_L3_trans_dir(prog, dep, vsa, io_map[io_map_num_entries - 1]);
+
               }
+              
+              // compute the flow-in set
+              // Flow-in set: (array part + space) not equal dest iter
+              int copy_level = vsa->array_part_band_width + vsa->space_band_width;
+              //io_map[io_map_num_entries - 1]->domain = compute_flow_in_of_dep(dep, copy_level, prog);
+              io_map[io_map_num_entries - 1]->domain = NULL;
             } else if (is_dep_carried_at_time_band(prog, dep)) {
-              io_map[io_map_num_entries - 1]->L1_trans_bound = UNKNOWN_BOUND;
-              io_map[io_map_num_entries - 1]->L1_trans_type = UNKNOWN_TYPE;
+              io_map[io_map_num_entries - 1]->L1_trans_bound = NO_BOUND;
+              io_map[io_map_num_entries - 1]->L1_trans_type = EMBEDDED;
               io_map[io_map_num_entries - 1]->L1_trans_dir = NULL;
               io_map[io_map_num_entries - 1]->L2_trans_bound = UNKNOWN_BOUND;
               io_map[io_map_num_entries - 1]->L2_trans_type = UNKNOWN_TYPE;
@@ -144,6 +162,10 @@ void vsa_IO_extract(PlutoProg *prog, VSA *vsa) {
                 io_map[io_map_num_entries - 1]->L3_trans_type = SEPARATE;
                 io_map[io_map_num_entries - 1]->L3_trans_dir = get_L3_trans_dir(prog, dep, vsa, io_map[io_map_num_entries - 1]);
               }
+
+              // compute the flow-in set
+              // Flow-in set: (array part + space) not equal dest iter
+              io_map[io_map_num_entries - 1]->domain = NULL;
             }
           }
         }
@@ -258,7 +280,7 @@ bool is_dep_carried_at_space_band(PlutoProg *prog, Dep *dep) {
 
 /* Examine if the dependece is carried by time loops */
 bool is_dep_carried_at_time_band(PlutoProg *prog, Dep *dep) {
-  return (!is_dep_carried_at_space_band(prog, dep) && !is_dep_carried_at_array_part_band(prog, dep));
+  return !is_dep_carried_at_space_band(prog, dep);
 }
 
 /* Examine if the dependence is carried by array partitioning loops */
@@ -374,6 +396,9 @@ char *get_trans_bound_str(TransBound bound) {
       break;
     case OUT_BOUND:
       return "OUT_BOUND";
+      break;
+    case NO_BOUND:
+      return "NO_BOUND";
       break;
     case UNKNOWN_BOUND:
       return "UNKNOWN_BOUND";

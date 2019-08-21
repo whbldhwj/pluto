@@ -133,7 +133,7 @@ void pluto_gen_cloog_file(FILE *fp, const PlutoProg *prog) {
   }
 }
 
-static void gen_stmt_macro(const Stmt *stmt, FILE *outfp) {
+void gen_stmt_macro(const Stmt *stmt, FILE *outfp) {
   int j;
 
   for (j = 0; j < stmt->dim; j++) {

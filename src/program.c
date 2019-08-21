@@ -3297,43 +3297,50 @@ void pluto_prog_add_hyperplane(PlutoProg *prog, int pos,
   prog->hProps[pos].psa_type = psa_hyp_type;
 }
 
-Stmt *psa_create_helper_stmt_raw(
-  unsigned level, PlutoConstraints *domain,
-  const char *text, PlutoStmtType type, PSAStmtType psa_type,
-  int ploop_num) {
+/*
+ * This function creates a stmt with the original domain
+ */
+//Stmt *psa_create_helper_stmt_with_anchor_raw(
+//  unsigned level, PlutoConstraints *domain,
+//  const char *text, PlutoStmtType type, PSAStmtType psa_type) {
+//
+//  int npar;
+//  PlutoMatrix *newtrans = pluto_matrix_alloc(level, domain->ncols);
+//  
+//  char **iterators = (char **)malloc(sizeof(char *) * level);
+//  for (unsigned i = 0; i < level; i++) {
+//    char *tmpstr = (char *)malloc(5) ;
+//    sprintf(tmpstr, "d%d", i + 1);
+//    iterators[i] = tmpstr;
+//  }
+//
+//  /* Create new stmt */
+//  Stmt *newstmt =
+//    pluto_create_stmt(level, domain, newtrans, iterators, text, type);
+//
+////  newstmt->ploop_id = ploop_num;
+//
+//  pluto_matrix_set(newstmt->trans, 0);
+//  for (unsigned i = 0; i < newstmt->trans->nrows; i++) {
+//    newstmt->trans->val[i][i] = 1;
+//  }
+//
+//  for (unsigned i = 0; i < level; i++) {
+//    free(iterators[i]);
+//  }
+//  free(iterators);
+//  pluto_matrix_free(newtrans);
+//
+//  return newstmt;
+//}
 
-  int npar;
-  PlutoMatrix *newtrans = pluto_matrix_alloc(level, domain->ncols);
-  
-  char **iterators = (char **)malloc(sizeof(char *) * level);
-  for (unsigned i = 0; i < level; i++) {
-    char *tmpstr = (char *)malloc(5) ;
-    sprintf(tmpstr, "d%d", i + 1);
-    iterators[i] = tmpstr;
-  }
-
-  /* Create new stmt */
-  Stmt *newstmt =
-    pluto_create_stmt(level, domain, newtrans, iterators, text, type);
-
-  newstmt->ploop_id = ploop_num;
-
-  pluto_matrix_set(newstmt->trans, 0);
-  for (unsigned i = 0; i < newstmt->trans->nrows; i++) {
-    newstmt->trans->val[i][i] = 1;
-  }
-
-  for (unsigned i = 0; i < level; i++) {
-    free(iterators[i]);
-  }
-  free(iterators);
-  pluto_matrix_free(newtrans);
-
-  return newstmt;
-}
-
-Stmt *psa_create_helper_stmt(const Stmt *anchor_stmt, unsigned level, const char *text,
-                             PlutoStmtType type, PSAStmtType psa_type, int ploop_num) {
+/*
+ * This function creates a stmt with a transformed domain 
+ */
+//Stmt *psa_create_helper_stmt(const Stmt *anchor_stmt, unsigned level, const char *text,
+//                             PlutoStmtType type, PSAStmtType psa_type, int ploop_num) {
+Stmt *psa_create_helper_stmt_with_anchor(const Stmt *anchor_stmt, unsigned level, const char *text,
+                             PlutoStmtType type, PSAStmtType psa_type) {
   int npar;
 
   assert(level <= anchor_stmt->trans->nrows);
@@ -3359,7 +3366,7 @@ Stmt *psa_create_helper_stmt(const Stmt *anchor_stmt, unsigned level, const char
   Stmt *newstmt =
       pluto_create_stmt(level, newdom, newtrans, iterators, text, type);
 
-  newstmt->ploop_id = ploop_num;
+//  newstmt->ploop_id = ploop_num;
 
   pluto_matrix_set(newstmt->trans, 0);
   for (unsigned i = 0; i < newstmt->trans->nrows; i++) {
@@ -3376,6 +3383,33 @@ Stmt *psa_create_helper_stmt(const Stmt *anchor_stmt, unsigned level, const char
   assert(newstmt->dim + npar + 1 == newstmt->domain->ncols);
 
   return newstmt;  
+}
+
+/* Create a new stmt using the post-transform domain */
+Stmt *psa_create_helper_stmt(int level, PlutoConstraints *domain, char *text, 
+    PlutoStmtType type, PSAStmtType psa_type) {
+  PlutoMatrix *trans = pluto_matrix_alloc(level, domain->ncols);
+  pluto_matrix_set(trans, 0);
+  for (int h = 0; h < level; h++) {
+    trans->val[h][h] = 1;
+  }
+  char **iterators = (char *)malloc(sizeof(char *) * level);
+  for (int i = 0; i < level; i++) {
+    char iter_str[20];
+    sprintf(iter_str, "d%d", i + 1);
+    iterators[i] = strdup(iter_str);
+  }
+
+  Stmt *new_stmt = pluto_create_stmt(level, domain, trans, iterators, text, type);
+  new_stmt->psa_type = psa_type;
+
+  pluto_matrix_free(trans);
+  for (int i = 0; i < level; i++) {
+    free(iterators[i]);
+  }
+  free(iterators);
+
+  return new_stmt;
 }
 
 /*
@@ -3598,6 +3632,7 @@ Stmt *pluto_stmt_alloc(int dim, const PlutoConstraints *domain,
   stmt->last_tile_dim = -1;
 
   stmt->type = STMT_UNKNOWN;
+  stmt->psa_type = PSA_STMT_UNKNOWN;
   stmt->ploop_id = -1;
 
   if (dim >= 1) {
@@ -4368,7 +4403,7 @@ void pluto_separate_stmts(PlutoProg *prog, Stmt **stmts, int num, int level,
     pluto_stmt_add_hyperplane(prog->stmts[i], H_SCALAR, PSA_H_SCALAR, level);
   }
   for (k = 0; k < num; k++) {
-    stmts[k]->trans->val[level][stmts[k]->trans->ncols - 1] = offset + 1 + k;
+    stmts[k]->trans->val[level][stmts[k]->trans->ncols - 1] = offset + k;
   }
 
   pluto_prog_add_hyperplane(prog, level, H_SCALAR, PSA_H_SCALAR);

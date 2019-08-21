@@ -256,7 +256,9 @@ char *create_new_acc_ref_str(Stmt *stmt, PlutoAccess *acc, PlutoProg *prog, VSA 
         acc_str = concat(acc_str, exp);
       }
     }
-  }   
+  }  
+
+  free(divs);
 
   return acc_str;
 }

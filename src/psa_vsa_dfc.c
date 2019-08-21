@@ -500,10 +500,10 @@ Stmt **psa_gen_dfc_write_out_code(
   //   loader_buf_size, dc_loader_write_stmt_text, dc_loader_write_module_name
   // );  
 
-  Stmt *loader_write_stmt = psa_create_helper_stmt_raw(
+  Stmt *loader_write_stmt = psa_create_helper_stmt(
     dfc_loader_level + acc_nrows, write_out_loader,
     dc_loader_write_stmt_text,
-    STMT_UNKNOWN, PSA_DC_LOADER_WRITE, loop_num);
+    STMT_UNKNOWN, PSA_STMT_UNKNOWN);
 
 // #ifdef JIE_DEBUG
 //   fprintf(stdout, "[Debug] Bounding box: %s\n", loader_lw_buf_size);
@@ -545,11 +545,10 @@ Stmt **psa_gen_dfc_write_out_code(
   dc_loader_collect_stmt_text = concat(dc_loader_collect_stmt_text, fifo_name);
   dc_loader_collect_stmt_text = concat(dc_loader_collect_stmt_text, ".read()");  
 
-  Stmt *loader_collect_stmt = psa_create_helper_stmt_raw(
+  Stmt *loader_collect_stmt = psa_create_helper_stmt(
     dfc_engine_level + acc_nrows, write_out_loader_collect,
     dc_loader_collect_stmt_text,
-    STMT_UNKNOWN, PSA_DC_LOADER_COLLECT, loop_num
-    );
+    STMT_UNKNOWN, PSA_STMT_UNKNOWN);
 
   // generate_scanner_code(
   //   vsa, prog,
@@ -988,10 +987,10 @@ Stmt **psa_gen_dfc_read_in_code(
   //   df_loader_read_module_name
   // );
 
-  Stmt *loader_read_stmt = psa_create_helper_stmt_raw(
+  Stmt *loader_read_stmt = psa_create_helper_stmt(
       dfc_loader_level + acc_nrows, read_in_loader,
       df_loader_read_stmt_text, 
-      STMT_UNKNOWN, PSA_DF_LOADER_READ, loop_num);
+      STMT_UNKNOWN, PSA_STMT_UNKNOWN);
 
   // Stmt *loader_read_stmt = psa_create_helper_stmt(
   //   anchor_stmt, dfc_loader_level, df_loader_read_stmt_text,
@@ -1034,11 +1033,10 @@ Stmt **psa_gen_dfc_read_in_code(
   //   df_loader_feed_stmt_text,
   //   df_loader_feed_module_name
   // );
-  Stmt *loader_feed_stmt = psa_create_helper_stmt_raw(
+  Stmt *loader_feed_stmt = psa_create_helper_stmt(
       dfc_engine_level + acc_nrows, read_in_loader_feed,
       df_loader_feed_stmt_text, 
-      STMT_UNKNOWN, PSA_DF_LOADER_FEED, loop_num
-      );      
+      STMT_UNKNOWN, PSA_STMT_UNKNOWN);      
 
   // create the program 
   char *df_loader_module_name = "df_loader";

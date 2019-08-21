@@ -35,6 +35,10 @@
 // perform space-time remapping
 #define SPACE_TIME_MAPPING
 
+// sync or async
+//#define SYNC_ARRAY
+#define ASYNC_ARRAY
+
 // upper bound of permissible systolic array dimension
 #define SA_DIM_UB 2
 
