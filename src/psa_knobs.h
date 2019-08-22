@@ -6,15 +6,6 @@
 #ifndef _PSA_KNOB_H
 #define _PSA_KNOB_H
 
-#include "pluto.h"
-#include "constraints.h"
-
-#include "clan/clan.h"
-#include "candl/candl.h"
-
-#include "pet.h"
-#include "osl/scop.h"
-
 /*
  * *****************************
  * Stage: Array Generation
@@ -95,10 +86,10 @@
 #define DUMP_VSA
 // print out the final transformed CPU code
 #define CPU_CODEGEN
-//// generate T2S code
-//#define T2S_CODEGEN
+// generate T2S code
+#define T2S_CODEGEN
 // generate Intel OpenCL code
-#define INTEL_CODEGEN
+//#define INTEL_CODEGEN
 //// generate Xilinx HLS code
 //#define XILINX_CODEGEN
 

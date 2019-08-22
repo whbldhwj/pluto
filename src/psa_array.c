@@ -749,7 +749,178 @@ void psa_compute_dep_distances(PlutoProg *prog) {
   }
 }
 
-PlutoProg **sa_candidates_generation_band(Band *band, int array_dim, 
+/* 
+ * Generate synchronized array 
+ * -- time loop --
+ *  -- space loop --
+ * */
+PlutoProg **sa_candidates_generation_band_sync(Band *band, int array_dim, 
+              PlutoProg *prog, int *nprogs) {
+  PlutoProg **progs = NULL;
+  unsigned i, j, k, nloops;
+
+  Ploop **loops;
+
+  int firstD = band->loop->depth;
+  int lastD = band->loop->depth + band->width - 1;
+
+  /* Select loops that carried dependence with distance less equal to 1 */
+  int *is_space_loop = (int *)malloc(band->width * sizeof(int));
+  for (i = firstD; i < firstD + band->width; i++) {    
+    for (j = 0; j < prog->ndeps; j++) {
+      Dep *dep = prog->deps[j];
+      assert(dep->disvec != NULL);
+      if (!(dep->disvec[i] == DEP_DIS_ZERO || dep->disvec[i] == DEP_DIS_PLUS_ONE)) {
+        break;
+      }
+    }
+    is_space_loop[i - firstD] = (j == prog->ndeps);
+  }
+
+  /* Perform loop permutation to generate all candidate variants */
+  if (array_dim == 1) {
+    for (i = firstD; i < firstD + band->width; i++) {
+      if (is_space_loop[i - firstD]) {
+        PlutoProg *new_prog = pluto_prog_dup(prog);
+        /* As new prog is generated, we will need to generate new bands correspondingly */
+        /* Make the loop i the innermost loop */
+        unsigned d;
+        for (d = i; d < lastD; d++) {
+          pluto_interchange(new_prog, d, d + 1);
+        }
+        
+        // TODO: perform loop skewing
+
+        pluto_compute_dep_directions(new_prog);
+        pluto_compute_dep_satisfaction(new_prog);
+
+        /* Update psa_hyp_type */
+        psa_detect_hyperplane_types(new_prog, array_dim, 0);
+        psa_detect_hyperplane_types_stmtwise(new_prog, array_dim, 0);
+
+        /* Update array dim */
+        new_prog->array_dim = array_dim;
+        // new_prog->array_part_dim = band->width;
+        new_prog->array_part_dim = 0;
+
+        /* Add the new invariant to the list */
+        if (progs) {
+          progs = (PlutoProg **)realloc(progs, (*nprogs + 1) * sizeof(PlutoProg *));
+          progs[*nprogs] = new_prog;
+          *nprogs = *nprogs + 1;
+        } else {
+          progs = (PlutoProg **)malloc((*nprogs + 1) * sizeof(PlutoProg *));
+          progs[*nprogs] = new_prog;
+          *nprogs = *nprogs + 1;
+        }
+      }
+    }    
+  } else if (array_dim == 2) {
+    for (i = firstD; i < firstD + band->width; i++) {
+      if (is_space_loop[i]) {
+        for (j = i + 1; j < firstD + band->width; j++) {
+          if (is_space_loop[j]) {
+            PlutoProg *new_prog = pluto_prog_dup(prog);
+            /* As new prog is generated, we will need to generate new bands correspondingly */
+            /* Make the loop i, j the innermost loops */
+            unsigned d;
+            for (d = i; d < lastD; d++) {
+              pluto_interchange(new_prog, d, d + 1);
+            }
+            for (d = j - 1; d < lastD; d++) {
+              pluto_interchange(new_prog, d, d + 1);
+            }
+
+            // TODO: perform loop skewing
+
+            pluto_compute_dep_directions(new_prog);
+            pluto_compute_dep_satisfaction(new_prog);
+
+            /* Update psa_hyp_type */
+            psa_detect_hyperplane_types(new_prog, array_dim, 0);
+            psa_detect_hyperplane_types_stmtwise(new_prog, array_dim, 0);
+
+            /* Update array dim */
+            new_prog->array_dim = array_dim;
+            // new_prog->array_part_dim = band->width;
+            new_prog->array_part_dim = 0;
+
+            /* Add the new invariant to the list */
+            if (progs) {
+              progs = (PlutoProg **)realloc(progs, (*nprogs + 1) * sizeof(PlutoProg *));
+              progs[*nprogs] = new_prog;
+              *nprogs = *nprogs + 1;
+            } else {
+              progs = (PlutoProg **)malloc((*nprogs + 1) * sizeof(PlutoProg *));
+              progs[*nprogs] = new_prog;
+              *nprogs = *nprogs + 1;
+            }
+          }
+        }
+      }
+    }
+  } else if (array_dim == 3) {
+    for (i = firstD; i < firstD + band->width; i++) {
+      if (is_space_loop[i]) {
+        for (j = i + 1; j < firstD + band->width; j++) {
+          if (is_space_loop[j]) {
+            for (k = j + 1; k < firstD + band->width; k++) {
+              if (is_space_loop[k]) {
+                PlutoProg *new_prog = pluto_prog_dup(prog);
+                /* As new prog is generated, we will need to generate new bands correspondingly */
+                /* Make the loop i, j, k the innermost loops */
+                unsigned d;
+                for (d = i; d < lastD; d++) {
+                  pluto_interchange(new_prog, d, d + 1);
+                }
+                for (d = j - 1; d < lastD; d++) {
+                  pluto_interchange(new_prog, d, d + 1);
+                }
+                for (d = k - 2; d < lastD; d++) {
+                  pluto_interchange(new_prog, d, d + 1);
+                }
+
+                // TODO: perform loop skewing
+
+                pluto_compute_dep_directions(new_prog);
+                pluto_compute_dep_satisfaction(new_prog);
+    
+                /* Update psa_hyp_type */
+                psa_detect_hyperplane_types(new_prog, array_dim, 0);
+                psa_detect_hyperplane_types_stmtwise(new_prog, array_dim, 0);
+    
+                /* Update array dim */
+                new_prog->array_dim = array_dim;
+                // new_prog->array_part_dim = band->width;
+                new_prog->array_part_dim = 0;
+    
+                /* Add the new invariant to the list */
+                if (progs) {
+                  progs = (PlutoProg **)realloc(progs, (*nprogs + 1) * sizeof(PlutoProg *));
+                  progs[*nprogs] = new_prog;
+                  *nprogs = *nprogs + 1;
+                } else {
+                  progs = (PlutoProg **)malloc((*nprogs + 1) * sizeof(PlutoProg *));
+                  progs[*nprogs] = new_prog;
+                  *nprogs = *nprogs + 1;
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  free(is_space_loop);
+  return progs;
+}
+
+/* Generate asynchronized array 
+ * -- space --
+ *  -- time --
+ */
+PlutoProg **sa_candidates_generation_band_async(Band *band, int array_dim, 
               PlutoProg *prog, int *nprogs) {
   PlutoProg **progs = NULL;
   unsigned i, j, k, nloops;
@@ -954,13 +1125,26 @@ PlutoProg **sa_candidates_generation(PlutoProg *prog, int *nprogs_p) {
     return progs;
   }
 
+#ifdef ASYNC_ARRAY
+  fprintf(stdout, "[PSA] Generate asynchronized array.\n");
+#endif
+#ifdef SYNC_ARRAY
+  fprintf(stdout, "[PSA] Generate syncrhonized array.\n");
+  fprintf(stdout, "[PSA] Notice! Sync array generation is only supported for T2S codegen.\n");
+#endif  
+
 #if SA_DIM_UB >= 1
   /* 1D systolic array */
   if (bands[0]->width >= 1) {   
     fprintf(stdout, "[PSA] Explore 1D systolic array... ");
     PlutoProg **new_progs = NULL;
     int new_nprogs = 0;
-    new_progs = sa_candidates_generation_band(bands[0], 1, prog, &new_nprogs);
+#ifdef ASYNC_ARRAY    
+    new_progs = sa_candidates_generation_band_async(bands[0], 1, prog, &new_nprogs);
+#endif
+#ifdef SYNC_ARRAY
+    new_progs = sa_candidates_generation_band_sync(bands[0], 1, prog, &new_nprogs);
+#endif    
     if (!progs) {
 // #ifdef JIE_DEBUG
 //       fprintf(stdout, "[Debug] in 1D branch.\n");
@@ -995,7 +1179,13 @@ PlutoProg **sa_candidates_generation(PlutoProg *prog, int *nprogs_p) {
     fprintf(stdout, "[Debug] prog transdep[2] nrows: %d\n", prog->transdeps[2]->dpolytope->nrows);
     fprintf(stdout, "[Debug] prog transdep[2] ncols: %d\n", prog->transdeps[2]->dpolytope->ncols);
 #endif
-    new_progs = sa_candidates_generation_band(bands[0], 2, prog, &new_nprogs);
+#ifdef ASYNC_ARRAY    
+    new_progs = sa_candidates_generation_band_async(bands[0], 2, prog, &new_nprogs);
+#endif
+#ifdef SYNC_ARRAY
+    new_progs = sa_candidates_generation_band_sync(bands[0], 2, prog, &new_nprogs);
+#endif    
+
 #ifdef JIE_DEBUG
     fprintf(stdout, "[Debug] new_prog ntransdeps: %d\n", new_progs[0]->ntransdeps);
     fprintf(stdout, "[Debug] new_prog transdep[2] nrows: %d\n", new_progs[0]->transdeps[2]->dpolytope->nrows);
@@ -1030,7 +1220,12 @@ PlutoProg **sa_candidates_generation(PlutoProg *prog, int *nprogs_p) {
     fprintf(stdout, "[PSA] Explore 3D systolic array... ");
     PlutoProg **new_progs = NULL;
     int new_nprogs = 0;
-    new_progs = sa_candidates_generation_band(bands[0], 3, prog, &new_nprogs);
+#ifdef ASYNC_ARRAY
+    new_progs = sa_candidates_generation_band_async(bands[0], 3, prog, &new_nprogs);
+#endif
+#ifdef SYNC_ARRAY    
+    new_progs = sa_candidates_generation_band_sync(bands[0], 3, prog, &new_nprogs);
+#endif    
     if (!progs) {
       progs = (PlutoProg **)malloc((nprogs + new_nprogs) * sizeof(PlutoProg *));
       for (i = nprogs; i < nprogs + new_nprogs; i++) {

@@ -641,11 +641,11 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
     fprintf(stdout, "[pluto] Number of parameters: %d\n", prog->npar);
   }
 
-/* Jie Added - Start */
+  /* Jie Added - Start */
 #ifdef PRINT_DEPS_PREV_TRANSFORM
-  psa_print_deps(prog);
+//  psa_print_deps(prog);
 #endif
-/* Jie Added - End */
+  /* Jie Added - End */
 
   if (options->iss) {
     pluto_iss_dep(prog);
@@ -666,10 +666,15 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
   fprintf(stdout, "[PSA] %d programs generated after reuse analysis.\n", num_reuse_progs);
   /* Jie Added - End */ 
 
+
 //  for (int reuse_prog_id = 0; reuse_prog_id < num_reuse_progs; reuse_prog_id++) {
   for (int reuse_prog_id = 0; reuse_prog_id < 1; reuse_prog_id++) {
     reuse_prog = reuse_progs[reuse_prog_id];
-    
+
+#ifdef PRINT_DEPS_PREV_TRANSFROM
+    psa_print_deps(reuse_prog);
+#endif    
+
 /*
  * *******************************************
  * Stage: Array Generation

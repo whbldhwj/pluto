@@ -1042,6 +1042,7 @@ void psa_detect_hyperplane_types_stmtwise(PlutoProg *prog, int array_dim, int ar
   int num_array_part_loop = 0;
   int num_array_space_loop = 0;
 
+#ifdef ASYNC_ARRAY
   for (s = 0; s < prog->nstmts; s++) {
     Stmt *stmt = prog->stmts[s];
     num_array_part_loop = 0;
@@ -1067,6 +1068,61 @@ void psa_detect_hyperplane_types_stmtwise(PlutoProg *prog, int array_dim, int ar
       }
     }
   }
+#endif
+#ifdef SYNC_ARRAY
+  for (s = 0; s < prog->nstmts; s++) {
+    Stmt *stmt = prog->stmts[s];
+    num_array_part_loop = 0;
+    num_array_space_loop = 0;
+    int i1, i2;
+    for (i1 = 0; i1 < stmt->trans->nrows; i1++) {
+      if (pluto_is_hyperplane_loop(stmt, i1)) {
+        bool is_task_inter_loop = IS_PSA_TASK_INTER_LOOP(stmt->psa_hyp_types[i1]);
+        bool is_simd_loop = IS_PSA_SIMD_LOOP(stmt->psa_hyp_types[i1]);
+        PSAHypType psa_hyp_type_mask = (is_task_inter_loop)? PSA_H_TASK_INTER_LOOP : 0;
+        psa_hyp_type_mask = (is_simd_loop)? psa_hyp_type_mask | PSA_H_SIMD_LOOP : psa_hyp_type_mask;
+
+        if (num_array_part_loop < array_part_dim) {
+          stmt->psa_hyp_types[i1] = PSA_H_ARRAY_PART_LOOP | psa_hyp_type_mask;
+          num_array_part_loop++;
+        } else {
+          break;
+        }
+      } else {
+        stmt->psa_hyp_types[i1] = PSA_H_SCALAR;
+      }
+    }
+    for (i2 = stmt->trans->nrows - 1; i2 >= 0; i2--) {
+      if (pluto_is_hyperplane_loop(stmt, i2)) {
+        bool is_task_inter_loop = IS_PSA_TASK_INTER_LOOP(stmt->psa_hyp_types[i2]);
+        bool is_simd_loop = IS_PSA_SIMD_LOOP(stmt->psa_hyp_types[i2]);
+        PSAHypType psa_hyp_type_mask = (is_task_inter_loop)? PSA_H_TASK_INTER_LOOP : 0;
+        psa_hyp_type_mask = (is_simd_loop)? psa_hyp_type_mask | PSA_H_SIMD_LOOP : psa_hyp_type_mask;
+
+        if (num_array_space_loop < array_dim) {
+          stmt->psa_hyp_types[i2] = PSA_H_SPACE_LOOP | psa_hyp_type_mask;
+          num_array_space_loop++;
+        } else {
+          break;
+        }
+      } else {
+        stmt->psa_hyp_types[i] = PSA_H_SCALAR;
+      }
+    }
+    for (i = i1; i <= i2; i++) {
+      if (pluto_is_hyperplane_loop(stmt, i)) {
+        bool is_task_inter_loop = IS_PSA_TASK_INTER_LOOP(stmt->psa_hyp_types[i]);
+        bool is_simd_loop = IS_PSA_SIMD_LOOP(stmt->psa_hyp_types[i]);
+        PSAHypType psa_hyp_type_mask = (is_task_inter_loop)? PSA_H_TASK_INTER_LOOP : 0;
+        psa_hyp_type_mask = (is_simd_loop)? psa_hyp_type_mask | PSA_H_SIMD_LOOP : psa_hyp_type_mask;
+
+        stmt->psa_hyp_types[i] = PSA_H_TIME_LOOP | psa_hyp_type_mask;
+      } else {
+        stmt->psa_hyp_types[i] = PSA_H_SCALAR;
+      }
+    } 
+  }
+#endif
 }
 
 void psa_detect_hyperplane_types(PlutoProg *prog, int array_dim, int array_part_dim) {
@@ -1075,6 +1131,7 @@ void psa_detect_hyperplane_types(PlutoProg *prog, int array_dim, int array_part_
   int num_array_part_loop = 0;
   int num_array_space_loop = 0;
 
+#ifdef ASYNC_ARRAY
   for (depth = 0; depth < prog->num_hyperplanes; depth++) {
     for (i = 0; i < nstmts; i++) {
       if (pluto_is_hyperplane_loop(prog->stmts[i], depth))
@@ -1086,7 +1143,7 @@ void psa_detect_hyperplane_types(PlutoProg *prog, int array_dim, int array_part_
       bool is_simd_loop = IS_PSA_SIMD_LOOP(prog->hProps[depth].psa_type);
       PSAHypType psa_hyp_type_mask = (is_task_inter_loop)? PSA_H_TASK_INTER_LOOP : 0;
       psa_hyp_type_mask = (is_simd_loop)? psa_hyp_type_mask | PSA_H_SIMD_LOOP : psa_hyp_type_mask;
-
+      
       if (num_array_part_loop < array_part_dim) {
         prog->hProps[depth].psa_type = PSA_H_ARRAY_PART_LOOP | psa_hyp_type_mask;
         num_array_part_loop++;
@@ -1100,6 +1157,71 @@ void psa_detect_hyperplane_types(PlutoProg *prog, int array_dim, int array_part_
       prog->hProps[depth].psa_type = PSA_H_SCALAR;
     }
   }
+#endif
+#ifdef SYNC_ARRAY
+  int depth1, depth2;
+  for (depth1 = 0; depth1 < prog->num_hyperplanes; depth1++) {
+    for (i = 0; i < nstmts; i++) {
+      if (pluto_is_hyperplane_loop(prog->stmts[i], depth1))
+        break;
+    }    
+    if (i < nstmts) {
+      // get intra-pe optimization info
+      bool is_task_inter_loop = IS_PSA_TASK_INTER_LOOP(prog->hProps[depth1].psa_type);
+      bool is_simd_loop = IS_PSA_SIMD_LOOP(prog->hProps[depth1].psa_type);
+      PSAHypType psa_hyp_type_mask = (is_task_inter_loop)? PSA_H_TASK_INTER_LOOP : 0;
+      psa_hyp_type_mask = (is_simd_loop)? psa_hyp_type_mask | PSA_H_SIMD_LOOP : psa_hyp_type_mask;
+      
+      if (num_array_part_loop < array_part_dim) {
+        prog->hProps[depth1].psa_type = PSA_H_ARRAY_PART_LOOP | psa_hyp_type_mask;
+        num_array_part_loop++;
+      } else {
+        break;
+      }
+    } else {
+      prog->hProps[depth1].psa_type = PSA_H_SCALAR;
+    }
+  }
+  for (depth2 = prog->num_hyperplanes - 1; depth2 >= 0; depth2--) {
+    for (i = 0; i < nstmts; i++) {
+      if (pluto_is_hyperplane_loop(prog->stmts[i], depth2))
+        break;
+    }
+    if (i < nstmts) {
+      // get intra-pe optimization info
+      bool is_task_inter_loop = IS_PSA_TASK_INTER_LOOP(prog->hProps[depth2].psa_type);
+      bool is_simd_loop = IS_PSA_SIMD_LOOP(prog->hProps[depth2].psa_type);
+      PSAHypType psa_hyp_type_mask = (is_task_inter_loop)? PSA_H_TASK_INTER_LOOP : 0;
+      psa_hyp_type_mask = (is_simd_loop)? psa_hyp_type_mask | PSA_H_SIMD_LOOP : psa_hyp_type_mask;
+      
+      if (num_array_space_loop < array_dim) {
+        prog->hProps[depth2].psa_type = PSA_H_SPACE_LOOP | psa_hyp_type_mask;
+        num_array_space_loop++;
+      } else {
+        break;
+      }     
+    } else {
+      prog->hProps[depth2].psa_type = PSA_H_SCALAR;
+    }
+  }
+  for (depth = depth1; depth <= depth2; depth++) {
+    for (i = 0; i < nstmts; i++) {
+      if (pluto_is_hyperplane_loop(prog->stmts[i], depth))
+        break;
+    }
+    if (i < nstmts) {
+      // get intra-pe optimization info
+      bool is_task_inter_loop = IS_PSA_TASK_INTER_LOOP(prog->hProps[depth].psa_type);
+      bool is_simd_loop = IS_PSA_SIMD_LOOP(prog->hProps[depth].psa_type);
+      PSAHypType psa_hyp_type_mask = (is_task_inter_loop)? PSA_H_TASK_INTER_LOOP : 0;
+      psa_hyp_type_mask = (is_simd_loop)? psa_hyp_type_mask | PSA_H_SIMD_LOOP : psa_hyp_type_mask;
+
+      prog->hProps[depth].psa_type = PSA_H_TIME_LOOP | psa_hyp_type_mask;
+    } else {
+      prog->hProps[depth].psa_type = PSA_H_SCALAR;
+    }  
+  }
+#endif  
 }
 /* Jie Added - End */
 

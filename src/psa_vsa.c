@@ -1148,6 +1148,7 @@ void vsa_band_width_extract(PlutoProg *prog, VSA *vsa) {
   assert(nbands == 1);
 
   unsigned i, h;
+#ifdef ASYNC_ARRAY  
   for (i = 0; i < nbands; i++) {
     Band *band_cur = bands[i];
     unsigned first_array_part_hyp = 0;
@@ -1172,46 +1173,38 @@ void vsa_band_width_extract(PlutoProg *prog, VSA *vsa) {
     }    
     vsa->array_part_band_width = first_space_hyp - first_array_part_hyp;
     vsa->space_band_width = first_time_hyp - first_space_hyp;
-
-//    /* Engine band */
-//    //vsa->op_engine_band_width = (int *)malloc(vsa->op_num * sizeof(int));
-//    //vsa->res_engine_band_width = (int *)malloc(vsa->res_num * sizeof(int));
-//    vsa->engine_band_width = (int *)malloc((vsa->op_num + vsa->res_num) * sizeof(int));
-//
-//    int array_dim = prog->array_dim;
-//    int ref_idx;
-//    for (ref_idx = 0; ref_idx < vsa->op_num; ref_idx++) {
-//      char *acc_channel_dir = vsa->op_channel_dirs[ref_idx];
-//      if (array_dim == 2) {        
-//        vsa->engine_band_width[ref_idx] = 1;        
-//      } else if (array_dim == 1) {
-//        if (!strcmp(acc_channel_dir, "D")) {
-//          vsa->engine_band_width[ref_idx] = 1;
-//        } else if (!strcmp(acc_channel_dir, "R")) {
-//          vsa->engine_band_width[ref_idx] = 0;
-//        } else {
-//          fprintf(stdout, "[PSA] Error! Not supported!\n");
-//          exit(1);
-//        }
-//      }
-//    }
-//
-//    for (ref_idx = 0; ref_idx < vsa->res_num; ref_idx++) {
-//      char *acc_channel_dir = vsa->res_channel_dirs[ref_idx];
-//      if (array_dim == 2) {
-//        vsa->engine_band_width[ref_idx + vsa->op_num] = 1;
-//      } else if (array_dim == 1) {
-//        if (!strcmp(acc_channel_dir, "D")) {
-//          vsa->engine_band_width[ref_idx + vsa->op_num] = 1;
-//        } else if (!strcmp(acc_channel_dir, "R")) {
-//          vsa->engine_band_width[ref_idx + vsa->op_num] = 0;
-//        } else {
-//          fprintf(stdout, "[PSA] Error! Not supported!\n");
-//          exit(1);
-//        }
-//      }
-//    }
+    vsa->time_band_width = band_cur->width - vsa->array_part_band_width - vsa->space_band_width;
   }
+#endif
+#ifdef SYNC_ARRAY
+  for (i = 0; i < nbands; i++) {
+    Band *band_cur = bands[i];
+    unsigned first_array_part_hyp = 0;
+    unsigned first_space_hyp, first_time_hyp;
+    bool first_array_part_hyp_found = false;
+    bool first_space_hyp_found = false;
+    bool first_time_hyp_found = false;
+    for (h = 0; h < prog->num_hyperplanes; h++) {
+      if (IS_PSA_ARRAY_PART_LOOP(prog->hProps[h].psa_type) &&
+        !first_array_part_hyp_found) {
+        first_array_part_hyp = h;
+        first_array_part_hyp_found = true;        
+      }
+      if (IS_PSA_TIME_LOOP(prog->hProps[h].psa_type) && !first_time_hyp_found) {
+        first_time_hyp = h;
+        first_time_hyp_found = true;
+      }     
+      if (IS_PSA_SPACE_LOOP(prog->hProps[h].psa_type) && !first_space_hyp_found) {
+        first_space_hyp = h;
+        first_space_hyp_found = true;
+      }
+    }    
+    vsa->array_part_band_width = first_time_hyp - first_array_part_hyp;
+    vsa->time_band_width = first_space_hyp - first_time_hyp; 
+    vsa->space_band_width = band_cur->width - vsa->array_part_band_width - vsa->time_band_width;
+  }
+
+#endif  
 
   /* Free Memory */
   pluto_bands_free(bands, nbands);
@@ -1259,6 +1252,7 @@ VSA *vsa_alloc() {
   vsa->type = NULL;
   vsa->array_part_band_width = 0;
   vsa->space_band_width = 0;
+  vsa->time_band_width = 0;
   vsa->engine_band_width = NULL;  
 
   vsa->acc_data_trans_sets = NULL;

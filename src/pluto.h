@@ -34,6 +34,8 @@
 
 #include "osl/extensions/dependence.h"
 
+#include "psa_knobs.h"
+
 // -- Jie Added --
 //#define JIE_DEBUG
 // ---------------
@@ -900,6 +902,7 @@ struct psaVSA {
   /* ARRAY_PART, SPACE LOOP NUM */
   int array_part_band_width;
   int space_band_width;
+  int time_band_width;
 
   /* ENGINE LOOP NUM */
   //int *op_engine_band_width;

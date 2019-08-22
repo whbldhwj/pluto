@@ -59,6 +59,7 @@ bool systolic_array_dep_checker(PlutoProg *prog) {
     Stmt *src_stmt = prog->stmts[dep->src];
     Stmt *dest_stmt = prog->stmts[dep->dest];
     PlutoConstraints *tdpoly = pluto_get_transformed_dpoly(dep, src_stmt, dest_stmt);
+    pluto_constraints_simplify(tdpoly);
 
     assert(tdpoly->ncols == src_stmt->trans->nrows + dest_stmt->trans->nrows + prog->npar + 1);
     // We look at the dependence polyhedral at rows where both src_stmt and dest_stmt's coeff is non-zero

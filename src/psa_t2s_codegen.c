@@ -5,6 +5,7 @@
  */
 #include "pluto.h"
 #include "psa_vsa.h"
+#include "psa_knobs.h"
 
 /* 
  * This function generates T2S inputs
@@ -115,7 +116,12 @@ void psa_t2s_codegen(FILE *fp, const VSA *vsa) {
   fprintf(fp, "// Space-time transformation\n");
   fprintf(fp, "APP.space_time_transform(");
   int line_num = 0;
-  char **lines = t2s_space_time_pprint(vsa, &line_num);
+#ifdef ASYNC_ARRAY  
+  char **lines = t2s_space_time_async_pprint(vsa, &line_num);
+#endif
+#ifdef SYNC_ARRAY
+  char **lines = t2s_space_time_sync_pprint(vsa, &line_num);
+#endif  
   for (int i = 0; i < line_num; i++) {
     if (i == 0) {
       fprintf(fp, "%s\n", lines[i]);
@@ -158,7 +164,7 @@ void psa_t2s_codegen(FILE *fp, const VSA *vsa) {
 /* 
  * Print out the space_time transform in T2S spec
  */
-char **t2s_space_time_pprint(VSA *vsa, int *line_num) {
+char **t2s_space_time_async_pprint(VSA *vsa, int *line_num) {
   // T2S progam only contains one perfectly nested loop
   int time_band_width = vsa->t2s_iter_num - vsa->array_part_band_width - vsa->space_band_width;
 
@@ -256,6 +262,111 @@ char **t2s_space_time_pprint(VSA *vsa, int *line_num) {
   // array time
   {
     char *str = "Systolic::Async";
+    lines[*line_num] = str;
+    *line_num = *line_num + 1;
+  }
+
+  return lines;
+}
+
+char **t2s_space_time_sync_pprint(VSA *vsa, int *line_num) {
+  // T2S progam only contains one perfectly nested loop
+  int space_band_width = vsa->t2s_iter_num - vsa->array_part_band_width - vsa->time_band_width;
+
+  int total_line_num = 1 + 1 + vsa->time_band_width + 1 
+    + space_band_width + 1;
+  char **lines = (char **)malloc(total_line_num * sizeof(char *));
+  // print the source loops
+  {
+    char *str = "{";
+    for (int i = 0; i < vsa->t2s_iter_num; i++) {
+      if (i > 0) {
+        str = concat(str, ", ");
+      }
+      str = concat(str, vsa->t2s_iters[i]);
+    }
+    str = concat(str, "},");
+    lines[*line_num] = str;
+    *line_num = *line_num + 1;
+  }
+
+  // print the space loops
+  {
+    char *str = "{";
+    for (int i = vsa->array_part_band_width + vsa->time_band_width; i < vsa->array_part_band_width + vsa->time_band_width + space_band_width; i++) {
+      if (i - vsa->array_part_band_width - vsa->time_band_width > 0) {
+        str = concat(str, ", ");
+      }
+      str = concat(str, vsa->t2s_iters[i]);
+    }
+    str = concat(str, "},");
+    lines[*line_num] = str;
+    *line_num = *line_num + 1;
+  
+    // print the space transform
+    for (int row = 0; row < space_band_width; row++) {
+      char *str = "";
+      if (row == 0)
+        str = concat(str, "{");
+      else
+        str = concat(str, " ");
+      for (int col = 0; col < vsa->t2s_iter_num; col++) {
+        if (col > 0)
+          str = concat(str, ", ");
+        if (col == vsa->array_part_band_width + vsa->time_band_width + row)
+          str = concat(str, "1");
+        else
+          str = concat(str, "0");      
+      }
+      if (row < space_band_width - 1)
+        str = concat(str, ",");
+      else
+        str = concat(str, "},");
+      lines[*line_num] = str;
+      *line_num = *line_num + 1;
+    }
+  }
+
+  // print the time loops
+  {
+    char *str = "{";
+    for (int i = vsa->array_part_band_width; i < vsa->array_part_band_width + vsa->time_band_width; i++) {
+      if (i - vsa->array_part_band_width > 0) {
+        str = concat(str, ", ");
+      }
+      str = concat(str, vsa->t2s_iters[i]);
+    }
+    str = concat(str, "},");
+    lines[*line_num] = str;
+    *line_num = *line_num + 1;
+
+    // print the time transform
+    for (int row = 0; row < vsa->time_band_width; row++) {
+      char *str = "";
+      if (row == 0)
+        str = concat(str, "{");
+      else
+        str = concat(str, " ");
+      for (int col = 0; col < vsa->t2s_iter_num; col++) {
+        if (col > 0)
+          str = concat(str, ", ");
+        if (col == vsa->array_part_band_width + row)
+          str = concat(str, "1");
+        else
+          str = concat(str, "0");
+      }
+      if (row < vsa->time_band_width - 1)
+        str = concat(str, ",");
+      else
+        str = concat(str, "},");
+      lines[*line_num] = str;
+      *line_num = *line_num + 1;
+    }
+  }
+
+  // array time
+  {
+    char *str = "Systolic::Sync";
     lines[*line_num] = str;
     *line_num = *line_num + 1;
   }
