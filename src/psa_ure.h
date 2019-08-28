@@ -13,14 +13,18 @@
 #define URE_MERGE
 
 int t2s_compare_stmt_order(Stmt *stmt1, Stmt *stmt2, int band_width);
-void create_RAR_UREs(Stmt *stmt, PlutoAccess *acc, PlutoProg *prog, VSA *vsa);
+//void create_RAR_UREs(Stmt *stmt, PlutoAccess *acc, PlutoProg *prog, VSA *vsa);
+PlutoConstraints *get_RAR_domain(Stmt *stmt, PlutoAccess *acc, PlutoProg *prog, VSA *vsa); 
+void create_RAR_UREs(int cc_id, PlutoProg *prog, VSA *vsa);
 void create_drain_UREs(Stmt *stmt, PlutoAccess *acc, PlutoProg *prog, VSA *vsa);
 char *create_stmt_domain_str(Stmt *stmt, PlutoProg *prog, VSA *vsa);
 void stmt_to_UREs(Stmt *stmt, PlutoProg *prog, VSA *vsa);
 char *pluto_constraints_to_t2s_format(const PlutoConstraints *cst, VSA *vsa, int niter, int nparam, char **params);
 URE **URE_append(URE **list1, int *num1, URE **list2, int num2);
 URE **URE_add(URE **list, int *num, URE *ele);
+void URE_init(URE *ure);
 char *create_URE_name(char **URE_names, int URE_num, char *var_name);
+char *create_URE_text(URE *ure);
 char *create_new_acc_str(Stmt *stmt, PlutoAccess *acc, PlutoProg *prog, VSA *vsa);
 char *create_new_acc_ref_str(Stmt *stmt, PlutoAccess *acc, PlutoProg *prog, VSA *vsa);
 void vsa_t2s_meta_iter_extract(PlutoProg *prog, VSA *vsa);

@@ -2224,7 +2224,8 @@ Graph *ddg_create(PlutoProg *prog) {
 
 /* Jie Added - Start */
 /*
- * Create the ADG (RAR deps not included)
+ * Create the ADG
+ * Access functions are connected if there is RAW or WAR dependence between them.
  */
 Graph *adg_create(PlutoProg *prog) {
   int i;
@@ -2248,10 +2249,58 @@ Graph *adg_create(PlutoProg *prog) {
     Dep *dep = prog->deps[i];
     if (IS_RAR(dep->type)) 
       continue;
-    g->adj->val[dep->src_acc->sym_id][dep->dest_acc->sym_id] += 1;
+    else if (IS_RAW(dep->type) || IS_WAR(dep->type))
+      g->adj->val[dep->src_acc->sym_id][dep->dest_acc->sym_id] += 1;
   }
 
   return g;
+}
+/* Jie Added - End */
+
+/* Jie Added - Start */
+/*
+ * Two read access functions are connected if they are of the same access function
+ * However, the front-end (e.g. PET) could change the access functions, making it different to directly compare the access matrix.
+ * We take the access function of acc1 and acc2, and build a map from the iterator domain of acc1.
+ * If two maps equal, then, we can safely say these two access functions are the same.
+ * This is a temporary fix and has problems. For example, comparing <A[i][0], A[i][k]> in the MM will merge them, however,
+ * comparing <A[i][k], A[i][0]> will set them separate.
+ */ 
+void adg_merge_rar(Graph *g, PlutoProg *prog) {
+  int *num_stmts_per_acc;
+  int num_read_write_data;
+  struct stmt_access_pair ***acc_stmts;
+
+  acc_stmts = get_read_write_access_with_stmts(
+      prog->stmts, prog->nstmts, &num_read_write_data, &num_stmts_per_acc);
+
+  for (int i = 0; i < num_read_write_data; i++) {
+    for (int j = 0; j < num_stmts_per_acc[i]; j++) {
+      // read access
+      if (acc_stmts[i][j]->acc_rw == 0) {
+        PlutoAccess *acc1 = acc_stmts[i][j]->acc;
+        for (int d = 0; d < prog->ndeps; d++) {
+          if (!(IS_RAR(prog->deps[d]) && prog->deps[d]->src_acc == acc1))
+            continue;
+        }
+
+        for (int k = j + 1; k < num_stmts_per_acc[i]; k++) {
+          if (acc_stmts[i][k]->acc_rw == 0) {
+            PlutoAccess *acc2 = acc_stmts[i][k]->acc;
+            for (int d = 0; d < prog->ndeps; d++) {
+              if (!(IS_RAR(prog->deps[d]) && prog->deps[d]->src_acc == acc2))
+                continue;
+            }
+     
+            bool is_same = psa_access_merge(acc_stmts[i][j], acc_stmts[i][k], prog);
+            if (is_same) {
+              g->adj->val[acc1->sym_id][acc2->sym_id] += 1;
+            }
+          }
+        }
+      }
+    }
+  }
 }
 /* Jie Added - End */
 
@@ -2411,7 +2460,14 @@ void adg_compute_cc(PlutoProg *prog) {
   for (i = 0; i < g->num_ccs; i++) {
     g->ccs[i].max_dim = get_max_dim_in_cc(prog, i);
     g->ccs[i].size = get_cc_size(prog, i);
-    g->ccs[i].id = i;    
+    g->ccs[i].id = i;   
+    g->ccs[i].vertices = (int *)malloc(g->ccs[i].size * sizeof(int));
+    int idx = 0;
+    for (int n = 0; n < g->nVertices; n++) {
+      if (g->vertices[n].cc_id == i) {
+        g->ccs[i].vertices[idx++] = n;
+      }
+    }
   }
 
   graph_free(gU);

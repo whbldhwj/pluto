@@ -480,8 +480,10 @@ int64 *pluto_constraints_lexmin_isl(const PlutoConstraints *cst, int negvar) {
 
 PlutoConstraints *pluto_constraints_union_isl(const PlutoConstraints *cst1,
                                               const PlutoConstraints *cst2) {
-  isl_set *set1 = isl_set_from_pluto_constraints(cst1, NULL);
-  isl_set *set2 = isl_set_from_pluto_constraints(cst2, NULL);
+  isl_ctx *ctx = isl_ctx_alloc();
+  isl_set *set1 = isl_set_from_pluto_constraints(cst1, ctx);
+  isl_set *set2 = isl_set_from_pluto_constraints(cst2, ctx);
+ 
   isl_set *set3 = isl_set_union(set1, set2);
 
   PlutoConstraints *ucst = isl_set_to_pluto_constraints(set3);

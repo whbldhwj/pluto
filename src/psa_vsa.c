@@ -215,6 +215,8 @@ void update_t2s_ivar(int acc_id, struct stmt_access_var_pair **acc_var_map, stru
        acc_var_map[acc_id]->var_iters[iter_id]->iter_offset = 0;
       }
 
+      adg_var_map[cc_id]->var_ref = strdup(get_iter_str(acc_var_map[acc_id]->var_iters, iter_num));
+
       char var_ref[50];
       if (prog->options->dsa == 0)
         sprintf(var_ref, "%s(%s)", var_name, get_iter_str(acc_var_map[acc_id]->var_iters, iter_num));
@@ -354,7 +356,20 @@ void update_t2s_var(struct stmt_access_var_pair **acc_var_map, struct var_pair *
   char **iters = vsa->t2s_iters;
 
   Graph *adg = prog->adg;
-  if (adg->ccs[cc_id].size == 1) {
+  // Test if it is an external variable or not
+  PlutoAccess *acc = acc_var_map[adg->ccs[cc_id].vertices[0]]->acc;
+  bool is_external = 1;
+  // test if this access carries RAW, if so, it's an intermediate variable, otherwise, it's an external variable
+  for (int i = 0; i < prog->ndeps; i++) {
+    if (IS_RAW(prog->deps[i]->type) || IS_WAR(prog->deps[i]->type)) {
+      if (prog->deps[i]->src_acc == acc || prog->deps[i]->dest_acc == acc) {
+        is_external = 0;
+        break;
+      }
+    }
+  }
+
+  if (is_external) {
     // external variable
     vsa->evar_num++;
     vsa->evar_names = realloc(vsa->evar_names, vsa->evar_num * sizeof(char *));
@@ -372,7 +387,7 @@ void update_t2s_var(struct stmt_access_var_pair **acc_var_map, struct var_pair *
 
         vsa->evar_names[vsa->evar_num - 1] = strdup(var_name);
         acc_var_map[acc_id]->var_name = strdup(var_name);
-        adg_var_map[cc_id]->var_name = strdup(var_name);
+        adg_var_map[cc_id]->var_name = strdup(var_name);        
         adg_var_map[cc_id]->ei = 0;
         adg_var_map[cc_id]->d = 0;
 
@@ -389,6 +404,8 @@ void update_t2s_var(struct stmt_access_var_pair **acc_var_map, struct var_pair *
 
         vsa->evar_refs[vsa->evar_num - 1] = strdup(var_ref);
         acc_var_map[acc_id]->var_ref = strdup(var_ref);
+
+        adg_var_map[cc_id]->var_ref = strdup(var_ref);
 
         // build the drain variable
         if (acc_var_map[acc_id]->d == 1) {
@@ -520,6 +537,7 @@ void vsa_t2s_var_extract(PlutoProg *prog, VSA *vsa) {
   // Additionally, if the access function is a write access, we will add the drain variable correspondingly.
 
   Graph *adg = adg_create(prog);
+  adg_merge_rar(adg, prog);
   prog->adg= adg;
 #ifdef PSA_VSA_DEBUG
 //  fprintf(stdout, "[Debug] Access dependence graph:\n");
@@ -539,6 +557,7 @@ void vsa_t2s_var_extract(PlutoProg *prog, VSA *vsa) {
   for (int i = 0; i < adg->num_ccs; i++) {
     adg_var_map[i] = (struct var_pair *)malloc(sizeof(struct var_pair));
     adg_var_map[i]->var_name = NULL;
+    adg_var_map[i]->var_ref = NULL;
     adg_var_map[i]->dvar_name = NULL;
     adg_var_map[i]->ei = -1;
     adg_var_map[i]->d = 0;

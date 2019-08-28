@@ -374,6 +374,7 @@ typedef enum transtype {
 
 struct var_pair {
   char *var_name;
+  char *var_ref;
   char *dvar_name;
   bool ei;
   bool d;
@@ -385,8 +386,24 @@ struct ure {
 
   // URE name
   char *name;
-
+  
+  // URE id
   int id;
+
+  // LHS
+  char *LHS;
+
+  // URE wrap level
+  int wrap_level;
+
+  // URE select condition
+  char **select_cond;
+
+  // URE select LHS
+  char **select_LHS;
+
+  // URE select RHS
+  char **select_RHS;
 };
 typedef struct ure URE;
 
@@ -779,6 +796,9 @@ struct iter {
 
   /* Stride */
   char *stride;
+
+  /* Type */
+  char type;
 };
 typedef struct iter Iter;
 
@@ -1129,6 +1149,7 @@ Graph *ddg_create(PlutoProg *prog);
 /* Jie Added - Start */
 Graph *adg_create(PlutoProg *prog);
 void adg_compute_cc(PlutoProg *prog);
+void adg_merge_rar(Graph *g, PlutoProg *prog);
 /* Jie Added - End */
 int ddg_sccs_direct_connected(Graph *g, PlutoProg *prog, int scc1, int scc2);
 int cut_between_sccs(PlutoProg *prog, Graph *ddg, int scc1, int scc2);

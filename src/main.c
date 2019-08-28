@@ -722,23 +722,39 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
 #ifdef PRINT_DEPS_POST_TRANSFORM
     psa_print_deps(reuse_prog);
 #endif
- 
+
 /*
  * *******************************************
  * Stage: Array Generation
- * Step: Uniform Dependence Checker
+ * Step: Systolic Array Transformation Legality Checker
  * *******************************************
  */
-#ifdef UNIFORMITY_CHECK
-    fprintf(stdout, "[PSA] Check uniformity of the design.\n");
-    bool is_uniform = systolic_array_dep_checker(reuse_prog);
-    if (!is_uniform) {
-      fprintf(stdout, "[PSA] Non-uniform dependence detected.\n");
-      // return 1;
+#ifdef SPACE_TIME_CHECK
+    fprintf(stdout, "[PSA] Check space-time mapping legality.\n");
+    bool is_legal = systolic_array_legal_checker(reuse_prog);
+    if (!is_legal) {
+      fprintf(stdout, "[PSA] This program can't be synthesized to systolic array.\n");
       continue;
     }
-    fprintf(stdout, "[PSA] Uniformity: %d\n", is_uniform);
+    fprintf(stdout, "[PSA] Space-time mapping leagalibty: %d\n", is_legal);
 #endif
+
+///*
+// * *******************************************
+// * Stage: Array Generation
+// * Step: Uniform Dependence Checker
+// * *******************************************
+// */
+//#ifdef UNIFORMITY_CHECK
+//    fprintf(stdout, "[PSA] Check uniformity of the design.\n");
+//    bool is_uniform = systolic_array_dep_checker(reuse_prog);
+//    if (!is_uniform) {
+//      fprintf(stdout, "[PSA] Non-uniform dependence detected.\n");
+//      // return 1;
+//      continue;
+//    }
+//    fprintf(stdout, "[PSA] Uniformity: %d\n", is_uniform);
+//#endif
 
 /*
  * *******************************************
@@ -777,6 +793,8 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
       PlutoProg *array_prog = progs[prog_id];  
       pluto_transformations_pretty_print(array_prog);
 
+      /* ARRAY_PART_BAND_WIDTH */
+      vsa_band_width_extract(array_prog, psa_vsa);
 #ifdef T2S_CODEGEN
       fprintf(stdout, "[PSA] Input code DSA form: %d\n", options->dsa);
       /* T2S_ITERS */
@@ -938,18 +956,18 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
       bname = basename(basec);
 
       char *dumpFileName;
-      dumpFileName = malloc(strlen(bname) - 2 + strlen(".") + strlen("t2s") + strlen(".c") + 1);
+      dumpFileName = malloc(strlen(bname) - 2 + strlen(".") + strlen("t2s") + strlen(".cpp") + 1);
       strncpy(dumpFileName, bname, strlen(bname) - 2);
       dumpFileName[strlen(bname) - 2] = '\0';
       strcat(dumpFileName, ".");
       strcat(dumpFileName, "t2s");
-      strcat(dumpFileName, ".c");
+      strcat(dumpFileName, ".cpp");
 
       FILE *t2s_fp = fopen(dumpFileName, "w");
       if (t2s_fp) {
         psa_t2s_codegen(t2s_fp, psa_vsa);
       } else {
-        fprintf(stdout, "[PSA] ERROR! File %s can't be opened!\n", "t2s.c");
+        fprintf(stdout, "[PSA] ERROR! File %s can't be opened!\n", "t2s.cpp");
         return 1;
       }
       fclose(t2s_fp);

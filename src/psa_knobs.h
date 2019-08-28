@@ -20,6 +20,9 @@
 // print out the transformed code after Pluto's auto-transformation
 #define PRINT_PLUTO_TRANS_PROGRAM
 
+// check the legality of space-time transformation
+#define SPACE_TIME_CHECK
+
 // check the uniformity of the application
 #define UNIFORMITY_CHECK
 

@@ -1,27 +1,23 @@
 {
-  "EVAR_NUM": 5,
+  "EVAR_NUM": 3,
   "EDVAR_NUM": 1,
   "IVAR_NUM": 1,
   "IDVAR_NUM": 1,
   "EVAR_NAMES": [
     "B_CC0_E",
     "A_CC1_E",
-    "B_CC3_E",
-    "A_CC4_E",
-    "C_CC5_E"
+    "C_CC3_E"
   ],
   "EDVAR_NAMES": [
-    "C_CC5_ED"
+    "C_CC3_ED"
   ],
   "EVAR_REFS": [
     "B_CC0_E(t1, t2, t3)",
     "A_CC1_E(t1, t2, t3)",
-    "B_CC3_E(t1, t2, t3)",
-    "A_CC4_E(t1, t2, t3)",
-    "C_CC5_E(t1, t2, t3)"
+    "C_CC3_E(t1, t2, t3)"
   ],
   "EDVAR_REFS": [
-    "C_CC5_ED(t1, t2, t3)"
+    "C_CC3_ED(t1, t2, t3)"
   ],
   "IVAR_NAMES": [
     "C_ext_CC2_I"
@@ -30,10 +26,10 @@
     "C_ext_CC2_ID"
   ],
   "IVAR_REFS": [
-    "C_ext_CC2_I(t1, t2, 0)"
+    "C_ext_CC2_I(t1, t2, t3)"
   ],
   "IDVAR_REFS": [
-    "C_ext_CC2_ID(t1, t2, 0)"
+    "C_ext_CC2_ID(t1, t2, t3)"
   ],
   "T2S_ITER_NUM": 3,
   "T2S_ITERS": [
@@ -48,15 +44,10 @@
     "C_ext",
     "C"
   ],
-  "URE_NUM": 7,
+  "URE_NUM": 2,
   "URES": [
-    "B_CC0_E(t1, t2, t3) = select((t3 == 0 && t1 == 0 && t2 >= 0 && -t2 + (63) >= 0), B(0, t2), B_CC0_E(t1 + (-1), t2, t3));",
-    "A_CC1_E(t1, t2, t3) = select((t3 == 0 && t2 == 0 && t1 >= 0 && -t1 + (63) >= 0), A(t1, 0), A_CC1_E(t1, t2 + (-1), t3));",
-    "C_ext_CC2_I(t1, t2, 0) = select((t3 == 0 && t2 >= 0 && t1 >= 0 && -t2 + (63) >= 0 && -t1 + (63) >= 0), (A_CC1_E(t1, t2, t3) * B_CC0_E(t1, t2, t3)));",
-    "B_CC3_E(t1, t2, t3) = select((t1 == 0 && t3 + -1 >= 0 && -t3 + (63) >= 0 && t2 >= 0 && -t2 + (63) >= 0), B(t3, t2), B_CC3_E(t1 + (-1), t2, t3));",
-    "A_CC4_E(t1, t2, t3) = select((t2 == 0 && t1 >= 0 && -t1 + (63) >= 0 && t3 + -1 >= 0 && -t3 + (63) >= 0), A(t1, t3), A_CC4_E(t1, t2 + (-1), t3));",
-    "C_ext_CC2_I(t1, t2, t3) = select((t1 >= 0 && t2 >= 0 && -t3 + (63) >= 0 && -t1 + (63) >= 0 && -t2 + (63) >= 0 && t3 + -1 >= 0), (C_ext_CC2_I(t1, t2, t3 + (-1)) + (A_CC4_E(t1, t2, t3) * B_CC3_E(t1, t2, t3))));",
-    "C_CC5_E(t1, t2, t3) = select((t3 + (-63) == 0 && t2 >= 0 && t1 >= 0 && -t2 + (63) >= 0 && -t1 + (63) >= 0), C_ext_CC2_I(t1, t2, (63)));"
+    "B_CC0_E(t1, t2, t3) = select((t3 == 0 && t1 == 0 && t2 >= 0 && -t2 + (63) >= 0) || (t1 == 0 && t2 >= 0 && -t2 + (63) >= 0 && t3 + -1 >= 0 && -t3 + (63) >= 0), B(t3, t2), B_CC0_E(t1 + (-1), t2, t3));",
+    "A_CC1_E(t1, t2, t3) = select((t3 == 0 && t2 == 0 && t1 >= 0 && -t1 + (63) >= 0) || (t2 == 0 && t1 >= 0 && -t1 + (63) >= 0 && t3 + -1 >= 0 && -t3 + (63) >= 0), A(t1, t3), A_CC1_E(t1, t2 + (-1), t3));"
   ],
   "DOMAIN_EXP_NUM": 0,
   "DOMAIN_EXPS": [

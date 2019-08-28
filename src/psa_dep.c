@@ -46,6 +46,60 @@
 #include "pet.h"
 
 /*
+ * A program can be transformed to systolic array if and only if it satisfies the following constraints:
+ * - uniform dependency
+ * - single fully permuatable band
+ * - no further child band under the common permutable band
+ */
+bool systolic_array_legal_checker(PlutoProg *prog) {
+  /* single fully permutable band */
+  unsigned nbands = 0;
+  int err_type = 0;
+  unsigned nloops = 0;
+  Ploop **loops;
+
+  Band **bands = pluto_get_outermost_permutable_bands(prog, &nbands);
+  if (nbands != 1) {
+    err_type = 1;
+  }
+  if (!err_type) {
+    /* no child band under the current band */
+    loops = pluto_get_loops_under(
+        bands[0]->loop->stmts, bands[0]->loop->nstmts,
+        bands[0]->loop->depth, prog, &nloops);
+    if (nloops > bands[0]->width) {
+      err_type = 2;
+    }
+  }
+  if (!err_type) {
+    /* uniform dependency */
+    bool is_uniform = systolic_array_dep_checker(prog);
+    if (!is_uniform) {
+      err_type = 3;
+    }
+  }
+
+  pluto_bands_free(bands, nbands);
+  for (int i = 0; i < nloops; i++) {
+    pluto_loop_free(loops[i]);
+  }
+  free(loops);
+
+  if (err_type == 1) {
+    fprintf(stdout, "[PSA] More than one outer permutable band detected.\n");
+    return 0;   
+  } else if (err_type == 2){
+    fprintf(stdout, "[PSA] More than one child permutable band detected.\n");
+    return 0;
+  } else if (err_type == 3) {
+    fprintf(stdout, "[PSA] Non-uniform dependency detectec.\n");
+    return 0;
+  } else {
+    return 1;
+  }
+}
+
+/*
  * Detecting non-uniform dependences and exit the program if any non-uniform
  * dependences is detected. 
  */

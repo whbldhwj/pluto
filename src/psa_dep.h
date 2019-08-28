@@ -17,6 +17,7 @@
 
 #include "distmem.h"
 
+bool systolic_array_legal_checker(PlutoProg *prog);
 bool systolic_array_dep_checker(PlutoProg *prog);
 void rar_scalar_filter(PlutoProg *prog);
 void rar_filter(PlutoProg *prog);

@@ -3673,6 +3673,53 @@ bool pluto_access_cmp(const PlutoAccess *acc1, const PlutoAccess *acc2) {
   return 0;
 }
 
+/* Jie Added - Start */
+/*
+ * This function tests that if we could reuse the value accssed by two access functions across stmts.
+ * We take the iteration domain of stmt1, and build two maps:
+ * map1: stmt1_iter_domain -> stmt1_acc
+ * map2: stmt1_iter_domain -> stmt2_acc
+ * If these two maps equal, then return true, otherwise return false
+ */
+bool psa_access_merge(struct stmt_access_pair *stmt_acc1, struct stmt_access_pair *stmt_acc2, PlutoProg *prog) {
+  PlutoConstraints *new_domain1 = pluto_get_new_domain(stmt_acc1->stmt);
+  PlutoConstraints *acc_map1 = pluto_compute_region_data(stmt_acc1->stmt, new_domain1, stmt_acc1->acc, stmt_acc1->stmt->trans->nrows, prog);
+
+  PlutoConstraints *new_domain2 = pluto_get_new_domain(stmt_acc2->stmt);
+  PlutoConstraints *acc_map2 = pluto_compute_region_data(stmt_acc2->stmt, new_domain1, stmt_acc2->acc, stmt_acc2->stmt->trans->nrows, prog);
+ 
+  // the return constraints is in the format [dim_in, dim_out, npar, 1]
+  // we will need to adjust it to [dim_out, dim_in, npar, 1]
+  for (int i = 0; i < stmt_acc1->acc->mat->nrows; i++) {
+    pluto_constraints_add_dim(acc_map1, i, NULL);
+    pluto_constraints_interchange_cols(acc_map1, i, i + stmt_acc1->stmt->trans->nrows);
+  }
+  for (int i = 0; i < stmt_acc1->acc->mat->nrows; i++) {
+    pluto_constraints_remove_dim(acc_map1, stmt_acc1->stmt->trans->nrows + stmt_acc1->acc->mat->nrows);
+  }
+
+  for (int i = 0; i < stmt_acc2->acc->mat->nrows; i++) {
+    pluto_constraints_add_dim(acc_map2, i, NULL);
+    pluto_constraints_interchange_cols(acc_map2, i, i + stmt_acc2->stmt->trans->nrows);
+  }
+  for (int i = 0; i < stmt_acc2->acc->mat->nrows; i++) {
+    pluto_constraints_remove_dim(acc_map2, stmt_acc2->stmt->trans->nrows + stmt_acc2->acc->mat->nrows);
+  }
+
+  // convert PlutoConstraints to isl_map
+  isl_ctx *ctx = isl_ctx_alloc();
+  isl_map *map1 = isl_map_from_pluto_constraints(acc_map1, ctx, stmt_acc1->stmt->trans->nrows, stmt_acc1->acc->mat->nrows, prog->npar); 
+  isl_map *map2 = isl_map_from_pluto_constraints(acc_map2, ctx, stmt_acc2->stmt->trans->nrows, stmt_acc2->acc->mat->nrows, prog->npar);
+
+  bool is_equal = isl_map_is_equal(map1, map2);
+
+  isl_map_free(map1);
+  isl_map_free(map2);
+  isl_ctx_free(ctx);
+  return is_equal;
+}
+/* Jie Added - End */
+
 void pluto_access_free(PlutoAccess *acc) {
   if (acc) {
     pluto_matrix_free(acc->mat);

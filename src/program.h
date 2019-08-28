@@ -117,7 +117,10 @@ void pluto_transformation_print_level(const PlutoProg *prog, int level);
 
 Stmt *pluto_stmt_dup(const Stmt *stmt);
 PlutoAccess *pluto_access_dup(const PlutoAccess *acc);
+/* Jie Added - Start */
 bool pluto_access_cmp(const PlutoAccess *acc1, const PlutoAccess *acc2); 
+bool psa_access_merge(struct stmt_access_pair *stmt_acc1, struct stmt_access_pair *stmt_acc2, PlutoProg *prog);
+/* Jie Added - End */
 void pluto_dep_free(Dep *dep);
 Dep *pluto_dep_dup(Dep *d);
 void pluto_remove_stmt(PlutoProg *prog, int stmt_id);

@@ -25,9 +25,9 @@ void dsa_kernel(data_t A[I][K], data_t B[K][J], data_t C[I][J]) {
         if (k == 0)
           C_ext[i][j][k] = A[i][k] * B[k][j];
         else
-          C_ext[i][j][k] = C_ext[i][j][k - 1] + A[i][k] * B[k][j];
+          C_ext[i][j][k] = C_ext[i][j][k - 1] + A[i][k] * B[k][j];        
         if (k == 63)
-          C[i][j] = C_ext[i][j][63];
+          C[i][j] = C_ext[i][j][k];
       }
 #pragma endscop  
   
