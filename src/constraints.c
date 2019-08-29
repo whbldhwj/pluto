@@ -411,6 +411,30 @@ static int row_compar(const void *e1, const void *e2) {
   /* return memcmp(row1, row2, ncols*sizeof(int64)); */
 }
 
+PlutoConstraints *pluto_constraints_simplify_context_isl(PlutoConstraints *cst, PlutoConstraints *context) {
+  isl_ctx *ctx = isl_ctx_alloc();
+  isl_set *cst_set = isl_set_from_pluto_constraints(cst, ctx);
+  isl_set *context_set = isl_set_from_pluto_constraints(context, ctx);
+
+//  isl_printer *printer = isl_printer_to_file(ctx, stdout);
+//  isl_printer_print_set(printer, cst_set);
+//  printf("\n");
+//  isl_printer_print_set(printer, context_set);
+//  printf("\n");
+
+  isl_set *new_cst_set = isl_set_gist(cst_set, context_set);
+  PlutoConstraints *new_cst = isl_set_to_pluto_constraints(new_cst_set);
+
+//  isl_printer_print_set(printer, new_cst_set);
+//  printf("\n");
+
+  isl_set_free(cst_set);
+//  isl_set_free(context_set);
+//  isl_set_free(new_cst_set);
+  isl_ctx_free(ctx);
+  return new_cst;
+}
+
 /*
  * Eliminates duplicate constraints; the simplified constraints
  * are still at the same memory location but the number of constraints
@@ -1005,6 +1029,9 @@ void pluto_constraints_pretty_print(FILE *fp, const PlutoConstraints *cst) {
     fprintf(fp, "%s 0\n", cst->is_eq[i] ? "=" : ">=");
   }
   fprintf(fp, "\n");
+
+  if (cst->next != NULL) 
+    pluto_constraints_pretty_print(fp, cst->next);
 }
 
 void pluto_constraints_cplex_print(FILE *fp, const PlutoConstraints *cst) {
@@ -1875,34 +1902,6 @@ void pluto_constraints_project_out(PlutoConstraints *cst, int start, int num) {
     pluto_constraints_project_out(cst->next, start, num);
   }
 }
-
-/* Jie Added - Start */
-// void pluto_constraints_project_out_isl(PlutoConstraints *cst, int start, int num) {
-//   psa_constraints_project_out_single_isl(cst, start, num);
-
-//   if (cst->next != NULL) {
-//     psa_constraints_project_out_isl(cst->next, start, num);
-//   }
-// }
-
-// void pluto_constraints_project_out_isl_single(PlutoConstraints *cst, int start, int num) {
-//   isl_set *iset1, *iset2;
-
-//   isl_ctx *ctx = isl_ctx_alloc();
-
-//   iset1 = isl_set_from_pluto_constraints(cst, ctx);
-//   iset2 = isl_set_project_out(iset1, isl_dim_set, start, num);
-
-//   PlutoConstraints *icst = isl_set_to_pluto_constraints(iset2);
-
-//   isl_set_free(iset1);
-//   isl_set_free(iset2);
-//   isl_ctx_free(ctx);
-
-//   pluto_constraints_free(cst);
-//   cst = icst;
-// }
-/* Jie Added - Start */
 
 void pluto_constraints_interchange_cols(PlutoConstraints *cst, int col1,
                                         int col2) {

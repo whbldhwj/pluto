@@ -100,7 +100,9 @@ PlutoConstraints *pluto_constraints_add_to_each(PlutoConstraints *cst1,
                                                 const PlutoConstraints *cst2);
 
 void pluto_constraints_simplify(PlutoConstraints *const cst);
-
+/* Jie Added - Start */
+PlutoConstraints *pluto_constraints_simplify_context_isl(PlutoConstraints *cst, PlutoConstraints *context);
+/* Jie Added - End */
 int64 *pluto_constraints_lexmin(const PlutoConstraints *, int);
 int64 *pluto_constraints_lexmin_isl(const PlutoConstraints *cst, int negvar);
 int64 *pluto_constraints_lexmin_pip(const PlutoConstraints *cst, int negvar);
@@ -142,7 +144,7 @@ void pluto_constraints_project_out_single(PlutoConstraints *cst, int start,
                                           int num);
 void pluto_constraints_project_out_isl(PlutoConstraints *cst, int start,
                                        int num);
-void pluto_constraints_project_out_isl_single(PlutoConstraints **cst, int start,
+void pluto_constraints_project_out_isl_single(PlutoConstraints *cst, int start,
                                               int num);                                       
 /* Jie Added - Start */                                              
 PlutoConstraints *pluto_constraints_difference_isl(const PlutoConstraints *cst1,

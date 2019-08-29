@@ -105,7 +105,7 @@ bool systolic_array_legal_checker(PlutoProg *prog) {
  */
 bool systolic_array_dep_checker(PlutoProg *prog) {
   int ndeps = prog->ndeps;
-  Dep **deps = prog->deps;
+  Dep **deps = prog->deps;  
 
   /* Check the uniformity of dependences */  
   for (int i = 0; i < ndeps; i++) {
@@ -138,11 +138,13 @@ bool systolic_array_dep_checker(PlutoProg *prog) {
             if (tdpoly->val[row][col + src_niter] == 0) {
               fprintf(stdout, "[PSA] Dep %d is non-uniform. Error type: 1\n", i);
               pluto_constraints_pretty_print(stdout, tdpoly);
+              pluto_constraints_free(tdpoly);
               return false;
             } else {
               if (tdpoly->val[row][col] + tdpoly->val[row][col + src_niter] != 0) {
                 fprintf(stdout, "[PSA] Dep %d is non-uniform. Error type: 2\n", i);
                 pluto_constraints_pretty_print(stdout, tdpoly);
+                pluto_constraints_free(tdpoly);
                 return false;
               } else {
                 int par_id;
@@ -151,11 +153,10 @@ bool systolic_array_dep_checker(PlutoProg *prog) {
                     break;
                   }
                 }
-                if (par_id == prog->npar)
-                  return true;
-                else {
+                if (par_id != prog->npar) {
                   fprintf(stdout, "[PSA] Dep %d is non-uniform. Error type: 3\n", i);
                   pluto_constraints_pretty_print(stdout, tdpoly);
+                  pluto_constraints_free(tdpoly);
                   return false;                                  
                 }
               }

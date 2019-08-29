@@ -23,6 +23,7 @@ char *pluto_constraints_to_t2s_format(const PlutoConstraints *cst, VSA *vsa, int
 URE **URE_append(URE **list1, int *num1, URE **list2, int num2);
 URE **URE_add(URE **list, int *num, URE *ele);
 void URE_init(URE *ure);
+void URE_free(URE *ure);
 char *create_URE_name(char **URE_names, int URE_num, char *var_name);
 char *create_URE_text(URE *ure);
 char *create_new_acc_str(Stmt *stmt, PlutoAccess *acc, PlutoProg *prog, VSA *vsa);

@@ -67,6 +67,7 @@ isl_fixed_box *pluto_constraints_box_hull_isl(PlutoConstraints *cst, int nin, in
 /* start: 0-indexed */
 void pluto_constraints_project_out_isl(PlutoConstraints *cst, int start,
                                        int num) {
+  isl_ctx *ctx = isl_ctx_alloc();
   int end;
   isl_set *set;
 
@@ -77,15 +78,18 @@ void pluto_constraints_project_out_isl(PlutoConstraints *cst, int start,
   end = start + num - 1;
   assert(start >= 0 && end <= cst->ncols - 2);
 
-  set = isl_set_from_pluto_constraints(cst, NULL);
+  set = isl_set_from_pluto_constraints(cst, ctx);
   set = isl_set_project_out(set, isl_dim_set, start, num);
-  pluto_constraints_free(cst);
-  cst = isl_set_to_pluto_constraints(set);
+  //pluto_constraints_free(cst);
+  PlutoConstraints *new_cst = isl_set_to_pluto_constraints(set);
+  pluto_constraints_copy(cst, new_cst);
+  pluto_constraints_free(new_cst);
   isl_set_free(set);
+  isl_ctx_free(ctx);
 }
 
 /* start: 0-indexed */
-void pluto_constraints_project_out_isl_single(PlutoConstraints **cst, int start,
+void pluto_constraints_project_out_isl_single(PlutoConstraints *cst, int start,
                                               int num) {
   int end;
   isl_basic_set *bset;
@@ -95,15 +99,20 @@ void pluto_constraints_project_out_isl_single(PlutoConstraints **cst, int start,
     return;
 
   end = start + num - 1;
-  assert(start >= 0 && end <= (*cst)->ncols - 2);
+  assert(start >= 0 && end <= cst->ncols - 2);
 
   isl_ctx *ctx = isl_ctx_alloc();
-  bset = isl_basic_set_from_pluto_constraints(ctx, *cst);
+  bset = isl_basic_set_from_pluto_constraints(ctx, cst);
   bset = isl_basic_set_project_out(bset, isl_dim_set, start, num);
-  pluto_constraints_free(*cst);
-  *cst = isl_basic_set_to_pluto_constraints(bset);
+//  pluto_constraints_free(cst);
+  PlutoConstraints *new_cst = isl_basic_set_to_pluto_constraints(bset);
+  pluto_constraints_copy_single(cst, new_cst);
+  pluto_constraints_free(new_cst);
+
   isl_basic_set_free(bset);
   isl_ctx_free(ctx);
+
+  return cst;
 }
 
 PlutoConstraints *pluto_constraints_difference_isl(const PlutoConstraints *cst1,
@@ -125,6 +134,8 @@ PlutoConstraints *pluto_constraints_difference_isl(const PlutoConstraints *cst1,
   
   //PlutoConstraints *diffcst = isl_basic_set_to_pluto_constraints(bset3);    
   PlutoConstraints *diffcst = isl_set_to_pluto_constraints(set1); 
+
+  pluto_constraints_free(cst1);
 
 // #ifdef JIE_DEBUG
 //   fprintf(stdout, "[Debug] Diff:\n");
@@ -208,6 +219,8 @@ __isl_give isl_set *isl_set_from_pluto_constraints(const PlutoConstraints *cst,
     set = isl_set_union(set, isl_set_from_basic_set(bset));
     cst = cst->next;
   }
+
+  // isl_space_free(dim);
 
   return set;
 }
@@ -489,6 +502,7 @@ PlutoConstraints *pluto_constraints_union_isl(const PlutoConstraints *cst1,
   PlutoConstraints *ucst = isl_set_to_pluto_constraints(set3);
 
   isl_set_free(set3);
+  isl_ctx_free(ctx);
 
   return ucst;
 }

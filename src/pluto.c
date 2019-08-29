@@ -2253,6 +2253,15 @@ Graph *adg_create(PlutoProg *prog) {
       g->adj->val[dep->src_acc->sym_id][dep->dest_acc->sym_id] += 1;
   }
 
+  for (i = 0; i < num_read_write_data; i++) {
+    for (int j = 0; j < num_stmts_per_acc[i]; j++) {
+      free(acc_stmts[i][j]);
+    }
+    free(acc_stmts[i]);
+  }
+  free(acc_stmts);
+  free(num_stmts_per_acc);
+
   return g;
 }
 /* Jie Added - End */
@@ -2301,6 +2310,15 @@ void adg_merge_rar(Graph *g, PlutoProg *prog) {
       }
     }
   }
+
+  for (int i = 0; i < num_read_write_data; i++) {
+    for (int j = 0; j < num_stmts_per_acc[i]; j++) {
+      free(acc_stmts[i][j]);
+    }
+    free(acc_stmts[i]);
+  }
+  free(acc_stmts);
+  free(num_stmts_per_acc);
 }
 /* Jie Added - End */
 
@@ -2505,6 +2523,7 @@ void ddg_compute_scc(PlutoProg *prog) {
     g->sccs[i].id = gT->sccs[i].id;
     g->sccs[i].sol = NULL;
     g->sccs[i].is_parallel = 0;
+    g->sccs[i].vertices = NULL;
   }
 
   graph_free(gT);

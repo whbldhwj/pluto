@@ -138,25 +138,29 @@ void psa_t2s_codegen(FILE *fp, const VSA *vsa) {
     }
   }
   fprintf(fp, ")\n");
-  
+  for (int i = 0; i < line_num; i++) {
+    free(lines[i]);
+  }
+  free(lines);
+
   /* Domain */
   // Notice: the loop bound is shited by one due to the limitation of Halide
   fprintf(fp, "   .domain(");  
   for (int i = 0; i < vsa->t2s_iter_num; i++) {
     if (i == 0) {
-      fprintf(fp, "%s, %s + 1, %s + 1, %s,\n", 
+      fprintf(fp, "%s, %s, %s, %s,\n", 
           vsa->t2s_meta_iters[i]->iter_name,
           vsa->t2s_meta_iters[i]->lb,
           vsa->t2s_meta_iters[i]->ub,
           vsa->t2s_meta_iters[i]->stride);
     } else if (i < vsa->t2s_iter_num - 1) {
-      fprintf(fp, "           %s, %s + 1, %s + 1, %s,\n", 
+      fprintf(fp, "           %s, %s, %s, %s,\n", 
           vsa->t2s_meta_iters[i]->iter_name,
           vsa->t2s_meta_iters[i]->lb,
           vsa->t2s_meta_iters[i]->ub,
           vsa->t2s_meta_iters[i]->stride);
     } else {
-      fprintf(fp, "           %s, %s + 1, %s + 1, %s,\n", 
+      fprintf(fp, "           %s, %s, %s, %s,\n", 
           vsa->t2s_meta_iters[i]->iter_name,
           vsa->t2s_meta_iters[i]->lb,
           vsa->t2s_meta_iters[i]->ub,
@@ -167,14 +171,14 @@ void psa_t2s_codegen(FILE *fp, const VSA *vsa) {
   int titer_cnt = 0;
   for (int i = 0; i < vsa->t2s_iter_num; i++) {
     if (vsa->t2s_meta_iters[i]->type == 'T') {
-      if (titer_cnt < vsa->time_band_width) {
-        fprintf(fp, "           tloop%d, %s + 1, %s + 1, %s,\n", 
+      if (titer_cnt < vsa->time_band_width - 1) {
+        fprintf(fp, "           tloop%d, %s, %s, %s,\n", 
             titer_cnt + 1,
             vsa->t2s_meta_iters[i]->lb,
             vsa->t2s_meta_iters[i]->ub,
             vsa->t2s_meta_iters[i]->stride);
       } else {
-        fprintf(fp, "           tloop%d, %s + 1, %s + 1, %s", 
+        fprintf(fp, "           tloop%d, %s, %s, %s", 
             titer_cnt + 1,
             vsa->t2s_meta_iters[i]->lb,
             vsa->t2s_meta_iters[i]->ub,
@@ -196,9 +200,9 @@ void psa_t2s_codegen(FILE *fp, const VSA *vsa) {
   fprintf(fp, "Image<float> CPU_output(");
   for (int i = 0; i < vsa->t2s_iter_num; i++) {
     if (i == 0) {
-      fprintf(fp, "%s + 2", vsa->t2s_meta_iters[i]->ub);
+      fprintf(fp, "%s + 1", vsa->t2s_meta_iters[i]->ub);
     } else {
-      fprintf(fp, ", %s + 2", vsa->t2s_meta_iters[i]->ub);
+      fprintf(fp, ", %s + 1", vsa->t2s_meta_iters[i]->ub);
     }
   }
   fprintf(fp, ");\n");
@@ -253,7 +257,8 @@ char **t2s_space_time_pprint(VSA *vsa, int *line_num) {
   char **lines = (char **)malloc(total_line_num * sizeof(char *));
   // print the source loops
   {
-    char *str = "{";
+    char *str = "";
+    str = concat(str, "{");
     for (int i = 0; i < vsa->t2s_iter_num; i++) {
       if (i > 0) {
         str = concat(str, ", ");
@@ -267,7 +272,8 @@ char **t2s_space_time_pprint(VSA *vsa, int *line_num) {
 
   // print the time loops
   {
-    char *str = "{";
+    char *str = "";
+    str = concat(str, "{");
     for (int i = 0; i < vsa->time_band_width; i++) {
       char iter_str[10];
       sprintf(iter_str, "tloop%d", i + 1);
@@ -285,7 +291,8 @@ char **t2s_space_time_pprint(VSA *vsa, int *line_num) {
 
   // print the space loops
   {
-    char *str = "{";
+    char *str = "";
+    str = concat(str, "{");
 #ifdef ASYNC_ARRAY
     for (int i = vsa->array_part_band_width; i < vsa->array_part_band_width + vsa->space_band_width; i++) {
       if (i - vsa->array_part_band_width > 0) {
@@ -354,7 +361,7 @@ char **t2s_space_time_pprint(VSA *vsa, int *line_num) {
       if (row < vsa->t2s_iter_num - 1) 
         str = concat(str, ",");
       else 
-        str = concat(str, "},");
+        str = concat(str, "}");
       lines[*line_num] = str;
       *line_num = *line_num + 1;
     }

@@ -60,6 +60,7 @@ Graph *graph_alloc(int nVertices) {
 
   /* Not computed yet */
   g->num_ccs = -1;
+
   return g;
 }
 
@@ -282,7 +283,14 @@ void free_scc_vertices(Graph *ddg) {
 void graph_free(Graph *g) {
   pluto_matrix_free(g->adj);
   free(g->vertices);
-  free(g->sccs);
-  free(g->ccs);
+  if (g->sccs) {
+    free(g->sccs);
+  }
+  if (g->ccs) {
+    for (int i = 0; i < g->num_ccs; i++) {
+      free(g->ccs[i].vertices);
+    }
+    free(g->ccs);
+  }
   free(g);
 }

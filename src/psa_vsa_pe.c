@@ -315,7 +315,7 @@ Stmt **psa_gen_compute_code(
     stmt_text = concat(stmt_text, fifo_name);
     stmt_text = concat(stmt_text, ".read()");
 
-    pluto_constraints_project_out_isl_single(&read_in, copy_level, acc_nrows);
+    pluto_constraints_project_out_isl_single(read_in, copy_level, acc_nrows);
 
     // create the statement
     Stmt *op_transfer_stmt = psa_create_helper_stmt(
@@ -392,7 +392,7 @@ Stmt **psa_gen_compute_code(
     //   buf_size, stmt_text, module_name
     // );
 
-    pluto_constraints_project_out_isl_single(&write_out, copy_level, acc_nrows);
+    pluto_constraints_project_out_isl_single(write_out, copy_level, acc_nrows);
 
 // #ifdef JIE_DEBUG
 //     pluto_constraints_pretty_print(stdout, write_out);

@@ -456,9 +456,11 @@ int64 *min_lexical(int64 *a, int64 *b, int64 num) {
 }
 
 /* Free returned string with free */
-char *concat(const char *prefix, const char *suffix) {
+char *concat(char *prefix, const char *suffix) {
   char *concat = malloc(strlen(prefix) + strlen(suffix) + 1);
   sprintf(concat, "%s%s", prefix, suffix);
+  if (strcmp(prefix, ""))
+    free(prefix);
   return concat;
 }
 

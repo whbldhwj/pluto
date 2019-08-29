@@ -26,10 +26,10 @@ void vsa_t2s_IO_extract(PlutoProg *prog, VSA *vsa) {
 //      num_func_per_var[cc_id] = 4;
       t2s_IO_func_names = realloc(t2s_IO_func_names, (t2s_IO_func_num + 4) * sizeof(char *));
       t2s_IO_build_calls = realloc(t2s_IO_build_calls, (t2s_IO_build_num + 1) * sizeof(char *));
-      char *drainer = adg_var_map[cc_id]->var_name;
-      char *collector = adg_var_map[cc_id]->var_name;
-      char *unloader = adg_var_map[cc_id]->var_name;      
-      char *deserializer = adg_var_map[cc_id]->var_name;
+      char *drainer = strdup(adg_var_map[cc_id]->var_name);
+      char *collector = strdup(adg_var_map[cc_id]->var_name);
+      char *unloader = strdup(adg_var_map[cc_id]->var_name);      
+      char *deserializer = strdup(adg_var_map[cc_id]->var_name);
 //      sprintf(drainer, "%s_drainer", adg_var_map[cc_id]->var_name);
 //      sprintf(collector, "%s_collector", adg_var_map[cc_id]->var_name);
 //      sprintf(unloader, "%s_unloader", adg_var_map[cc_id]->var_name);
@@ -37,42 +37,51 @@ void vsa_t2s_IO_extract(PlutoProg *prog, VSA *vsa) {
       drainer = concat(drainer, "_drainer");
       collector = concat(collector, "_collector");
       unloader = concat(unloader, "_unloader");
-      deserializer = concat(deserializer, "_deserializer");
+      deserializer = concat(deserializer, "_deserializer(Place::Host)");
       t2s_IO_func_names[t2s_IO_func_num + 0] = strdup(drainer);
       t2s_IO_func_names[t2s_IO_func_num + 1] = strdup(collector);
       t2s_IO_func_names[t2s_IO_func_num + 2] = strdup(unloader);
-      t2s_IO_func_names[t2s_IO_func_num + 3] = strdup(concat(deserializer, "(Place::Host)"));     
+      t2s_IO_func_names[t2s_IO_func_num + 3] = strdup(deserializer);     
       t2s_IO_func_num += 4;
-      char build_API[100];
+      char build_API[200];
       sprintf(build_API, "isolate_producer_chain(%s, %s, %s, %s %s)",
           adg_var_map[cc_id]->var_name,
           drainer, collector, unloader, deserializer);
       t2s_IO_build_calls[t2s_IO_build_num] = strdup(build_API);
       t2s_IO_build_num++;
+
+      free(drainer);
+      free(collector);
+      free(unloader);
+      free(deserializer);
     } else {
 //      IO_func_list[cc_id] = (char **)malloc(3 * sizeof(char *));
 //      num_func_per_var[cc_id] = 3;
       t2s_IO_func_names = realloc(t2s_IO_func_names, (t2s_IO_func_num + 3) * sizeof(char *));
       t2s_IO_build_calls = realloc(t2s_IO_build_calls, (t2s_IO_build_num + 1) * sizeof(char *));
-      char *serializer = adg_var_map[cc_id]->var_name;
-      char *loader = adg_var_map[cc_id]->var_name;
-      char *feeder = adg_var_map[cc_id]->var_name;
+      char *serializer = strdup(adg_var_map[cc_id]->var_name);
+      char *loader = strdup(adg_var_map[cc_id]->var_name);
+      char *feeder = strdup(adg_var_map[cc_id]->var_name);
 //      sprintf(serializer, "%s_serializer(Place::Host)", adg_var_map[cc_id]->var_name);
 //      sprintf(loader, "%s_loader", adg_var_map[cc_id]->var_name);
 //      sprintf(feeder, "%s_feeder", adg_var_map[cc_id]->var_name);
-      serializer = concat(serializer, "_serializer");
+      serializer = concat(serializer, "_serializer(Place::Host)");
       loader = concat(loader, "_loader");
       feeder = concat(feeder, "_feeder");
-      t2s_IO_func_names[t2s_IO_func_num + 0] = strdup(concat(serializer, "(Place::Host)"));
+      t2s_IO_func_names[t2s_IO_func_num + 0] = strdup(serializer);
       t2s_IO_func_names[t2s_IO_func_num + 1] = strdup(loader);
       t2s_IO_func_names[t2s_IO_func_num + 2] = strdup(feeder);
       t2s_IO_func_num += 3;
-      char build_API[100];
+      char build_API[200];
       sprintf(build_API, "isolate_consumer_chain(%s, %s, %s, %s)",
           adg_var_map[cc_id]->var_name,
           feeder, loader, serializer);
       t2s_IO_build_calls[t2s_IO_build_num] = strdup(build_API);
       t2s_IO_build_num++;
+
+      free(serializer);
+      free(loader);
+      free(feeder);
     }
   }
   
@@ -187,6 +196,9 @@ char *create_new_acc_str(Stmt *stmt, PlutoAccess *acc, PlutoProg *prog, VSA *vsa
     }
   }   
   acc_str = concat(acc_str, ")");
+
+  pluto_matrix_free(new_acc);
+  free(divs);
 
   return acc_str;
 }
@@ -349,7 +361,7 @@ void vsa_URE_extract(PlutoProg *prog, VSA *vsa) {
   int band_width = vsa->t2s_iter_num; 
 
   int URE_num = 0;
-  URE **UREs = NULL;
+  URE **UREs = NULL;  
 
   // Sort the statements based on the lexicographic order
   // This is based on the assumption that all the statements have the scheduling functions with
@@ -484,6 +496,8 @@ char *create_stmt_domain_str(Stmt *stmt, PlutoProg *prog, VSA *vsa) {
   // print out the constraints in Halide syntax
   char *const_str = pluto_constraints_to_t2s_format(new_domain, vsa, stmt->trans->nrows, prog->npar, prog->params);
 
+  pluto_constraints_free(new_domain);
+
   return const_str;
 }
 
@@ -505,7 +519,7 @@ PlutoConstraints *get_RAR_domain(Stmt *stmt, PlutoAccess *acc, PlutoProg *prog, 
       Stmt *dest_stmt = prog->stmts[dep->dest];
       PlutoConstraints *tdpoly = pluto_get_transformed_dpoly(dep, src_stmt, dest_stmt);
       // Project out the src iters
-      pluto_constraints_project_out_isl_single(&tdpoly, 0, src_stmt->trans->nrows);
+      pluto_constraints_project_out_isl_single(tdpoly, 0, src_stmt->trans->nrows);
 #ifdef PSA_URE_DEBUG
 //      fprintf(stdout, "[Debug] RAR poly after projecting out the src iters:\n");
 //      pluto_constraints_pretty_print(stdout, tdpoly);
@@ -548,7 +562,7 @@ char *create_RAR_domain_str(Stmt *stmt, PlutoAccess *acc, PlutoProg *prog, VSA *
       Stmt *dest_stmt = prog->stmts[dep->dest];
       PlutoConstraints *tdpoly = pluto_get_transformed_dpoly(dep, src_stmt, dest_stmt);
       // Project out the src iters
-      pluto_constraints_project_out_isl_single(&tdpoly, 0, src_stmt->trans->nrows);
+      pluto_constraints_project_out_isl_single(tdpoly, 0, src_stmt->trans->nrows);
 #ifdef PSA_URE_DEBUG
 //      fprintf(stdout, "[Debug] RAR poly after projecting out the src iters:\n");
 //      pluto_constraints_pretty_print(stdout, tdpoly);
@@ -625,7 +639,7 @@ char *create_WAW_domain_str(Stmt *stmt, PlutoAccess *acc, PlutoProg *prog, VSA *
       Stmt *dest_stmt = prog->stmts[dep->dest];
       PlutoConstraints *tdpoly = pluto_get_transformed_dpoly(dep, src_stmt, dest_stmt);
       // Project out the dest iters
-      pluto_constraints_project_out_isl_single(&tdpoly, src_stmt->trans->nrows, dest_stmt->trans->nrows);
+      pluto_constraints_project_out_isl_single(tdpoly, src_stmt->trans->nrows, dest_stmt->trans->nrows);
 #ifdef PSA_URE_DEBUG
 //      fprintf(stdout, "[Debug] WAW poly after projecting out the dest iters:\n");
 //      pluto_constraints_pretty_print(stdout, tdpoly);
@@ -801,7 +815,45 @@ void URE_init(URE *ure) {
   ure->LHS = NULL;
 }
 
+void URE_free(URE *ure) {
+  free(ure->text);
+  free(ure->name);
+  free(ure->LHS);
+  for (int i = 0; i < ure->wrap_level; i++) {
+    free(ure->select_cond[i]);
+    free(ure->select_LHS[i]);
+    free(ure->select_RHS[i]);
+  }
+  free(ure->select_cond);
+  free(ure->select_LHS);
+  free(ure->select_RHS);
+
+  free(ure);
+}
+
+PlutoConstraints *get_anchor_domain(PlutoProg *prog) {
+  PlutoConstraints *domain = NULL;
+  for (int i = 0; i < prog->nstmts; i++) {
+    PlutoConstraints *new_domain = pluto_get_new_domain(prog->stmts[i]);
+    if (domain == NULL) {
+      if (new_domain != NULL)
+        domain = pluto_constraints_dup(new_domain);
+    } else {
+      if (new_domain != NULL) {
+        pluto_constraints_pretty_print(stdout, domain);
+        pluto_constraints_pretty_print(stdout, new_domain);
+        domain = pluto_constraints_unionize_isl(domain, new_domain);
+      }
+    }
+    pluto_constraints_free(new_domain);
+  }
+  return domain;
+}
+
 void create_RAR_UREs(int cc_id, PlutoProg *prog, VSA *vsa) {
+  // create a union of all statements' iteration domains which is used to simplify the URE domain
+  PlutoConstraints *anchor_domain = get_anchor_domain(prog);
+
   int URE_num = vsa->URE_num;
   // unionize the domain str of all stmts
   PlutoConstraints *union_domain = NULL;
@@ -809,16 +861,20 @@ void create_RAR_UREs(int cc_id, PlutoProg *prog, VSA *vsa) {
     PlutoAccess *acc = vsa->acc_var_map[prog->adg->ccs[cc_id].vertices[i]]->acc;
     Stmt *stmt = vsa->acc_var_map[prog->adg->ccs[cc_id].vertices[i]]->stmt;
     PlutoConstraints *rar_domain = get_RAR_domain(stmt, acc, prog, vsa);
-    if (union_domain == NULL && rar_domain != NULL) {
-      union_domain = pluto_constraints_dup(rar_domain);
+    if (union_domain == NULL) { 
+      if (rar_domain != NULL)
+        union_domain = pluto_constraints_dup(rar_domain);
     } else {
-//      union_domain = pluto_constraints_unionize(union_domain, rar_domain);
-      union_domain = pluto_constraints_unionize_isl(union_domain, rar_domain);
+      if (rar_domain != NULL)
+        union_domain = pluto_constraints_unionize_isl(union_domain, rar_domain);
     }
     pluto_constraints_free(rar_domain);
   }
 
-  char *domain_str = pluto_constraints_to_t2s_format(union_domain, vsa, prog->num_hyperplanes, prog->npar, prog->params);
+  PlutoConstraints *new_union_domain = pluto_constraints_simplify_context_isl(union_domain, anchor_domain);
+  pluto_constraints_pretty_print(stdout, new_union_domain);
+
+  char *domain_str = pluto_constraints_to_t2s_format(new_union_domain, vsa, prog->num_hyperplanes, prog->npar, prog->params);
   PlutoAccess *anchor_acc = vsa->acc_var_map[prog->adg->ccs[cc_id].vertices[prog->adg->ccs[cc_id].size - 1]]->acc;
   Stmt *anchor_stmt = vsa->acc_var_map[prog->adg->ccs[cc_id].vertices[prog->adg->ccs[cc_id].size - 1]]->stmt;
   char *var_name = vsa->acc_var_map[anchor_acc->sym_id]->var_name;
@@ -857,7 +913,9 @@ void create_RAR_UREs(int cc_id, PlutoProg *prog, VSA *vsa) {
     }
   }
   char var_ref_RHS[50];
-  sprintf(var_ref_RHS, "%s(%s)", var_name, get_iter_str(var_iters_RHS, vsa->t2s_iter_num));
+  char *str_tmp = get_iter_str(var_iters_RHS, vsa->t2s_iter_num);
+  sprintf(var_ref_RHS, "%s(%s)", var_name, str_tmp);
+  free(str_tmp);
   
   merge_URE->select_cond[merge_URE->wrap_level - 1] = strdup(domain_str);
   merge_URE->select_LHS[merge_URE->wrap_level - 1] = strdup(new_acc_str);
@@ -867,6 +925,18 @@ void create_RAR_UREs(int cc_id, PlutoProg *prog, VSA *vsa) {
   merge_URE->text = create_URE_text(merge_URE);
 
   vsa->UREs = URE_add(vsa->UREs, &vsa->URE_num, merge_URE);
+
+  for (int i = 0; i < vsa->t2s_iter_num; i++) {
+    free(var_iters_RHS[i]->iter_name);
+    free(var_iters_RHS[i]);
+  }
+
+  free(new_acc_str);
+  free(var_iters_RHS);
+  pluto_constraints_free(anchor_domain);
+  pluto_constraints_free(union_domain);
+  pluto_constraints_free(new_union_domain);
+  free(domain_str);
 }
 
 char *create_URE_text(URE *ure) {
@@ -1084,7 +1154,141 @@ void create_drain_UREs(Stmt *stmt, PlutoAccess *acc, PlutoProg *prog, VSA *vsa) 
 void stmt_to_UREs(Stmt *stmt, PlutoProg *prog, VSA *vsa) {
   char *domain_str = create_stmt_domain_str(stmt, prog, vsa);
 
+  int wacc_cnt = 0;
+  int racc_cnt = 0;
+  char *text = strdup(stmt->text);
 
+  // PET will assign out-of-order IDs to access functions in the statement
+  // In order to parse all references, we will iteratively run multiple 
+  // times untill we substitute all references in the original statement
+  while(wacc_cnt != stmt->nwrites || racc_cnt != stmt->nreads) {
+    char *new_text = "";
+    char ch;
+    int loc = 0;
+    while((ch = text[loc]) != '\0') {      
+      PlutoAccess *tmp_acc;
+      if (wacc_cnt != stmt->nwrites)
+        tmp_acc = stmt->writes[wacc_cnt];
+      else if (racc_cnt != stmt->nreads) 
+        tmp_acc = stmt->reads[racc_cnt];
+      else
+        tmp_acc = NULL;
+      
+      if (tmp_acc != NULL) {
+        char *tmp_acc_name;
+        tmp_acc_name = tmp_acc->name;
+        char substr[strlen(tmp_acc_name) + 1];
+        memcpy(substr, text + loc, PLMIN(strlen(tmp_acc_name), strlen(text) - loc)* sizeof(char));
+        substr[strlen(tmp_acc_name)] = '\0';
+        if (!strcmp(substr, tmp_acc_name) && text[loc + strlen(tmp_acc_name)] == '[') {
+          new_text = concat(new_text, vsa->acc_var_map[tmp_acc->sym_id]->var_ref);
+          loc += strlen(tmp_acc_name);
+          // skip the brackets
+          int dim = tmp_acc->mat->nrows;
+          int dim_cnt = 0;
+          while((ch = text[loc]) != '\0') {
+            if (ch == ']')
+              dim_cnt += 1;
+            loc++;
+            if (dim_cnt == dim)
+              break;
+          }
+          if (wacc_cnt != stmt->nwrites)
+            wacc_cnt++;
+          else if (racc_cnt != stmt->nreads)
+            racc_cnt++;
+        } else {
+          char ch_str[2];
+          ch_str[0] = ch;
+          ch_str[1] = '\0';
+          new_text = concat(new_text, ch_str);
+          loc++;
+        }
+      } else {
+        char ch_str[2];
+        ch_str[0] = ch;
+        ch_str[1] = '\0';
+        new_text = concat(new_text, ch_str);
+        loc++;
+      }
+
+    }
+    if (text)
+      free(text);
+    text = strdup(new_text);   
+    free(new_text);
+  }
+
+  char *var_name = vsa->acc_var_map[stmt->writes[0]->sym_id]->var_name;
+  URE *stmt_URE = NULL;
+  bool new_URE = true;
+  // check if this variable is already defined
+  for (int i = 0; i < vsa->URE_num; i++) {
+    if (!strcmp(vsa->UREs[i]->name, var_name)) {
+      stmt_URE = vsa->UREs[i];
+      new_URE = false;
+      break;
+    }
+  }
+  if (stmt_URE) {
+    stmt_URE->wrap_level++;
+    stmt_URE->select_cond = realloc(stmt_URE->select_cond, stmt_URE->wrap_level * sizeof(char *));
+    stmt_URE->select_LHS = realloc(stmt_URE->select_LHS, stmt_URE->wrap_level * sizeof(char *));
+    stmt_URE->select_RHS = realloc(stmt_URE->select_RHS, stmt_URE->wrap_level * sizeof(char *));
+    stmt_URE->select_cond[stmt_URE->wrap_level - 1] = strdup(domain_str);
+    stmt_URE->select_RHS[stmt_URE->wrap_level - 1] = strdup(vsa->acc_var_map[stmt->writes[0]->sym_id]->var_ref);
+  } else {
+    stmt_URE = (URE *)malloc(sizeof(URE));
+    URE_init(stmt_URE);
+    stmt_URE->id = vsa->URE_num;
+    char **URE_names = get_vsa_URE_names(vsa->UREs, vsa->URE_num);
+    stmt_URE->name = create_URE_name(URE_names, vsa->URE_num, var_name);
+    stmt_URE->LHS = strdup(vsa->acc_var_map[stmt->writes[0]->sym_id]->var_ref);
+    stmt_URE->wrap_level = 1;
+    stmt_URE->select_cond = realloc(stmt_URE->select_cond, stmt_URE->wrap_level * sizeof(char *));
+    stmt_URE->select_LHS = realloc(stmt_URE->select_LHS, stmt_URE->wrap_level * sizeof(char *));
+    stmt_URE->select_RHS = realloc(stmt_URE->select_RHS, stmt_URE->wrap_level * sizeof(char *));
+    stmt_URE->select_cond[stmt_URE->wrap_level - 1] = strdup(domain_str);
+    stmt_URE->select_RHS[stmt_URE->wrap_level - 1] = strdup(stmt_URE->LHS);
+
+    for (int i = 0; i < vsa->URE_num; i++) {
+      free(URE_names[i]);
+    }
+    free(URE_names);
+  }
+
+  char *new_text = "";
+  char ch;
+  int loc = 0;
+  while((ch = text[loc]) != ';') {
+    if (ch == '=') {
+      while(text[++loc] == ' ') {
+        
+      }
+      while((ch = text[loc]) != ';') {
+        char tmp[2];
+        tmp[0] = ch;
+        tmp[1] = '\0';
+        new_text = concat(new_text, tmp);          
+
+        loc++;
+      }
+    } else {
+      loc++;
+    }
+  }
+
+  stmt_URE->select_LHS[stmt_URE->wrap_level - 1] = strdup(new_text);
+  char *str_tmp = create_URE_text(stmt_URE);
+  free(stmt_URE->text);
+  stmt_URE->text = str_tmp;
+
+  if (new_URE)
+    vsa->UREs = URE_add(vsa->UREs, &vsa->URE_num, stmt_URE);
+
+  free(text);
+  free(new_text);
+  free(domain_str);
 }
 
 /* 
@@ -1277,6 +1481,7 @@ void vsa_t2s_meta_iter_extract(PlutoProg *prog, VSA *vsa) {
   int iter_cnt = 0;
   clast_parse_t2s_meta_iters(t2s_meta_iters, vsa->t2s_iter_num, &iter_cnt, root, cloogOptions);
 
+  cloog_clast_free(root);
   cloog_options_free(cloogOptions);
   cloog_state_free(state);
 
@@ -1326,11 +1531,15 @@ void iter_parse_user_stmt(struct cloogoptions *options, Iter **iters, int iter_n
 void iter_parse_for(struct cloogoptions *options, Iter **iters, int iter_num, int *iter_cnt, struct clast_for *f) {
   if (*iter_cnt < iter_num) {
     iters[*iter_cnt]->iter_name = strdup(f->iterator);
-    if (f->LB) {     
-      iters[*iter_cnt]->lb = strdup(clast_expr_to_str(options, f->LB));
+    if (f->LB) {    
+      char *str_tmp = clast_expr_to_str(options, f->LB);
+      iters[*iter_cnt]->lb = strdup(str_tmp);
+      free(str_tmp);
     } 
     if (f->UB) {
-      iters[*iter_cnt]->ub = strdup(clast_expr_to_str(options, f->UB));
+      char *str_tmp = clast_expr_to_str(options, f->UB); 
+      iters[*iter_cnt]->ub = strdup(str_tmp);
+      free(str_tmp);
     }
     iters[*iter_cnt]->stride = clast_int_to_str(f->stride);
     *iter_cnt = *iter_cnt + 1;
@@ -1353,18 +1562,22 @@ char *clast_expr_to_str(struct cloogoptions *i, struct clast_expr *e) {
     case clast_expr_name:
       tmp_str = clast_name_to_str((struct clast_name *)e);
       str = concat(str, tmp_str);
+      free(tmp_str);
       break;
     case clast_expr_term:
       tmp_str = clast_term_to_str(i, (struct clast_term *)e);
       str = concat(str, tmp_str);
+      free(tmp_str);
       break;
     case clast_expr_red:
       tmp_str = clast_reduction_to_str(i, (struct clast_reduction *)e);
       str = concat(str, tmp_str);
+      free(tmp_str);
       break;
     case clast_expr_bin:
       tmp_str = clast_binary_to_str(i, (struct clast_binary *)e);
       str = concat(str, tmp_str);
+      free(tmp_str);
       break;
     default:
       assert(0);
@@ -1390,17 +1603,22 @@ char *clast_term_to_str(struct cloogoptions *i, struct clast_term *t) {
     else if (cloog_int_is_neg_one(t->val))
       str = concat(str, "-");
     else {
-      str = concat(str, clast_int_to_str(t->val));
+      char *str_tmp = clast_int_to_str(t->val);
+      str = concat(str, str_tmp);
+      free(str_tmp);
       str = concat(str, "*");
     }
     if (group)
       str = concat(str, "(");
     char *str_tmp = clast_expr_to_str(i, t->var);
     str = concat(str, str_tmp);
+    free(str_tmp);
     if (group)
       str = concat(str, ")");
   } else {
-    str = concat(str, clast_int_to_str(t->val));
+    char *str_tmp = clast_int_to_str(t->val);
+    str = concat(str, str_tmp);
+    free(str_tmp);
   }
   return str;
 }
@@ -1418,14 +1636,17 @@ char *clast_reduction_to_str(struct cloogoptions *i, struct clast_reduction *r) 
       if (r->n == 1) {
         str_tmp = clast_expr_to_str(i, r->elts[0]);
         str = concat(str, str_tmp);
+        free(str_tmp);
         break;
       }
       if (i->language == CLOOG_LANGUAGE_FORTRAN) {
         str_tmp = clast_minmax_f_to_str(i, r);
         str = concat(str, str_tmp);
+        free(str_tmp);
       } else {
         str_tmp = clast_minmax_c_to_str(i, r);
         str = concat(str, str_tmp);        
+        free(str_tmp);
       }
       break;
     default:
@@ -1444,6 +1665,7 @@ char *clast_sum_to_str(struct cloogoptions *opt, struct clast_reduction *r) {
   t = (struct clast_term *) r->elts[0];
   char *str_tmp = clast_term_to_str(opt, t);
   str = concat(str, str_tmp);
+  free(str_tmp);
 
   for (i = 1; i < r->n; ++i) {
     assert(r->elts[i]->type == clast_expr_term);
@@ -1452,6 +1674,7 @@ char *clast_sum_to_str(struct cloogoptions *opt, struct clast_reduction *r) {
       str = concat(str, "+");
     char *str_tmp = clast_term_to_str(opt, t);
     str = concat(str, str_tmp);
+    free(str_tmp);
   }
 
   return str;

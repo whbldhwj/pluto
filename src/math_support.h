@@ -70,7 +70,7 @@ int64 lcm(int64 a, int64 b);
 int64 gcd(int64 a, int64 b);
 int64 *min_lexical(int64 *a, int64 *b, int64 num);
 
-char *concat(const char *prefix, const char *suffix);
+char *concat(char *prefix, const char *suffix);
 void pluto_affine_function_print(FILE *fp, int64 *func, int ndims, char **vars);
 char *pluto_affine_function_sprint(int64 *func, int ndims, char **vars);
 

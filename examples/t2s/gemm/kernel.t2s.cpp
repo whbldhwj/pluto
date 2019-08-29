@@ -24,12 +24,14 @@ Var t1, t2, t3;
 Func B_CC0_E(FUNC_S), A_CC1_E(FUNC_S), C_CC3_E(FUNC_S), C_ext_CC2_I(FUNC_S), APP(FUNC_S);
 
 // UREs
-B_CC0_E(t1, t2, t3) = select((t3 == 0 && t1 == 0 && t2 >= 0 && -t2 + (63) >= 0) || (t1 == 0 && t2 >= 0 && -t2 + (63) >= 0 && t3 + -1 >= 0 && -t3 + (63) >= 0), B(t3, t2), B_CC0_E(t1 + (-1), t2, t3));
-A_CC1_E(t1, t2, t3) = select((t3 == 0 && t2 == 0 && t1 >= 0 && -t1 + (63) >= 0) || (t2 == 0 && t1 >= 0 && -t1 + (63) >= 0 && t3 + -1 >= 0 && -t3 + (63) >= 0), A(t1, t3), A_CC1_E(t1, t2 + (-1), t3));
+B_CC0_E(t1, t2, t3) = select((t1 + -1 == 0 && t3 + (-2) >= 0) || (t3 + -1 == 0 && t1 + -1 == 0), B(t3, t2), B_CC0_E(t1 + (-1), t2, t3));
+A_CC1_E(t1, t2, t3) = select((t2 + -1 == 0 && t3 + (-2) >= 0) || (t3 + -1 == 0 && t2 + -1 == 0), A(t1, t3), A_CC1_E(t1, t2 + (-1), t3));
+C_ext_CC2_I(t1, t2, t3) = select((t3 + -1 == 0 && t2 + -1 >= 0 && t1 + -1 >= 0 && -t2 + (8) >= 0 && -t1 + (8) >= 0), (A_CC1_E(t1, t2, t3) * B_CC0_E(t1, t2, t3)), select((t1 + -1 >= 0 && t2 + -1 >= 0 && -t3 + (8) >= 0 && -t1 + (8) >= 0 && -t2 + (8) >= 0 && t3 + (-2) >= 0), (C_ext_CC2_I(t1, t2, t3 + (-1)) + (A_CC1_E(t1, t2, t3) * B_CC0_E(t1, t2, t3))), C_ext_CC2_I(t1, t2, t3)));
+C_CC3_E(t1, t2, t3) = select((t3 + (-8) == 0 && t2 + -1 >= 0 && t1 + -1 >= 0 && -t2 + (8) >= 0 && -t1 + (8) >= 0), C_ext_CC2_I(t1, t2, t3), C_CC3_E(t1, t2, t3));
 
 // Build the initial loop nest
 Var tloop1;
-APP.merge_defs(B_CC0_E, A_CC1_E)
+APP.merge_defs(B_CC0_E, A_CC1_E, C_ext_CC2_I, C_CC3_E)
    .reorder_inward(t1, t2, t3)
    .space_time_transform({t1, t2, t3},
                          {tloop1},
@@ -39,17 +41,16 @@ APP.merge_defs(B_CC0_E, A_CC1_E)
                           0, 0, 1},
                          {1, 0, 0,
                           0, 1, 0,
-                          0, 0, 1},)
-   .domain(t1, 0 + 1, 63 + 1, 1,
-           t2, 0 + 1, 63 + 1, 1,
-           t3, 0 + 1, 63 + 1, 1,
-           tloop1, 0 + 1, 63 + 1, 1,
-);
+                          0, 0, 1})
+   .domain(t1, 1, 8, 1,
+           t2, 1, 8, 1,
+           t3, 1, 8, 1,
+           tloop1, 1, 8, 1);
 
 // PE Optimization
 
 // CPU Realization
-Image<float> CPU_output(63 + 2, 63 + 2, 63 + 2);
+Image<float> CPU_output(8 + 1, 8 + 1, 8 + 1);
 APP.realize(CPU_output);
 cout << "END" << endl;
 
@@ -58,10 +59,10 @@ cout << "END" << endl;
 /*
 // Build I/O network
 Func B_CC0_E_serializer(Place::Host), B_CC0_E_loader, B_CC0_E_feeder, A_CC1_E_serializer(Place::Host), A_CC1_E_loader, A_CC1_E_feeder, C_ext_CC2_I_drainer, C_ext_CC2_I_collector, C_ext_CC2_I_unloader, C_ext_CC2_I_deserializer(Place::Host), C_CC3_E_drainer, C_CC3_E_collector, C_CC3_E_unloader, C_CC3_E_deserializer(Place::Host);
-APP.isolate_consumer_chain(B_CC0_E, B_CC0_E_feeder, B_CC0_E_loader, B_CC0_E_serializer)
-   .isolate_consumer_chain(A_CC1_E, A_CC1_E_feeder, A_CC1_E_loader, A_CC1_E_serializer)
-   .isolate_producer_chain(C_ext_CC2_I, C_ext_CC2_I_drainer, C_ext_CC2_I_collector, C_ext_CC2_I_unloader C_ext_CC2_I_deserializer)
-   .isolate_producer_chain(C_CC3_E, C_CC3_E_drainer, C_CC3_E_collector, C_CC3_E_unloader C_CC3_E_deserializer);
+APP.isolate_consumer_chain(B_CC0_E, B_CC0_E_feeder, B_CC0_E_loader, B_CC0_E_serializer(Place::Host))
+   .isolate_consumer_chain(A_CC1_E, A_CC1_E_feeder, A_CC1_E_loader, A_CC1_E_serializer(Place::Host))
+   .isolate_producer_chain(C_ext_CC2_I, C_ext_CC2_I_drainer, C_ext_CC2_I_collector, C_ext_CC2_I_unloader C_ext_CC2_I_deserializer(Place::Host))
+   .isolate_producer_chain(C_CC3_E, C_CC3_E_drainer, C_CC3_E_collector, C_CC3_E_unloader C_CC3_E_deserializer(Place::Host));
 
 // I/O Optimization
 

@@ -464,7 +464,7 @@ PlutoConstraints *compute_write_out_iter(
      * uwcst is constructed that way) */
     /* Yields iterations inside the tile whose write locations are again
      * written to outside the tile */
-    pluto_constraints_project_out_isl_single(&tile_dest_outside, src->trans->nrows,
+    pluto_constraints_project_out_isl_single(tile_dest_outside, src->trans->nrows,
                                   dest->trans->nrows);
     
     // /* Locations that will again be written to outside */
@@ -595,7 +595,7 @@ PlutoConstraints *compute_write_out(struct stmt_access_pair *wacc_stmt,
      * uwcst is constructed that way) */
     /* Yields iterations inside the tile whose write locations are again
      * written to outside the tile */
-    pluto_constraints_project_out_isl_single(&tile_dest_outside, src->trans->nrows,
+    pluto_constraints_project_out_isl_single(tile_dest_outside, src->trans->nrows,
                                   dest->trans->nrows);
 
     IF_DEBUG(printf("Dep target iters outside of tile that write to same "
@@ -660,7 +660,7 @@ PlutoConstraints *compute_read_in_engine_reuse(
   );
   
   pluto_constraints_project_out_isl_single(
-     &access_region, reuse_level, 1
+     access_region, reuse_level, 1
   );
 
   pluto_constraints_add_dim(access_region, reuse_level, NULL);
@@ -718,7 +718,7 @@ PlutoConstraints *pluto_compute_region_data(const Stmt *stmt,
 
   pluto_constraints_add_to_each(datadom, acc_cst);
 
-  pluto_constraints_project_out_isl_single(&datadom, copy_level, datadom->ncols -
+  pluto_constraints_project_out_isl_single(datadom, copy_level, datadom->ncols -
                                                          copy_level - npar - 1 -
                                                          newacc->nrows);
 
@@ -733,6 +733,7 @@ PlutoConstraints *pluto_compute_region_data(const Stmt *stmt,
         pluto_compute_region_data(stmt, domain->next, acc, copy_level, prog);
   }
 
+  free(divs);
   return datadom;
 }
 
@@ -784,9 +785,9 @@ PlutoConstraints *pluto_get_transformed_dpoly(const Dep *dep, Stmt *src,
 
   //pluto_constraints_project_out(dpoly, src->trans->nrows + dest->trans->nrows,
   //                              dest->dim);
-  pluto_constraints_project_out_isl_single(&dpoly, src->trans->nrows, src->dim);
+  pluto_constraints_project_out_isl_single(dpoly, src->trans->nrows, src->dim);
 
-  pluto_constraints_project_out_isl_single(&dpoly, src->trans->nrows + dest->trans->nrows, dest->dim);
+  pluto_constraints_project_out_isl_single(dpoly, src->trans->nrows + dest->trans->nrows, dest->dim);
 
   // IF_DEBUG(printf("New domain is \n"););
   // IF_DEBUG(pluto_constraints_print(stdout, newdom););

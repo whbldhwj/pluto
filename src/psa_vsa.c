@@ -215,13 +215,17 @@ void update_t2s_ivar(int acc_id, struct stmt_access_var_pair **acc_var_map, stru
        acc_var_map[acc_id]->var_iters[iter_id]->iter_offset = 0;
       }
 
-      adg_var_map[cc_id]->var_ref = strdup(get_iter_str(acc_var_map[acc_id]->var_iters, iter_num));
+      adg_var_map[cc_id]->var_ref = get_iter_str(acc_var_map[acc_id]->var_iters, iter_num);
 
       char var_ref[50];
-      if (prog->options->dsa == 0)
-        sprintf(var_ref, "%s(%s)", var_name, get_iter_str(acc_var_map[acc_id]->var_iters, iter_num));
-      else if (prog->options->dsa > 0) {
-        sprintf(var_ref, "%s(%s)", var_name, create_new_acc_ref_str(stmt, acc, prog, vsa));
+      if (prog->options->dsa == 0) {
+        char *str_tmp = get_iter_str(acc_var_map[acc_id]->var_iters, iter_num);
+        sprintf(var_ref, "%s(%s)", var_name, str_tmp);
+        free(str_tmp);
+      } else if (prog->options->dsa > 0) {
+        char *str_tmp = create_new_acc_ref_str(stmt, acc, prog, vsa);
+        sprintf(var_ref, "%s(%s)", var_name, str_tmp);
+        free(str_tmp);
       }
 
       vsa->ivar_refs[vsa->ivar_num - 1] = strdup(var_ref);
@@ -237,6 +241,8 @@ void update_t2s_ivar(int acc_id, struct stmt_access_var_pair **acc_var_map, stru
 
         vsa->idvar_names[vsa->idvar_num - 1] = strdup(var_name);
         acc_var_map[acc_id]->dvar_name = strdup(var_name);
+        if (adg_var_map[cc_id]->dvar_name)
+          free(adg_var_map[cc_id]->dvar_name);
         adg_var_map[cc_id]->dvar_name = strdup(var_name);
         adg_var_map[cc_id]->d = 1;
 
@@ -248,10 +254,14 @@ void update_t2s_ivar(int acc_id, struct stmt_access_var_pair **acc_var_map, stru
         }
 
         char var_ref[50];
-        if (prog->options->dsa == 0)
-          sprintf(var_ref, "%s(%s)", var_name, get_iter_str(acc_var_map[acc_id]->dvar_iters, iter_num));
-        else if (prog->options->dsa > 0) {
-          sprintf(var_ref, "%s(%s)", var_name, create_new_acc_ref_str(stmt, acc, prog, vsa));
+        if (prog->options->dsa == 0) {
+          char *str_tmp = get_iter_str(acc_var_map[acc_id]->dvar_iters, iter_num);
+          sprintf(var_ref, "%s(%s)", var_name, str_tmp);
+          free(str_tmp);
+        } else if (prog->options->dsa > 0) {
+          char *str_tmp = create_new_acc_ref_str(stmt, acc, prog, vsa);
+          sprintf(var_ref, "%s(%s)", var_name, str_tmp);
+          free(str_tmp);
         }
 
         vsa->idvar_refs[vsa->idvar_num - 1] = strdup(var_ref);
@@ -274,10 +284,14 @@ void update_t2s_ivar(int acc_id, struct stmt_access_var_pair **acc_var_map, stru
       get_var_iters(acc_id, acc_var_map, prog, vsa);
 
       char var_ref[50];
-      if (prog->options->dsa == 0)
-        sprintf(var_ref, "%s(%s)", var_name, get_iter_str(acc_var_map[acc_id]->var_iters, iter_num));
-      else if (prog->options->dsa > 0) {
-        sprintf(var_ref, "%s(%s)", var_name, create_new_acc_ref_str(stmt, acc, prog, vsa));
+      if (prog->options->dsa == 0) {
+        char *str_tmp = get_iter_str(acc_var_map[acc_id]->var_iters, iter_num);
+        sprintf(var_ref, "%s(%s)", var_name, str_tmp);
+        free(str_tmp);
+      } else if (prog->options->dsa > 0) {
+        char *str_tmp = create_new_acc_ref_str(stmt, acc, prog, vsa);
+        sprintf(var_ref, "%s(%s)", var_name, str_tmp);
+        free(str_tmp);
       }
 
       acc_var_map[acc_id]->var_ref = strdup(var_ref);    
@@ -302,10 +316,14 @@ void update_t2s_ivar(int acc_id, struct stmt_access_var_pair **acc_var_map, stru
         }
 
         char var_ref[50];
-        if (prog->options->dsa == 0)
-          sprintf(var_ref, "%s(%s)", var_name, get_iter_str(acc_var_map[acc_id]->dvar_iters, iter_num));
-        else if (prog->options->dsa > 0) {
-          sprintf(var_ref, "%s(%s)", var_name, create_new_acc_ref_str(stmt, acc, prog, vsa));
+        if (prog->options->dsa == 0) {
+          char *str_tmp = get_iter_str(acc_var_map[acc_id]->dvar_iters, iter_num);
+          sprintf(var_ref, "%s(%s)", var_name, str_tmp);
+          free(str_tmp);
+        } else if (prog->options->dsa > 0) {
+          char *str_tmp = create_new_acc_ref_str(stmt, acc, prog, vsa);
+          sprintf(var_ref, "%s(%s)", var_name, str_tmp);
+          free(str_tmp);
         }
 
         acc_var_map[acc_id]->dvar_ref = strdup(var_ref);
@@ -342,7 +360,7 @@ char *get_iter_str(IterExp **iters, int iter_num) {
     iter_str = concat(iter_str, iter_exp);
     if (iter_id < iter_num - 1) {
       iter_str = concat(iter_str, ", ");
-    }
+    }  
   }
   return iter_str;
 }
@@ -400,7 +418,9 @@ void update_t2s_var(struct stmt_access_var_pair **acc_var_map, struct var_pair *
         }
 
         char var_ref[50];
-        sprintf(var_ref, "%s(%s)", var_name, get_iter_str(acc_var_map[acc_id]->var_iters, iter_num));
+        char *tmp_iter_str = get_iter_str(acc_var_map[acc_id]->var_iters, iter_num);
+        sprintf(var_ref, "%s(%s)", var_name, tmp_iter_str);
+        free(tmp_iter_str);
 
         vsa->evar_refs[vsa->evar_num - 1] = strdup(var_ref);
         acc_var_map[acc_id]->var_ref = strdup(var_ref);
@@ -428,7 +448,9 @@ void update_t2s_var(struct stmt_access_var_pair **acc_var_map, struct var_pair *
           }
 
           char var_ref[50];
-          sprintf(var_ref, "%s(%s)", var_name, get_iter_str(acc_var_map[acc_id]->dvar_iters, iter_num));
+          char *str_tmp = get_iter_str(acc_var_map[acc_id]->dvar_iters, iter_num);
+          sprintf(var_ref, "%s(%s)", var_name, str_tmp);
+          free(str_tmp);
 
           vsa->edvar_refs[vsa->edvar_num - 1] = strdup(var_ref);
           acc_var_map[acc_id]->dvar_ref = strdup(var_ref);
@@ -522,12 +544,12 @@ void vsa_t2s_var_extract(PlutoProg *prog, VSA *vsa) {
     }
   }
 
-  char *iters = "t1";;
-  for (int i = 1; i < band_width; i++) {  
-    char iter_tmp[6];
-    sprintf(iter_tmp, ", t%d", i + 1);
-    iters = concat(iters, iter_tmp);
-  }
+//  char *iters = "t1";;
+//  for (int i = 1; i < band_width; i++) {  
+//    char iter_tmp[6];
+//    sprintf(iter_tmp, ", t%d", i + 1);
+//    iters = concat(iters, iter_tmp);
+//  }
 
   // Build the access dependence graph. Each node in the graph is one unique access function in the program.
   // Then compute the connected components of the graph, all the accesses in the same componenet will 
@@ -592,9 +614,20 @@ void vsa_t2s_var_extract(PlutoProg *prog, VSA *vsa) {
 
   vsa->acc_var_map = acc_var_map;
   vsa->adg_var_map = adg_var_map;
+  vsa->acc_var_map_num_entries = total_accs;
+  vsa->adg_var_map_num_entries = adg->num_ccs;
 #ifdef PSA_VSA_DEBUG
   acc_var_map_pretty_print(acc_var_map, total_accs);
 #endif  
+
+  for (int i = 0; i < num_read_write_data; i++) {
+    for (int j = 0; j < num_stmts_per_acc[i]; j++) {
+      free(acc_stmts[i][j]);
+    }
+    free(acc_stmts[i]);
+  }
+  free(acc_stmts);
+  free(num_stmts_per_acc);
 }
 
 /*
@@ -1026,8 +1059,8 @@ void vsa_array_shape_extract(PlutoProg *prog, VSA *vsa) {
     // Project out all hyperplanes except the space loops
     int array_part_band_width = vsa->array_part_band_width;
     int space_band_width = vsa->space_band_width;
-    pluto_constraints_project_out_isl_single(&new_stmt_domain, 0, array_part_band_width);
-    pluto_constraints_project_out_isl_single(&new_stmt_domain, space_band_width, stmt->trans->nrows - array_part_band_width - space_band_width);
+    pluto_constraints_project_out_isl_single(new_stmt_domain, 0, array_part_band_width);
+    pluto_constraints_project_out_isl_single(new_stmt_domain, space_band_width, stmt->trans->nrows - array_part_band_width - space_band_width);
     if (i == 0) {
       space_domain = pluto_constraints_dup(new_stmt_domain);
     } else {
@@ -1315,6 +1348,115 @@ VSA *vsa_alloc() {
 
 void vsa_free(VSA *vsa) {
   // TODO
+
+#ifdef T2S_CODEGEN  
+  for (int i = 0; i < vsa->acc_var_map_num_entries; i++) {
+    free(vsa->acc_var_map[i]->var_name);
+    free(vsa->acc_var_map[i]->var_ref);
+    free(vsa->acc_var_map[i]->dvar_name);
+    free(vsa->acc_var_map[i]->dvar_ref);
+    for (int j = 0; j < vsa->t2s_iter_num; j++) {
+      if (vsa->acc_var_map[i]->var_iters) {
+        free(vsa->acc_var_map[i]->var_iters[j]->iter_name);
+        free(vsa->acc_var_map[i]->var_iters[j]);
+      }
+      if (vsa->acc_var_map[i]->dvar_iters) {
+        free(vsa->acc_var_map[i]->dvar_iters[j]->iter_name);
+        free(vsa->acc_var_map[i]->dvar_iters[j]);
+      }
+    }
+    if (vsa->acc_var_map[i]->var_iters) {
+      free(vsa->acc_var_map[i]->var_iters);
+    }
+    if (vsa->acc_var_map[i]->dvar_iters) {
+      free(vsa->acc_var_map[i]->dvar_iters);
+    }
+    
+    free(vsa->acc_var_map[i]);
+  }  
+  free(vsa->acc_var_map);
+
+  for (int i = 0; i < vsa->adg_var_map_num_entries; i++) {
+    free(vsa->adg_var_map[i]->var_name);
+    free(vsa->adg_var_map[i]->var_ref);
+    free(vsa->adg_var_map[i]->dvar_name);
+    
+    free(vsa->adg_var_map[i]);
+  }
+  free(vsa->adg_var_map);
+
+  for (int i = 0; i < vsa->t2s_IO_build_num; i++) {
+    free(vsa->t2s_IO_build_calls[i]);
+  }
+  free(vsa->t2s_IO_build_calls);
+
+  for (int i = 0; i < vsa->t2s_IO_func_num; i++) {
+    free(vsa->t2s_IO_func_names[i]);
+  }
+  free(vsa->t2s_IO_func_names);
+
+  for (int i = 0; i < vsa->domain_exp_num; i++) {
+    free(vsa->domain_exps[i]);
+  }
+  free(vsa->domain_exps);
+
+  /* UREs */
+  for (int i = 0; i < vsa->URE_num; i++) {
+    URE_free(vsa->UREs[i]);  
+  }
+  free(vsa->UREs);
+
+  /* Arrays */
+  for (int i = 0; i < vsa->array_num; i++) {
+    free(vsa->arrays[i]->text);
+    free(vsa->arrays[i]);
+  }
+  free(vsa->arrays);
+
+  /* Iters */
+  for (int i = 0; i < vsa->t2s_iter_num; i++) {
+    free(vsa->t2s_meta_iters[i]->iter_name);
+    free(vsa->t2s_meta_iters[i]->lb);
+    free(vsa->t2s_meta_iters[i]->ub);
+    free(vsa->t2s_meta_iters[i]->stride);
+    free(vsa->t2s_meta_iters[i]);
+  }
+  free(vsa->t2s_meta_iters);
+
+  for (int i = 0; i < vsa->t2s_iter_num; i++) {
+    free(vsa->t2s_iters[i]);
+  }
+  free(vsa->t2s_iters);
+
+  for (int i = 0; i < vsa->evar_num; i++) {
+    free(vsa->evar_names[i]);
+    free(vsa->evar_refs[i]);
+  }
+  free(vsa->evar_names);
+  free(vsa->evar_refs);
+
+  for (int i = 0; i < vsa->edvar_num; i++) {
+    free(vsa->edvar_names[i]);
+    free(vsa->edvar_refs[i]);
+  }
+  free(vsa->edvar_names);
+  free(vsa->edvar_refs);
+
+  for (int i = 0; i < vsa->ivar_num; i++) {
+    free(vsa->ivar_names[i]);
+    free(vsa->ivar_refs[i]);
+  }
+  free(vsa->ivar_names);
+  free(vsa->ivar_refs);
+
+  for (int i = 0; i < vsa->idvar_num; i++) {
+    free(vsa->idvar_names[i]);
+    free(vsa->idvar_refs[i]);
+  }
+  free(vsa->idvar_names);
+  free(vsa->idvar_refs);
+#endif
+
   free(vsa);
 }
 

@@ -981,9 +981,11 @@ struct psaVSA {
 
   /* ACCESS_VARIABLE_MAP */
   struct stmt_access_var_pair **acc_var_map;
-  
+  int acc_var_map_num_entries;
+
   /* ADG_VARIABLE_MAP */
   struct var_pair **adg_var_map;
+  int adg_var_map_num_entries;
 
   /* T2S_ITERS_NUM */
   int t2s_iter_num;

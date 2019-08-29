@@ -17,23 +17,23 @@
 
 ///* DSA Form 1 */
 void dsa_kernel(data_t A[I][K], data_t B[K][J], data_t C[I][J]) {
-  data_t C_ext[64][64][64];
+  data_t C_ext[8 + 1][8 + 1][8 + 1];
 #pragma scop
-  for (int i = 0; i < 64;i ++)
-    for (int j = 0; j < 64; j++)
-      for (int k = 0; k < 64; k++) {
-        if (k == 0)
+  for (int i = 1; i < 8 + 1; i ++)
+    for (int j = 1; j < 8 + 1; j++)
+      for (int k = 1; k < 8 + 1; k++) {
+        if (k == 1)
           C_ext[i][j][k] = A[i][k] * B[k][j];
         else
           C_ext[i][j][k] = C_ext[i][j][k - 1] + A[i][k] * B[k][j];        
-        if (k == 63)
+        if (k == 8)
           C[i][j] = C_ext[i][j][k];
       }
 #pragma endscop  
   
-  for (int i = 0; i < 64; i++)
-    for (int j = 0; j < 64; j++) {
-      C[i][j] = C_ext[i][j][63];
+  for (int i = 0; i < 8; i++)
+    for (int j = 0; j < 8; j++) {
+      C[i][j] = C_ext[i + 1][j + 1][8];
     }
 }
 

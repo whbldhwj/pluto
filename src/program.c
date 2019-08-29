@@ -2891,6 +2891,10 @@ void pluto_prog_free(PlutoProg *prog) {
     graph_free(prog->ddg);
   }
 
+  if (prog->adg != NULL) {
+    graph_free(prog->adg);
+  }
+
   if (prog->hProps != NULL) {
     free(prog->hProps);
   }
@@ -3716,6 +3720,11 @@ bool psa_access_merge(struct stmt_access_pair *stmt_acc1, struct stmt_access_pai
   isl_map_free(map1);
   isl_map_free(map2);
   isl_ctx_free(ctx);
+  pluto_constraints_free(new_domain1);
+  pluto_constraints_free(acc_map1);
+  pluto_constraints_free(new_domain2);
+  pluto_constraints_free(acc_map2);
+
   return is_equal;
 }
 /* Jie Added - End */
