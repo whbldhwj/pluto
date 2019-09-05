@@ -3650,6 +3650,8 @@ Stmt *pluto_stmt_alloc(int dim, const PlutoConstraints *domain,
     stmt->iterators = NULL;
   }
 
+  stmt->untouched = 1;
+
   return stmt;
 }
 
@@ -3686,46 +3688,84 @@ bool pluto_access_cmp(const PlutoAccess *acc1, const PlutoAccess *acc2) {
  * If these two maps equal, then return true, otherwise return false
  */
 bool psa_access_merge(struct stmt_access_pair *stmt_acc1, struct stmt_access_pair *stmt_acc2, PlutoProg *prog) {
-  PlutoConstraints *new_domain1 = pluto_get_new_domain(stmt_acc1->stmt);
-  PlutoConstraints *acc_map1 = pluto_compute_region_data(stmt_acc1->stmt, new_domain1, stmt_acc1->acc, stmt_acc1->stmt->trans->nrows, prog);
+  assert(stmt_acc1->stmt->untouched == stmt_acc2->stmt->untouched);
 
-  PlutoConstraints *new_domain2 = pluto_get_new_domain(stmt_acc2->stmt);
-  PlutoConstraints *acc_map2 = pluto_compute_region_data(stmt_acc2->stmt, new_domain1, stmt_acc2->acc, stmt_acc2->stmt->trans->nrows, prog);
+  if (!stmt_acc1->stmt->untouched && !stmt_acc2->stmt->untouched) {
+    PlutoConstraints *new_domain1 = pluto_get_new_domain(stmt_acc1->stmt);
+    PlutoConstraints *acc_map1 = pluto_compute_region_data(stmt_acc1->stmt, new_domain1, stmt_acc1->acc, stmt_acc1->stmt->trans->nrows, prog);
+  
+    PlutoConstraints *new_domain2 = pluto_get_new_domain(stmt_acc2->stmt);
+    PlutoConstraints *acc_map2 = pluto_compute_region_data(stmt_acc2->stmt, new_domain1, stmt_acc2->acc, stmt_acc2->stmt->trans->nrows, prog);
+   
+    // the return constraints is in the format [dim_in, dim_out, npar, 1]
+    // we will need to adjust it to [dim_out, dim_in, npar, 1]
+    for (int i = 0; i < stmt_acc1->acc->mat->nrows; i++) {
+      pluto_constraints_add_dim(acc_map1, i, NULL);
+      pluto_constraints_interchange_cols(acc_map1, i, i + stmt_acc1->stmt->trans->nrows);
+    }
+    for (int i = 0; i < stmt_acc1->acc->mat->nrows; i++) {
+      pluto_constraints_remove_dim(acc_map1, stmt_acc1->stmt->trans->nrows + stmt_acc1->acc->mat->nrows);
+    }
+  
+    for (int i = 0; i < stmt_acc2->acc->mat->nrows; i++) {
+      pluto_constraints_add_dim(acc_map2, i, NULL);
+      pluto_constraints_interchange_cols(acc_map2, i, i + stmt_acc2->stmt->trans->nrows);
+    }
+    for (int i = 0; i < stmt_acc2->acc->mat->nrows; i++) {
+      pluto_constraints_remove_dim(acc_map2, stmt_acc2->stmt->trans->nrows + stmt_acc2->acc->mat->nrows);
+    }
+  
+    // convert PlutoConstraints to isl_map
+    isl_ctx *ctx = isl_ctx_alloc();
+    isl_map *map1 = isl_map_from_pluto_constraints(acc_map1, ctx, stmt_acc1->stmt->trans->nrows, stmt_acc1->acc->mat->nrows, prog->npar); 
+    isl_map *map2 = isl_map_from_pluto_constraints(acc_map2, ctx, stmt_acc2->stmt->trans->nrows, stmt_acc2->acc->mat->nrows, prog->npar);
+  
+    bool is_equal = isl_map_is_equal(map1, map2);
  
-  // the return constraints is in the format [dim_in, dim_out, npar, 1]
-  // we will need to adjust it to [dim_out, dim_in, npar, 1]
-  for (int i = 0; i < stmt_acc1->acc->mat->nrows; i++) {
-    pluto_constraints_add_dim(acc_map1, i, NULL);
-    pluto_constraints_interchange_cols(acc_map1, i, i + stmt_acc1->stmt->trans->nrows);
+    isl_map_free(map1);
+    isl_map_free(map2);
+    isl_ctx_free(ctx);
+    pluto_constraints_free(new_domain1);
+    pluto_constraints_free(acc_map1);
+    pluto_constraints_free(new_domain2);
+    pluto_constraints_free(acc_map2);
+
+    return is_equal;
+  } else {
+    PlutoConstraints *acc_map1 = psa_compute_region_data(stmt_acc1->stmt, stmt_acc1->stmt->domain, stmt_acc1->acc, prog);
+    PlutoConstraints *acc_map2 = psa_compute_region_data(stmt_acc2->stmt, stmt_acc2->stmt->domain, stmt_acc2->acc, prog);
+
+    for (int i = 0; i < stmt_acc1->acc->mat->nrows; i++) {
+      pluto_constraints_add_dim(acc_map1, i, NULL);
+      pluto_constraints_interchange_cols(acc_map1, i, i + stmt_acc1->stmt->dim);      
+    }
+    for (int i = 0; i < stmt_acc1->acc->mat->nrows; i++) {
+      pluto_constraints_remove_dim(acc_map1, stmt_acc1->stmt->dim + stmt_acc1->acc->mat->nrows);
+    }
+
+    for (int i = 0; i < stmt_acc2->acc->mat->nrows; i++) {
+      pluto_constraints_add_dim(acc_map2, i, NULL);
+      pluto_constraints_interchange_cols(acc_map2, i, i + stmt_acc2->stmt->dim);
+    }
+    for (int i = 0; i < stmt_acc2->acc->mat->nrows; i++) {
+      pluto_constraints_remove_dim(acc_map2, stmt_acc2->stmt->dim + stmt_acc2->acc->mat->nrows);
+    }
+
+    // convert to isl_map
+    isl_ctx *ctx = isl_ctx_alloc();
+    isl_map *map1 = isl_map_from_pluto_constraints(acc_map1, ctx, stmt_acc1->stmt->dim, stmt_acc1->acc->mat->nrows, prog->npar);
+    isl_map *map2 = isl_map_from_pluto_constraints(acc_map2, ctx, stmt_acc2->stmt->dim, stmt_acc2->acc->mat->nrows, prog->npar);
+
+    bool is_equal = isl_map_is_equal(map1, map2);
+
+    isl_map_free(map1);
+    isl_map_free(map2);
+    isl_ctx_free(ctx);
+    pluto_constraints_free(acc_map1);
+    pluto_constraints_free(acc_map2);
+
+    return is_equal;
   }
-  for (int i = 0; i < stmt_acc1->acc->mat->nrows; i++) {
-    pluto_constraints_remove_dim(acc_map1, stmt_acc1->stmt->trans->nrows + stmt_acc1->acc->mat->nrows);
-  }
-
-  for (int i = 0; i < stmt_acc2->acc->mat->nrows; i++) {
-    pluto_constraints_add_dim(acc_map2, i, NULL);
-    pluto_constraints_interchange_cols(acc_map2, i, i + stmt_acc2->stmt->trans->nrows);
-  }
-  for (int i = 0; i < stmt_acc2->acc->mat->nrows; i++) {
-    pluto_constraints_remove_dim(acc_map2, stmt_acc2->stmt->trans->nrows + stmt_acc2->acc->mat->nrows);
-  }
-
-  // convert PlutoConstraints to isl_map
-  isl_ctx *ctx = isl_ctx_alloc();
-  isl_map *map1 = isl_map_from_pluto_constraints(acc_map1, ctx, stmt_acc1->stmt->trans->nrows, stmt_acc1->acc->mat->nrows, prog->npar); 
-  isl_map *map2 = isl_map_from_pluto_constraints(acc_map2, ctx, stmt_acc2->stmt->trans->nrows, stmt_acc2->acc->mat->nrows, prog->npar);
-
-  bool is_equal = isl_map_is_equal(map1, map2);
-
-  isl_map_free(map1);
-  isl_map_free(map2);
-  isl_ctx_free(ctx);
-  pluto_constraints_free(new_domain1);
-  pluto_constraints_free(acc_map1);
-  pluto_constraints_free(new_domain2);
-  pluto_constraints_free(acc_map2);
-
-  return is_equal;
 }
 /* Jie Added - End */
 

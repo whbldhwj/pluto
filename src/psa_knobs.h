@@ -17,6 +17,9 @@
 // print out detailed information of each dependence after the Pluto transformation
 //#define PRINT_DEPS_POST_TRANSFORM
 
+// perform pluto's algorithm
+#define PLUTO_TRANSFORM
+
 // print out the transformed code after Pluto's auto-transformation
 #define PRINT_PLUTO_TRANS_PROGRAM
 
@@ -30,8 +33,8 @@
 #define SPACE_TIME_MAPPING
 
 // sync or async
-//#define SYNC_ARRAY
-#define ASYNC_ARRAY
+#define SYNC_ARRAY
+//#define ASYNC_ARRAY
 
 // upper bound of permissible systolic array dimension
 #define SA_DIM_UB 2

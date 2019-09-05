@@ -107,6 +107,19 @@ void pluto_interchange(PlutoProg *prog, int level1, int level2) {
 
 }
 
+void psa_stmt_add_loops(Stmt *stmt, int level1, int level2, PlutoProg *prog) {
+  for (int i = 0; i < stmt->trans->ncols; i++) {
+    stmt->trans->val[level1][i] += stmt->trans->val[level2][i];
+  }
+}
+
+/* Add loop level2 to loop level1 */
+void psa_add_loops(PlutoProg *prog, int level1, int level2) {
+  for (int i = 0; i < prog->nstmts; i++) {
+    psa_stmt_add_loops(prog->stmts[i], level1, level2, prog);
+  }
+}
+
 void pluto_sink_transformation(Stmt *stmt, int pos, PlutoProg *prog) {
   int i, npar;
 

@@ -669,6 +669,42 @@ PlutoConstraints *compute_read_in_engine_reuse(
   return access_region;
 }
 
+/* Compute the region(s) of accessed by 'acc' in the original domain */
+PlutoConstraints *psa_compute_region_data(const Stmt *stmt,
+                                         const PlutoConstraints *domain,
+                                         const PlutoAccess *acc,                                         
+                                         const PlutoProg *prog) {
+  int npar = prog->npar;
+  PlutoConstraints *datadom = pluto_constraints_dup(domain);
+  PlutoMatrix *newacc = pluto_matrix_dup(acc->mat);
+
+  for (int k = 0; k < newacc->nrows; k++) {
+    pluto_matrix_negate_row(newacc, newacc->nrows - 1 - k);
+    pluto_matrix_add_col(newacc, stmt->dim);
+    newacc->val[newacc->nrows - 1 - k][stmt->dim] = 1;
+
+    pluto_constraints_add_dim(datadom, domain->ncols - prog->npar - 1, NULL);
+  }
+
+  PlutoConstraints *acc_cst = pluto_constraints_from_equalities(newacc);
+
+  for (int i = 0; i < domain->ncols - stmt->dim - npar - 1; i++) {
+    pluto_constraints_add_dim(acc_cst, 0, NULL);
+  }
+
+  pluto_constraints_add_to_each(datadom, acc_cst);
+
+  pluto_constraints_free(acc_cst);
+  pluto_matrix_free(newacc);
+
+  if (domain->next != NULL) {
+    datadom->next = 
+      psa_compute_region_data(stmt, domain->next, acc, prog);
+  }
+
+  return datadom;
+}
+
 /* Compute region(s) of data accessed by 'acc' with 'copy_level' number of
  * outer loops as parameters
  * 'copy_level' outer dimensions will be treated as parameters in addition
@@ -696,7 +732,8 @@ PlutoConstraints *pluto_compute_region_data(const Stmt *stmt,
   assert((stmt->trans->nrows + npar + 1 == domain->ncols) ||
          (copy_level + stmt->trans->nrows + npar + 1 == domain->ncols));
 
-  PlutoMatrix *newacc = pluto_get_new_access_func(stmt, acc->mat, &divs);
+  PlutoMatrix *newacc;
+  newacc = pluto_get_new_access_func(stmt, acc->mat, &divs);
 
   PlutoConstraints *datadom = pluto_constraints_dup(domain);
 

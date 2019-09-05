@@ -40,6 +40,7 @@ char **get_vsa_URE_names(URE **UREs, int URE_num);
 void vsa_URE_extract(PlutoProg *prog, VSA *vsa);
 void vsa_t2s_iter_extract(PlutoProg *prog, VSA *vsa);
 void get_var_iters(int acc_id, struct stmt_access_var_pair **acc_var_map, PlutoProg *prog, VSA *vsa);
+void get_ivar_iters(int acc_id, struct stmt_access_var_pair **acc_var_map, PlutoProg *prog, VSA *vsa);
 void update_t2s_ivar(int acc_id, struct stmt_access_var_pair **acc_var_map, struct var_pair **adg_var_map, int cc_id, PlutoProg *prog, VSA *vsa);
 char *get_iter_str(IterExp **iters, int iter_num);
 void update_t2s_var(struct stmt_access_var_pair **acc_var_map, struct var_pair **adg_var_map, int total_accs, int cc_id, PlutoProg *prog, VSA *vsa);

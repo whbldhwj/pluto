@@ -141,8 +141,10 @@ void pluto_compute_dep_satisfaction(PlutoProg *prog) {
   /* Create and set satisfaction vectors */
   for (i = 0; i < prog->ndeps; i++) {
     Dep *dep = prog->deps[i];
-    if (IS_RAR(dep->type))
-      continue;
+    if (!prog->options->rar) {
+      if (IS_RAR(dep->type))
+        continue;
+    }
 
     if (dep->satvec)
       free(dep->satvec);

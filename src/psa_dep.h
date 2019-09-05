@@ -19,6 +19,8 @@
 
 bool systolic_array_legal_checker(PlutoProg *prog);
 bool systolic_array_dep_checker(PlutoProg *prog);
+bool systolic_array_dep_checker_isl(PlutoProg *prog);
+bool is_dep_constant_at_level(Dep *dep, PlutoProg *prog, int level);
 void rar_scalar_filter(PlutoProg *prog);
 void rar_filter(PlutoProg *prog);
 PlutoProg **psa_reuse_analysis(PlutoProg *prog, int *num_reuse_progs);

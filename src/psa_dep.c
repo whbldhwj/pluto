@@ -49,41 +49,37 @@
  * A program can be transformed to systolic array if and only if it satisfies the following constraints:
  * - uniform dependency
  * - single fully permuatable band
- * - no further child band under the common permutable band
+ * - no further child band under the common permutable band (removed)
  */
 bool systolic_array_legal_checker(PlutoProg *prog) {
   /* single fully permutable band */
   unsigned nbands = 0;
   int err_type = 0;
-  unsigned nloops = 0;
-  Ploop **loops;
 
-  Band **bands = pluto_get_outermost_permutable_bands(prog, &nbands);
+  Band **bands = pluto_get_outermost_permutable_bands(prog, &nbands);  
   if (nbands != 1) {
     err_type = 1;
   }
-  if (!err_type) {
-    /* no child band under the current band */
-    loops = pluto_get_loops_under(
-        bands[0]->loop->stmts, bands[0]->loop->nstmts,
-        bands[0]->loop->depth, prog, &nloops);
-    if (nloops > bands[0]->width) {
-      err_type = 2;
-    }
-  }
+//  if (!err_type) {
+//    int nbands_tmp = 0;
+//    Band **tmp_bands = pluto_get_innermost_permutable_bands(prog, &nbands_tmp);
+//    if (nbands_tmp > 1) {
+//      err_type = 2;
+//    } else if (nbands_tmp == 1) {
+//      if (tmp_bands[0]->loop->depth != bands[0]->loop->depth)  {
+//        err_type = 2;
+//      }
+//    }
+//  }
   if (!err_type) {
     /* uniform dependency */
-    bool is_uniform = systolic_array_dep_checker(prog);
+    bool is_uniform = systolic_array_dep_checker_isl(prog);
     if (!is_uniform) {
       err_type = 3;
     }
   }
 
   pluto_bands_free(bands, nbands);
-  for (int i = 0; i < nloops; i++) {
-    pluto_loop_free(loops[i]);
-  }
-  free(loops);
 
   if (err_type == 1) {
     fprintf(stdout, "[PSA] More than one outer permutable band detected.\n");
@@ -92,10 +88,129 @@ bool systolic_array_legal_checker(PlutoProg *prog) {
     fprintf(stdout, "[PSA] More than one child permutable band detected.\n");
     return 0;
   } else if (err_type == 3) {
-    fprintf(stdout, "[PSA] Non-uniform dependency detectec.\n");
+    fprintf(stdout, "[PSA] Non-uniform dependency detected.\n");
     return 0;
   } else {
     return 1;
+  }
+}
+
+bool is_dep_constant_at_level(Dep *dep, PlutoProg *prog, int level) {
+  isl_ctx *ctx = isl_ctx_alloc();
+  isl_set *dpoly_set = isl_set_from_pluto_constraints(dep->dpolytope, ctx);
+  
+  int npar = prog->npar;
+  int src = dep->src;
+  int dest = dep->dest;
+  Stmt *src_stmt = prog->stmts[src];
+  Stmt *dest_stmt = prog->stmts[dest];
+
+  int src_dim = src_stmt->dim;
+  int dest_dim = dest_stmt->dim;
+
+  isl_printer *printer = isl_printer_to_file(ctx, stdout);
+//  isl_printer_print_set(printer, dpoly_set);
+//  printf("\n");
+
+  // create isl_map for dependece distance
+  // dis = \phi(dest) - \phi(src)
+  // [dis | src_iter | dest_iter | param | 1]
+  PlutoConstraints *dis_cst = pluto_constraints_alloc(1, 1 + src_dim + dest_dim + npar + 1);  
+  dis_cst->is_eq[0] = 1;
+  dis_cst->val[0][0] = 1;
+  for (int i = 1; i < src_dim + 1; i++)
+    dis_cst->val[0][i] = src_stmt->trans->val[level][i - 1];
+  for (int i = src_dim + 1; i < src_dim + 1 + dest_dim; i++)
+    dis_cst->val[0][i] = -dest_stmt->trans->val[level][i - src_dim - 1];
+  for (int i = src_dim + 1 + dest_dim; i < src_dim + 1 + dest_dim + npar; i++) {
+    dis_cst->val[0][i] = src_stmt->trans->val[level][i - 1 - dest_dim] - 
+                  dest_stmt->trans->val[level][i - 1 - src_dim];
+  }
+  dis_cst->val[0][src_dim + 1 + dest_dim + npar] = src_stmt->trans->val[level][src_dim + npar] -
+                  dest_stmt->trans->val[level][dest_dim + npar];
+  dis_cst->nrows = 1;
+
+//  pluto_constraints_pretty_print(stdout, dis_cst);
+  isl_map *dis_map = isl_map_from_pluto_constraints(dis_cst, ctx, src_dim + dest_dim, 1, npar);
+
+//  isl_printer_print_map(printer, dis_map);
+//  printf("\n");
+
+  isl_set *dis_set = isl_set_apply(dpoly_set, dis_map);
+
+  isl_printer_print_set(printer, dis_set);
+  printf("\n");
+  // check if the set constains only one single element
+  bool is_constant;
+  if (!isl_set_is_empty(dis_set)) {
+    if (isl_set_is_singleton(dis_set)) {
+      is_constant = true;
+      // to get the number, we use a trick here
+      isl_printer *printer_str = isl_printer_to_str(ctx);
+      isl_printer_print_set(printer_str, dis_set);
+      char *tmp_str = isl_printer_get_str(printer_str);
+      isl_aff *dis_aff = isl_aff_read_from_str(ctx, tmp_str);
+      isl_val *dis_val = isl_aff_get_constant_val(dis_aff);
+      int dis = isl_val_get_num_si(dis_val);    
+      printf("%d\n", dis);
+      isl_printer_free(printer_str);
+      free(tmp_str);
+      isl_aff_free(dis_aff);
+      isl_val_free(dis_val);
+    } else {
+      is_constant = false;
+    }
+  } else {
+    is_constant = false;
+  }
+
+  isl_printer_free(printer);
+  pluto_constraints_free(dis_cst);
+  isl_set_free(dis_set);
+  isl_ctx_free(ctx);
+
+  return is_constant;
+}
+
+/*
+ * Detecting non-uniform dependences and exit the program if any non-uniform 
+ * dependences is detected.
+ * We will calculate the projected dependence distance on each hyperplane,
+ * if the projected dependence distance on every hyperplane is a constance,
+ * this dependence is classfied as a uniform dependdence.
+ */
+bool systolic_array_dep_checker_isl(PlutoProg *prog) {
+  int ndeps = prog->ndeps;
+  Dep **deps = prog->deps;
+
+  /* Check the uniformity of dependences */
+  int n;
+  for (n = 0; n < ndeps; n++) {
+    Dep *dep = deps[n];
+    printf("%d type: %d src: %d dest: %d arr: %s\n", n, dep->type, dep->src, dep->dest, dep->src_acc->name);
+//    PlutoConstraints *tdpoly = pluto_get_transformed_dpoly(dep, prog->stmts[dep->src], prog->stmts[dep->dest]);
+//    pluto_constraints_pretty_print(stdout, tdpoly);
+
+    bool is_uniform = true;
+    for (int h = 0; h < prog->num_hyperplanes; h++) {
+      if (!is_dep_constant_at_level(dep, prog, h)) {
+        is_uniform = false;
+        break;
+      }
+    }
+    if (!is_uniform) {
+      fprintf(stdout, "[PSA] Dep %d is non-uniform.\n", n);
+      PlutoConstraints *tdpoly = pluto_get_transformed_dpoly(dep, prog->stmts[dep->src], prog->stmts[dep->dest]);
+      pluto_constraints_pretty_print(stdout, tdpoly);
+      pluto_constraints_free(tdpoly);
+      break;
+    }
+  }
+
+  if (n < ndeps) {
+    return false;
+  } else {
+    return true;
   }
 }
 
@@ -120,7 +235,7 @@ bool systolic_array_dep_checker(PlutoProg *prog) {
     // Meanwhile:
     // 1. Src iter and dest iters should be at the same location
     // 2. Src iter and dest iters should have the opposite coeffcicients
-    // 3. The coefficients of global paramters should be zero
+    // 3. The coefficients of global parameters should be zero
     int src_niter = src_stmt->trans->nrows;
     int dest_niter = dest_stmt->trans->nrows;
     for (int row = 0; row < tdpoly->nrows; row++) {

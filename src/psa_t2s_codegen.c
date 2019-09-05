@@ -60,7 +60,7 @@ void psa_t2s_codegen(FILE *fp, const VSA *vsa) {
 
   /* Function declarations */
   fprintf(fp, "// Function declarations\n");
-  fprintf(fp, "#define FUNC_S type_of<float>(), {");
+  fprintf(fp, "#define FUNC_S type_of<int>(), {");
   for (int i = 0; i < vsa->t2s_iter_num; i++) {
     if (i == 0) 
       fprintf(fp, "%s", vsa->t2s_iters[i]);
@@ -106,7 +106,7 @@ void psa_t2s_codegen(FILE *fp, const VSA *vsa) {
   fprintf(fp, ";\n");
 
   fprintf(fp, "APP.merge_defs(");
-  for (int i = 0; i < vsa->URE_num; i++) {
+  for (int i = 0; i < vsa->URE_num - 1; i++) {
     if (i == 0) {
       fprintf(fp, vsa->UREs[i]->name);
     } else {
@@ -197,7 +197,7 @@ void psa_t2s_codegen(FILE *fp, const VSA *vsa) {
 
   /* Realization on CPU */
   fprintf(fp, "// CPU Realization\n");
-  fprintf(fp, "Image<float> CPU_output(");
+  fprintf(fp, "Image<int> FPGA_output(");
   for (int i = 0; i < vsa->t2s_iter_num; i++) {
     if (i == 0) {
       fprintf(fp, "%s + 1", vsa->t2s_meta_iters[i]->ub);
@@ -206,7 +206,7 @@ void psa_t2s_codegen(FILE *fp, const VSA *vsa) {
     }
   }
   fprintf(fp, ");\n");
-  fprintf(fp, "APP.realize(CPU_output);\n");
+  fprintf(fp, "APP.realize(FPGA_output);\n");
   fprintf(fp, "cout << \"END\" << endl;\n\n");
 
   /* CPU verification */

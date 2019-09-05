@@ -2,8 +2,8 @@
 #include <stdlib.h>
 #include <math.h>
 
-typedef float data_t;
-#define R 32
-#define S 32
+typedef int data_t;
+#define R 8
+#define S 8
 
-void dsa_kernel(data_t X[R + 2][S + 2], data_t W[3][3], data_t Z[R][S]);
+void dsa_kernel(data_t X[R + 2 + 1][S + 2 + 1], data_t W[3 + 1][3 + 1], data_t Z[R + 1][S + 1]);

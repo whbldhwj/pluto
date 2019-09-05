@@ -243,50 +243,57 @@ Graph *graph_dup(const Graph *graph) {
 //   fprintf(stdout, "[Debug] SCC number: %d\n", graph->num_sccs);
 // #endif
 
-  if (ngraph->sccs)
-    free(ngraph->sccs);
-  ngraph->sccs = (Scc *)malloc(ngraph->num_sccs * sizeof(Scc));
-  for (i = 0; i < ngraph->num_sccs; i++) {
-    ngraph->sccs[i].size = graph->sccs[i].size;
-    ngraph->sccs[i].max_dim = graph->sccs[i].max_dim;
-    ngraph->sccs[i].id = graph->sccs[i].id;
-// #ifdef JIE_DEBUG
-//     fprintf(stdout, "[Debug] Stop 1.4.\n");
-//     fprintf(stdout, "[Debug] size: %d\n", ngraph->sccs[i].size);
-//     fprintf(stdout, "[Debug] vertices NULL: %d\n", ngraph->sccs[i].vertices);
-//     //fprintf(stdout, "[Debug] vertices :%d\n", ngraph->sccs[i].vertices[0]);
-// #endif    
-    // TODO: vertices could be non-NULL
-    ngraph->sccs[i].vertices = NULL;
-    /*
-    ngraph->sccs[i].vertices = (int *)malloc(ngraph->sccs[i].size * sizeof(int));
-    for (j = 0; j < ngraph->sccs[i].size; j++) {
-      if (graph->sccs[i].vertices[j] != NULL) {
-        ngraph->sccs[i].vertices[j] = graph->sccs[i].vertices[j];
-      } else {
-        fprintf(stdout, "[Debug] Pointer Null!\n");
+  if (graph->num_sccs > 0) {
+    if (ngraph->sccs)
+      free(ngraph->sccs);
+    ngraph->sccs = (Scc *)malloc(graph->num_sccs * sizeof(Scc));
+    for (i = 0; i < ngraph->num_sccs; i++) {
+      ngraph->sccs[i].size = graph->sccs[i].size;
+      ngraph->sccs[i].max_dim = graph->sccs[i].max_dim;
+      ngraph->sccs[i].id = graph->sccs[i].id;
+      // TODO: vertices could be non-NULL
+      ngraph->sccs[i].vertices = NULL;
+      /*
+      ngraph->sccs[i].vertices = (int *)malloc(ngraph->sccs[i].size * sizeof(int));
+      for (j = 0; j < ngraph->sccs[i].size; j++) {
+        if (graph->sccs[i].vertices[j] != NULL) {
+          ngraph->sccs[i].vertices[j] = graph->sccs[i].vertices[j];
+        } else {
+          fprintf(stdout, "[Debug] Pointer Null!\n");
+        } 
       } 
-    } 
-    */
-// #ifdef JIE_DEBUG
-//     fprintf(stdout, "[Debug] Stop 1.5.\n");
-// #endif    
-    ngraph->sccs[i].is_parallel = graph->sccs[i].is_parallel;
-    // TODO: sol could be non-NULL
-    ngraph->sccs[i].sol = NULL;
-    /*
-    ngraph->sccs[i].sol = (double *)malloc(ngraph->sccs[i].size * sizeof(double));
-    for (j = 0; j < ngraph->sccs[i].size; j++) {
-      ngraph->sccs[i].sol[j] = graph->sccs[i].sol[j];
+      */
+      ngraph->sccs[i].is_parallel = graph->sccs[i].is_parallel;
+      // TODO: sol could be non-NULL
+      ngraph->sccs[i].sol = NULL;
+      /*
+      ngraph->sccs[i].sol = (double *)malloc(ngraph->sccs[i].size * sizeof(double));
+      for (j = 0; j < ngraph->sccs[i].size; j++) {
+        ngraph->sccs[i].sol[j] = graph->sccs[i].sol[j];
+      }
+      */
+      ngraph->sccs[i].fcg_scc_offset = graph->sccs[i].fcg_scc_offset;
+      ngraph->sccs[i].is_scc_coloured = graph->sccs[i].is_scc_coloured;
+      ngraph->sccs[i].has_parallel_hyperplane = graph->sccs[i].has_parallel_hyperplane;    
     }
-    */
-    ngraph->sccs[i].fcg_scc_offset = graph->sccs[i].fcg_scc_offset;
-    ngraph->sccs[i].is_scc_coloured = graph->sccs[i].is_scc_coloured;
-    ngraph->sccs[i].has_parallel_hyperplane = graph->sccs[i].has_parallel_hyperplane;    
   }
-// #ifdef JIE_DEBUG
-//   fprintf(stdout, "[Debug] Stop 1.6.\n");
-// #endif
+
+  if (graph->num_ccs > 0) {
+    if (ngraph->ccs)
+      free(ngraph->ccs);
+    ngraph->ccs = (CC *)malloc(graph->num_ccs * sizeof(CC));
+    for (i = 0; i < ngraph->num_ccs; i++) {
+      ngraph->ccs[i].size = graph->ccs[i].size;
+      ngraph->ccs[i].max_dim = graph->ccs[i].max_dim;
+      ngraph->ccs[i].id = graph->ccs[i].id;
+      if (graph->ccs[i].vertices) {
+        ngraph->ccs[i].vertices = (int *)malloc(ngraph->ccs[i].size * sizeof(int));
+        for (int j = 0; j < graph->ccs[i].size; j++) {
+          ngraph->ccs[i].vertices[j] = graph->ccs[i].vertices[j];
+        }
+      }
+    }
+  }
 
   ngraph->to_be_rebuilt = graph->to_be_rebuilt;
 
@@ -752,7 +759,11 @@ void psa_compute_dep_distances(PlutoProg *prog) {
 /* 
  * Generate synchronized array 
  * -- time loop --
- *  -- space loop --
+ * -- space loop --
+ * We first permute the space loop innermost.
+ * Next, we exmaine all dependences, for dependences which is strongly satisfied below the 
+ * time loop, the first space loop that strongly satisfied the dep will be added to the last 
+ * time loop.
  * */
 PlutoProg **sa_candidates_generation_band_sync(Band *band, int array_dim, 
               PlutoProg *prog, int *nprogs) {
@@ -789,10 +800,27 @@ PlutoProg **sa_candidates_generation_band_sync(Band *band, int array_dim,
           pluto_interchange(new_prog, d, d + 1);
         }
         
-        // TODO: perform loop skewing
-
         pluto_compute_dep_directions(new_prog);
         pluto_compute_dep_satisfaction(new_prog);
+
+        /* Perform loop skewing */
+//        for (int d = 0; d < prog->ndeps; d++) {
+//          Dep *dep = prog->deps[d];
+//          if (dep->satisfaction_level > lastD - array_dim && dep->satisfaction_level <= lastD) {
+//            /* This dependency is first strongly satisfied in the space band,
+//             * we will add the space loop to the last time loop */
+//            psa_add_loops(new_prog, lastD - array_dim, dep->satisfaction_level);
+//
+//            pluto_compute_dep_directions(new_prog);
+//            pluto_compute_dep_satisfaction(new_prog);
+//          }      
+//        }
+        for (int level = 0; level < array_dim; level++) {
+          psa_add_loops(new_prog, lastD - array_dim, level + lastD - array_dim + 1);
+        }
+        pluto_compute_dep_directions(new_prog);
+        pluto_compute_dep_satisfaction(new_prog);
+        psa_compute_dep_distances(new_prog);
 
         /* Update psa_hyp_type */
         psa_detect_hyperplane_types(new_prog, array_dim, 0);
@@ -831,10 +859,27 @@ PlutoProg **sa_candidates_generation_band_sync(Band *band, int array_dim,
               pluto_interchange(new_prog, d, d + 1);
             }
 
-            // TODO: perform loop skewing
-
             pluto_compute_dep_directions(new_prog);
             pluto_compute_dep_satisfaction(new_prog);
+
+            /* Perform loop skewing */
+//            for (int d = 0; d < prog->ndeps; d++) {
+//              Dep *dep = prog->deps[d];
+//              if (dep->satisfaction_level > lastD - array_dim && dep->satisfaction_level <= lastD) {
+//                /* This dependency is first strongly satisfied in the space band,
+//                 * we will add the space loop to the last time loop */
+//                psa_add_loops(new_prog, lastD - array_dim, dep->satisfaction_level);
+//
+//                pluto_compute_dep_directions(new_prog);
+//                pluto_compute_dep_satisfaction(new_prog);
+//              }      
+//            }
+            for (int level = 0; level < array_dim; level++) {
+              psa_add_loops(new_prog, lastD - array_dim, level + lastD - array_dim + 1);
+            }
+            pluto_compute_dep_directions(new_prog);
+            pluto_compute_dep_satisfaction(new_prog);
+            psa_compute_dep_distances(new_prog);
 
             /* Update psa_hyp_type */
             psa_detect_hyperplane_types(new_prog, array_dim, 0);
@@ -880,11 +925,28 @@ PlutoProg **sa_candidates_generation_band_sync(Band *band, int array_dim,
                   pluto_interchange(new_prog, d, d + 1);
                 }
 
-                // TODO: perform loop skewing
-
                 pluto_compute_dep_directions(new_prog);
                 pluto_compute_dep_satisfaction(new_prog);
-    
+
+                /* Perform loop skewing */
+//                for (int d = 0; d < prog->ndeps; d++) {
+//                  Dep *dep = prog->deps[d];
+//                  if (dep->satisfaction_level > lastD - array_dim && dep->satisfaction_level <= lastD) {
+//                    /* This dependency is first strongly satisfied in the space band,
+//                     * we will add the space loop to the last time loop */
+//                    psa_add_loops(new_prog, lastD - array_dim, dep->satisfaction_level);
+//
+//                    pluto_compute_dep_directions(new_prog);
+//                    pluto_compute_dep_satisfaction(new_prog);
+//                  }      
+//                } 
+                for (int level = 0; level < array_dim; level++) {
+                  psa_add_loops(new_prog, lastD - array_dim, level + lastD - array_dim + 1);
+                }
+                pluto_compute_dep_directions(new_prog);
+                pluto_compute_dep_satisfaction(new_prog); 
+                psa_compute_dep_distances(new_prog);
+
                 /* Update psa_hyp_type */
                 psa_detect_hyperplane_types(new_prog, array_dim, 0);
                 psa_detect_hyperplane_types_stmtwise(new_prog, array_dim, 0);
@@ -962,6 +1024,7 @@ PlutoProg **sa_candidates_generation_band_async(Band *band, int array_dim,
 
         pluto_compute_dep_directions(new_prog);
         pluto_compute_dep_satisfaction(new_prog);
+        psa_compute_dep_distances(new_prog);
 
         /* Update psa_hyp_type */
         psa_detect_hyperplane_types(new_prog, array_dim, 0);
@@ -1007,6 +1070,7 @@ PlutoProg **sa_candidates_generation_band_async(Band *band, int array_dim,
 
             pluto_compute_dep_directions(new_prog);
             pluto_compute_dep_satisfaction(new_prog);
+            psa_compute_dep_distances(new_prog);
 
             /* Update psa_hyp_type */
             psa_detect_hyperplane_types(new_prog, array_dim, 0);
@@ -1058,8 +1122,9 @@ PlutoProg **sa_candidates_generation_band_async(Band *band, int array_dim,
                 }
     
                 pluto_compute_dep_directions(new_prog);
-                pluto_compute_dep_satisfaction(new_prog);
-    
+                pluto_compute_dep_satisfaction(new_prog); 
+                psa_compute_dep_distances(new_prog);
+
                 /* Update psa_hyp_type */
                 psa_detect_hyperplane_types(new_prog, array_dim, 0);
                 psa_detect_hyperplane_types_stmtwise(new_prog, array_dim, 0);

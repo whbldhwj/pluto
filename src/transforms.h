@@ -44,4 +44,7 @@ void psa_tile_loop_constant(PlutoProg *prog, Ploop *loop, int tile_factor,
 //void psa_tile_loop_constant3(PlutoProg *prog, Ploop *loop, int tile_factor, 
 //                   PlutoHypType htype, PSAHypType psa_htype);
 
+void psa_stmt_add_loops(Stmt *stmt, int level1, int level2, PlutoProg *prog);
+void psa_add_loops(PlutoProg *prog, int level1, int level2);
+
 #endif

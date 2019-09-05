@@ -323,6 +323,9 @@ struct statement {
    * conflict graph */
   PlutoConstraints *intra_stmt_dep_cst;
 
+  /* If this statement is touched by the Pluto's algorithm */
+  bool untouched;
+
   struct pet_stmt *pstmt;
 };
 typedef struct statement Stmt;
@@ -1173,6 +1176,12 @@ PlutoConstraints *pluto_compute_region_data(const Stmt *stmt,
                                             const PlutoAccess *acc,
                                             int copy_level,
                                             const PlutoProg *prog);
+/* Jie Added - Start */
+PlutoConstraints *psa_compute_region_data(const Stmt *stmt, 
+                                          const PlutoConstraints *dom,
+                                          const PlutoAccess *acc,
+                                          const PlutoProg *prog);
+/* Jie Added - End */
 
 int generate_declarations(const PlutoProg *prog, FILE *outfp);
 /* Jie Added - Start */

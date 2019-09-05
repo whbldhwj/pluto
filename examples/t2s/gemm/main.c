@@ -9,43 +9,41 @@
 
 int main(){
   // declarations
-  data_t A[I][K];
-  data_t B[K][J];
-  data_t C[I][J];
-  data_t C_dsa[I][J];
+  data_t A[I + 1][K + 1];
+  data_t B[K + 1][J + 1];
+  data_t C[I + 1][J + 1];
+  data_t C_dsa[I + 1][J + 1];
 
   // data initialization
-  for (int i = 0; i < I; i++)
-    for (int k = 0; k < K; k++) {
+  for (int i = 0; i < I + 1; i++)
+    for (int k = 0; k < K + 1; k++) {
       A[i][k] = (float)rand() / RAND_MAX;
     }
-  for (int k = 0; k < K; k++)
-    for (int j = 0; j < J; j++) {
+  for (int k = 0; k < K + 1; k++)
+    for (int j = 0; j < J + 1; j++) {
       B[k][j] = (float)rand() / RAND_MAX;
     }
 
-  for (int i = 0; i < I; i++)
-    for (int j = 0; j < J; j++)
+  for (int i = 0; i < I + 1; i++)
+    for (int j = 0; j < J + 1; j++)
       C[i][j] = 0;
 
   // computation
-#pragma scop  
-  for (int i = 0; i < I; i++)
-    for (int j = 0; j < J; j++) {
+  for (int i = 1; i <= I; i++)
+    for (int j = 1; j <= J; j++) {
 //      C[i][j] = 0;
-      for (int k = 0; k < K; k++) {
+      for (int k = 1; k <= K; k++) {
         C[i][j] += A[i][k] * B[k][j];
       }
     }
-#pragma endscop
 
   dsa_kernel(A, B, C_dsa);
 
   // comparison
   int err = 0;
   float thres = 0.001;
-  for (int i = 0; i < I; i++) 
-    for (int j = 0; j < J; j++) {
+  for (int i = 1; i <= I; i++) 
+    for (int j = 1; j <= J; j++) {
       if (fabs(C_dsa[i][j] - C[i][j]) > thres) {
         err++;
       }

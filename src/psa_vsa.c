@@ -64,7 +64,7 @@ void vsa_array_extract(PlutoProg *prog, VSA *vsa) {
         vsa->arrays[array_num - 1]->text = strdup(acc->name);
         vsa->arrays[array_num - 1]->id = array_num - 1;
         vsa->arrays[array_num - 1]->dim = acc->mat->nrows;
-        vsa->arrays[array_num - 1]->data_type = "float"; // By default
+        vsa->arrays[array_num - 1]->data_type = "int"; // By default
       }    
     }
     for (int j = 0; j < stmt->nwrites; j++) {
@@ -85,7 +85,7 @@ void vsa_array_extract(PlutoProg *prog, VSA *vsa) {
         vsa->arrays[array_num - 1]->text = strdup(acc->name);
         vsa->arrays[array_num - 1]->id = array_num - 1;
         vsa->arrays[array_num - 1]->dim = acc->mat->nrows;
-        vsa->arrays[array_num - 1]->data_type = "float"; // By default
+        vsa->arrays[array_num - 1]->data_type = "int"; // By default
       }
     }
   }
@@ -121,6 +121,41 @@ void vsa_t2s_iter_extract(PlutoProg *prog, VSA *vsa) {
   for (int i = 0; i < vsa->t2s_iter_num; i++) {
     sprintf(iter, "t%d", i + 1);
     vsa->t2s_iters[i] = strdup(iter);
+  }
+}
+
+/*
+ * RAW: iter_read + dep = iter_write
+ */
+void get_ivar_iters(int acc_id, struct stmt_access_var_pair **acc_var_map, PlutoProg *prog, VSA *vsa) {
+  int iter_num = vsa->t2s_iter_num;
+  char **iters = vsa->t2s_iters;
+
+  PlutoAccess *acc = acc_var_map[acc_id]->acc;
+
+  for (int i = 0; i < prog->ndeps; i++) {
+    Dep *dep = prog->deps[i];
+    if (IS_RAW(dep->type)) {
+      if (dep->dest_acc == acc) {
+        // read access
+        for (int iter_id = 0; iter_id < iter_num; iter_id++) {
+          int diff;
+          if (dep->disvec[iter_id] == DEP_DIS_MINUS_ONE)
+            diff = -1;
+          else if (dep->disvec[iter_id] == DEP_DIS_ZERO)
+            diff = 0;
+          else if (dep->disvec[iter_id] == DEP_DIS_PLUS_ONE)
+            diff = 1;
+          else {
+            diff = 10;
+//            fprintf(stdout, "[ERROR] Unsupported dep distance in function: get_ivar_iters\n");
+//            exit(1);
+          }
+
+          acc_var_map[acc_id]->var_iters[iter_id]->iter_offset = acc_var_map[dep->src_acc->sym_id]->var_iters[iter_id]->iter_offset - diff;
+        }
+      }
+    }
   }
 }
 
@@ -223,7 +258,10 @@ void update_t2s_ivar(int acc_id, struct stmt_access_var_pair **acc_var_map, stru
         sprintf(var_ref, "%s(%s)", var_name, str_tmp);
         free(str_tmp);
       } else if (prog->options->dsa > 0) {
-        char *str_tmp = create_new_acc_ref_str(stmt, acc, prog, vsa);
+//        char *str_tmp = create_new_acc_ref_str(stmt, acc, prog, vsa);
+//        sprintf(var_ref, "%s(%s)", var_name, str_tmp);
+//        free(str_tmp);
+        char *str_tmp = get_iter_str(acc_var_map[acc_id]->var_iters, iter_num);
         sprintf(var_ref, "%s(%s)", var_name, str_tmp);
         free(str_tmp);
       }
@@ -259,7 +297,10 @@ void update_t2s_ivar(int acc_id, struct stmt_access_var_pair **acc_var_map, stru
           sprintf(var_ref, "%s(%s)", var_name, str_tmp);
           free(str_tmp);
         } else if (prog->options->dsa > 0) {
-          char *str_tmp = create_new_acc_ref_str(stmt, acc, prog, vsa);
+//          char *str_tmp = create_new_acc_ref_str(stmt, acc, prog, vsa);
+//          sprintf(var_ref, "%s(%s)", var_name, str_tmp);
+//          free(str_tmp);
+          char *str_tmp = get_iter_str(acc_var_map[acc_id]->dvar_iters, iter_num);
           sprintf(var_ref, "%s(%s)", var_name, str_tmp);
           free(str_tmp);
         }
@@ -289,7 +330,10 @@ void update_t2s_ivar(int acc_id, struct stmt_access_var_pair **acc_var_map, stru
         sprintf(var_ref, "%s(%s)", var_name, str_tmp);
         free(str_tmp);
       } else if (prog->options->dsa > 0) {
-        char *str_tmp = create_new_acc_ref_str(stmt, acc, prog, vsa);
+//        char *str_tmp = create_new_acc_ref_str(stmt, acc, prog, vsa);
+//        sprintf(var_ref, "%s(%s)", var_name, str_tmp);
+//        free(str_tmp);
+        char *str_tmp = get_iter_str(acc_var_map[acc_id]->var_iters, iter_num);
         sprintf(var_ref, "%s(%s)", var_name, str_tmp);
         free(str_tmp);
       }
@@ -321,7 +365,10 @@ void update_t2s_ivar(int acc_id, struct stmt_access_var_pair **acc_var_map, stru
           sprintf(var_ref, "%s(%s)", var_name, str_tmp);
           free(str_tmp);
         } else if (prog->options->dsa > 0) {
-          char *str_tmp = create_new_acc_ref_str(stmt, acc, prog, vsa);
+//          char *str_tmp = create_new_acc_ref_str(stmt, acc, prog, vsa);
+//          sprintf(var_ref, "%s(%s)", var_name, str_tmp);
+//          free(str_tmp);
+          char *str_tmp = get_iter_str(acc_var_map[acc_id]->dvar_iters, iter_num);
           sprintf(var_ref, "%s(%s)", var_name, str_tmp);
           free(str_tmp);
         }
@@ -352,11 +399,12 @@ char *get_iter_str(IterExp **iters, int iter_num) {
     char *iter_name = iters[iter_id]->iter_name;
     int iter_offset = iters[iter_id]->iter_offset;
     char iter_exp[20];
-    if (iter_offset == 0) {
+    if (iter_offset == 0)
       sprintf(iter_exp, "%s", iter_name);
-    } else {
-      sprintf(iter_exp, "%s + (%d)", iter_name, iter_offset);
-    }
+    else if (iter_offset > 0)
+      sprintf(iter_exp, "%s + %d", iter_name, iter_offset);
+    else if (iter_offset < 0)
+      sprintf(iter_exp, "%s - %d", iter_name, -iter_offset);
     iter_str = concat(iter_str, iter_exp);
     if (iter_id < iter_num - 1) {
       iter_str = concat(iter_str, ", ");
@@ -398,6 +446,8 @@ void update_t2s_var(struct stmt_access_var_pair **acc_var_map, struct var_pair *
       PlutoAccess *acc = acc_var_map[i]->acc;
       int acc_id = acc->sym_id;
       if (acc->cc_id == cc_id) {
+        acc_var_map[acc_id]->ei = 0;
+
         char *arr_name = acc->name;
         // build the var_name
         char var_name[50];
@@ -410,12 +460,12 @@ void update_t2s_var(struct stmt_access_var_pair **acc_var_map, struct var_pair *
         adg_var_map[cc_id]->d = 0;
 
         // build the var_ref
-        acc_var_map[acc_id]->var_iters = (IterExp **)malloc(iter_num * sizeof(IterExp *));
-        for (int iter_id = 0; iter_id < iter_num; iter_id++) {
-          acc_var_map[acc_id]->var_iters[iter_id] = (IterExp *)malloc(sizeof(IterExp));
-          acc_var_map[acc_id]->var_iters[iter_id]->iter_name = strdup(iters[iter_id]);
-          acc_var_map[acc_id]->var_iters[iter_id]->iter_offset = 0;
-        }
+//        acc_var_map[acc_id]->var_iters = (IterExp **)malloc(iter_num * sizeof(IterExp *));
+//        for (int iter_id = 0; iter_id < iter_num; iter_id++) {
+//          acc_var_map[acc_id]->var_iters[iter_id] = (IterExp *)malloc(sizeof(IterExp));
+//          acc_var_map[acc_id]->var_iters[iter_id]->iter_name = strdup(iters[iter_id]);
+//          acc_var_map[acc_id]->var_iters[iter_id]->iter_offset = 0;
+//        }
 
         char var_ref[50];
         char *tmp_iter_str = get_iter_str(acc_var_map[acc_id]->var_iters, iter_num);
@@ -437,7 +487,7 @@ void update_t2s_var(struct stmt_access_var_pair **acc_var_map, struct var_pair *
 
           vsa->edvar_names[vsa->edvar_num - 1] = strdup(var_name);
           acc_var_map[acc_id]->dvar_name = strdup(var_name);
-          acc_var_map[cc_id]->dvar_name = strdup(var_name);
+          adg_var_map[cc_id]->dvar_name = strdup(var_name);
           adg_var_map[cc_id]->d = 1;
 
           acc_var_map[acc_id]->dvar_iters = (IterExp **)malloc(iter_num * sizeof(IterExp *));
@@ -459,13 +509,95 @@ void update_t2s_var(struct stmt_access_var_pair **acc_var_map, struct var_pair *
     }
   } else {
     // intermediate variable
-    for (int i = 0; i < total_accs; i++) {
-      Stmt *stmt = acc_var_map[i]->stmt;
-      PlutoAccess *acc = acc_var_map[i]->acc;    
-      if (acc->cc_id == cc_id) {
-        update_t2s_ivar(acc->sym_id, acc_var_map, adg_var_map, cc_id, prog, vsa);
+    vsa->ivar_num++;
+    vsa->ivar_names = realloc(vsa->ivar_names, vsa->ivar_num * sizeof(char *));
+    vsa->ivar_refs = realloc(vsa->ivar_refs, vsa->ivar_num * sizeof(char *));
+
+    for (int i = 0; i < prog->adg->ccs[cc_id].size; i++) {
+      int acc_id = prog->adg->ccs[cc_id].vertices[i];
+      Stmt *stmt = acc_var_map[acc_id]->stmt;
+      PlutoAccess *acc = acc_var_map[acc_id]->acc;
+
+      acc_var_map[acc_id]->ei = 1;
+
+      char *arr_name = acc->name;
+      char var_name[50];
+      sprintf(var_name, "%s_CC%d_I", arr_name, cc_id);
+
+      if (i == 0) { 
+        vsa->ivar_names[vsa->ivar_num - 1] = strdup(var_name);
+        adg_var_map[cc_id]->var_name = strdup(var_name);
+        adg_var_map[cc_id]->ei = 1;
+        adg_var_map[cc_id]->d = 0;
+      }
+      acc_var_map[acc_id]->var_name = strdup(var_name);
+//      acc_var_map[acc_id]->var_iters = (IterExp **)malloc(iter_num * sizeof(IterExp *));
+//      for (int iter_id = 0; iter_id < iter_num; iter_id++) {
+//        acc_var_map[acc_id]->var_iters[iter_id] = (IterExp *)malloc(sizeof(IterExp));
+//        acc_var_map[acc_id]->var_iters[iter_id]->iter_name = strdup(iters[iter_id]);
+//        acc_var_map[acc_id]->var_iters[iter_id]->iter_offset = 0;
+//      }
+
+      // TODO: function to update iters
+      if (prog->options->dsa > 0)
+        get_ivar_iters(acc_id, acc_var_map, prog, vsa);
+
+      char var_ref[50];
+      char *str_tmp = get_iter_str(acc_var_map[acc_id]->var_iters, iter_num);
+      sprintf(var_ref, "%s(%s)", var_name, str_tmp);
+      free(str_tmp);
+
+      if (i == 0) {
+        adg_var_map[cc_id]->var_ref = strdup(var_ref);
+      }
+
+      if (i == 0) {
+        vsa->ivar_refs[vsa->ivar_num - 1] = strdup(var_ref);
+      }
+      acc_var_map[acc_id]->var_ref = strdup(var_ref);
+
+      // build the drain variable
+      if (acc_var_map[acc_id]->d == 1) {
+        if (adg_var_map[cc_id]->dvar_name == NULL) {
+          vsa->idvar_num++;
+          vsa->idvar_names = realloc(vsa->idvar_names, vsa->idvar_num * sizeof(char *));
+          vsa->idvar_names[vsa->idvar_num - 1] = NULL;
+          vsa->idvar_refs = realloc(vsa->idvar_refs, vsa->idvar_num * sizeof(char *));
+          vsa->idvar_refs[vsa->idvar_num - 1] = NULL;
+        }
+        char var_name[50];
+        sprintf(var_name, "%s_CC%d_ID", arr_name, cc_id);
+        if (adg_var_map[cc_id]->dvar_name == NULL) {
+          vsa->idvar_names[vsa->idvar_num - 1] = strdup(var_name);
+          adg_var_map[cc_id]->dvar_name = strdup(var_name);
+          adg_var_map[cc_id]->d = 1;
+        }
+        acc_var_map[acc_id]->dvar_name = strdup(var_name);
+        acc_var_map[acc_id]->dvar_iters = (IterExp **)malloc(iter_num * sizeof(IterExp *));
+        for (int iter_id = 0; iter_id < iter_num; iter_id++) {
+          acc_var_map[acc_id]->dvar_iters[iter_id] = (IterExp *)malloc(sizeof(IterExp));
+          acc_var_map[acc_id]->dvar_iters[iter_id]->iter_name = strdup(iters[iter_id]);
+          acc_var_map[acc_id]->dvar_iters[iter_id]->iter_offset = 0;
+        }
+
+        char var_ref[50];
+        char *str_tmp = get_iter_str(acc_var_map[acc_id]->dvar_iters, iter_num);
+        sprintf(var_ref, "%s(%s)", var_name, str_tmp);
+        free(str_tmp);
+
+        if (vsa->idvar_refs[vsa->idvar_num - 1] == NULL)
+          vsa->idvar_refs[vsa->idvar_num - 1] = strdup(var_ref);
+        acc_var_map[acc_id]->dvar_ref = strdup(var_ref);
       }
     }
+
+//    for (int i = 0; i < total_accs; i++) {
+//      Stmt *stmt = acc_var_map[i]->stmt;
+//      PlutoAccess *acc = acc_var_map[i]->acc;    
+//      if (acc->cc_id == cc_id) {
+//        update_t2s_ivar(acc->sym_id, acc_var_map, adg_var_map, cc_id, prog, vsa);
+//      }
+//    }
   }
 }
 
@@ -523,7 +655,12 @@ void vsa_t2s_var_extract(PlutoProg *prog, VSA *vsa) {
     acc_var_map[i]->d = 0;
     acc_var_map[i]->var_name = NULL;
     acc_var_map[i]->var_ref = NULL;
-    acc_var_map[i]->var_iters = NULL;
+    acc_var_map[i]->var_iters = (IterExp **)malloc(vsa->t2s_iter_num * sizeof(IterExp *));
+    for (int iter_id = 0; iter_id < vsa->t2s_iter_num; iter_id++) {
+      acc_var_map[i]->var_iters[iter_id] = (IterExp *)malloc(sizeof(IterExp));
+      acc_var_map[i]->var_iters[iter_id]->iter_name = strdup(vsa->t2s_iters[iter_id]);
+      acc_var_map[i]->var_iters[iter_id]->iter_offset = 0;
+    }
     acc_var_map[i]->dvar_name = NULL;
     acc_var_map[i]->dvar_ref = NULL;
     acc_var_map[i]->dvar_iters = NULL;
@@ -599,11 +736,11 @@ void vsa_t2s_var_extract(PlutoProg *prog, VSA *vsa) {
         acc_var_map[acc_id]->d = 0; 
       }
       int cc_id = acc->cc_id;
-      if (adg->ccs[cc_id].size == 1) {
-        acc_var_map[acc_id]->ei = 0; // external variable
-      } else {
-        acc_var_map[acc_id]->ei = 1; // intermediate variable
-      }
+//      if (adg->ccs[cc_id].size == 1) {
+//        acc_var_map[acc_id]->ei = 0; // external variable
+//      } else {
+//        acc_var_map[acc_id]->ei = 1; // intermediate variable
+//      }
     }
 
   // update the var_name, var_ref, var_iters by DFS in each CC

@@ -675,6 +675,13 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
     psa_print_deps(reuse_prog);
 #endif    
 
+#ifdef SPACE_TIME_CHECK
+    bool is_uniform = systolic_array_dep_checker_isl(reuse_prog);
+    fprintf(stdout, "[PSA] Uniformity before Pluto's Transformation: %d\n", is_uniform);
+    if (!is_uniform) {
+      continue;
+    }
+#endif
 /*
  * *******************************************
  * Stage: Array Generation
@@ -689,6 +696,7 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
       pluto_transformations_pretty_print(reuse_prog);
     }
   
+#ifdef PLUTO_TRANSFORM    
     t_start = rtclock();
     fprintf(stdout, "[PSA] ****************************\n");
     fprintf(stdout, "[PSA] Run Pluto's Algorithm.\n");
@@ -697,10 +705,17 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
       pluto_auto_transform(reuse_prog);
     }
     t_t = rtclock() - t_start;
-  
+
+    for (int s = 0; s < reuse_prog->nstmts; s++) {
+      reuse_prog->stmts[s]->untouched = 0;
+    }
+#endif
+
     pluto_compute_dep_directions(reuse_prog);
     pluto_compute_dep_satisfaction(reuse_prog);
-  
+    pluto_detect_hyperplane_types(reuse_prog);
+    pluto_detect_hyperplane_types_stmtwise(reuse_prog);
+ 
     if (!options->silent) {
       fprintf(
           stdout,
@@ -708,17 +723,18 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
       /* Print out transformations */
       pluto_transformations_pretty_print(reuse_prog);
     }
-  
+
     /* Jie Added - Start */
 #ifdef PRINT_PLUTO_TRANS_PROGRAM
     fprintf(stdout, "[PSA] Dump out the transformed program after Pluto's algorithm.\n");
     pluto_print_program(reuse_prog, srcFileName, "pluto_transform");
 #endif
+//    for (int n = 0; n < reuse_prog->nstmts; n++) {
+//      Stmt *stmt = reuse_prog->stmts[n];
+//      pluto_matrix_print(stdout, stmt->trans);
+//    }
     /* Jie Added - End */
   
-    /* Jie Added - Start */
-    /* Dependence Checker for Systolic Array */
-    // TODO: Move this part to post-auto-transform phase
 #ifdef PRINT_DEPS_POST_TRANSFORM
     psa_print_deps(reuse_prog);
 #endif
