@@ -575,7 +575,8 @@ struct dependence {
 
   /* Jie Added - Start */
   /* Dependence distance in transformed space */
-  DepDis *disvec;
+  // DepDis *disvec;
+  int *disvec;
   /* Jie Added - End */
 };
 typedef struct dependence Dep;

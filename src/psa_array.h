@@ -22,7 +22,9 @@ PlutoOptions *pluto_options_dup(const PlutoOptions *options);
 Graph *graph_dup(const Graph *graph);
 PlutoProg *pluto_prog_dup(const PlutoProg *prog);
 DepDis get_dep_distance(const Dep *dep, const PlutoProg *prog, int level);
-void psa_compute_dep_distances(PlutoProg *prog);
+int get_dep_distance_isl(const Dep *dep, const PlutoProg *prog, int level);
+//void psa_compute_dep_distances(PlutoProg *prog);
+void psa_compute_dep_distances_isl(PlutoProg *prog);
 PlutoProg **sa_candidates_generation_band_sync(Band *band, int array_dim,
               PlutoProg *prog, int *nprogs);
 PlutoProg **sa_candidates_generation_band_async(Band *band, int array_dim, 

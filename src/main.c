@@ -763,23 +763,6 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
     fprintf(stdout, "[PSA] Space-time mapping leagalibty: %d\n", is_legal);
 #endif
 
-///*
-// * *******************************************
-// * Stage: Array Generation
-// * Step: Uniform Dependence Checker
-// * *******************************************
-// */
-//#ifdef UNIFORMITY_CHECK
-//    fprintf(stdout, "[PSA] Check uniformity of the design.\n");
-//    bool is_uniform = systolic_array_dep_checker(reuse_prog);
-//    if (!is_uniform) {
-//      fprintf(stdout, "[PSA] Non-uniform dependence detected.\n");
-//      // return 1;
-//      continue;
-//    }
-//    fprintf(stdout, "[PSA] Uniformity: %d\n", is_uniform);
-//#endif
-
 /*
  * *******************************************
  * Stage: Array Generation
@@ -800,13 +783,13 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
     // heuristics, and place the optimal one in the first place of the list
     fprintf(stdout, "[PSA] ****************************\n");
     fprintf(stdout, "[PSA] Smart pick systolic array candidate.\n");
-    sa_candidates_smart_pick(progs, nprogs);     
+    sa_candidates_smart_pick(progs, nprogs);    
     for (int i = 1; i < nprogs; i++) {
       pluto_prog_free(progs[i]);
       progs[i] = NULL;      
     }
     nprogs = 1;
-    pluto_print_program(progs[0], srcFileName, "smart_pick");
+    pluto_print_program(progs[0], srcFileName, "smart_pick");    
 #endif    
 
     unsigned prog_id;

@@ -658,7 +658,7 @@ int psa_simd_vectorization_optimize(PlutoProg *prog, VSA *vsa) {
   /* Detect properties after transformation */
   pluto_compute_dep_directions(prog);
   pluto_compute_dep_satisfaction(prog);
-  psa_compute_dep_distances(prog);
+  psa_compute_dep_distances_isl(prog);
 
   pluto_bands_free(bands, nbands);
   return ret;
@@ -971,7 +971,7 @@ int psa_latency_hiding_optimize(PlutoProg *prog, VSA *vsa) {
   /* Detect properties after transformation */
   pluto_compute_dep_directions(prog);
   pluto_compute_dep_satisfaction(prog);
-  psa_compute_dep_distances(prog);
+  psa_compute_dep_distances_isl(prog);
 
   pluto_bands_free(bands, nbands);
   return ret;
@@ -1079,7 +1079,7 @@ void psa_pe_optimize(PlutoProg *prog, VSA *vsa) {
   /* Detect properties after transformation */
   pluto_compute_dep_directions(prog);
   pluto_compute_dep_satisfaction(prog);
-  psa_compute_dep_distances(prog);
+  psa_compute_dep_distances_isl(prog);
 
   pluto_bands_free(bands, nbands);
 }

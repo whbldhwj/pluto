@@ -299,26 +299,12 @@ bool is_dep_carried_at_array_part_band(PlutoProg *prog, Dep *dep) {
 /* Analyze the data transfer direction for L1 transfer modules */
 Vec *get_L1_trans_dir(PlutoProg *prog, Dep *dep, VSA *vsa, struct stmt_access_io_pair *stmt_access_io) {
   Vec *dir = vec_alloc(vsa->space_band_width);
-  DepDis *disvec = dep->disvec;
+  int *disvec = dep->disvec;
   int space_hyp_start = vsa->array_part_band_width;
 
   if (stmt_access_io->L1_trans_type == EMBEDDED) {
     for (int h = space_hyp_start; h < space_hyp_start + dir->length; h++) {
-      switch (disvec[h]) {
-        case DEP_DIS_MINUS_ONE:
-          dir->val[h - space_hyp_start] = -1;
-          break;
-        case DEP_DIS_ZERO:
-          dir->val[h - space_hyp_start] = 0;
-          break;
-        case DEP_DIS_PLUS_ONE:
-          dir->val[h - space_hyp_start] = 1;
-          break;
-        default:
-          fprintf(stdout, "[Error] Unsupported dependence direction!\n");
-          exit(1);
-          break;
-      }
+      dir->val[h - space_hyp_start] = disvec[h];
     }
   } else if (stmt_access_io->L1_trans_type == SEPARATE){
     /* Create I/O manually */

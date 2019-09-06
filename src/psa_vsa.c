@@ -139,19 +139,7 @@ void get_ivar_iters(int acc_id, struct stmt_access_var_pair **acc_var_map, Pluto
       if (dep->dest_acc == acc) {
         // read access
         for (int iter_id = 0; iter_id < iter_num; iter_id++) {
-          int diff;
-          if (dep->disvec[iter_id] == DEP_DIS_MINUS_ONE)
-            diff = -1;
-          else if (dep->disvec[iter_id] == DEP_DIS_ZERO)
-            diff = 0;
-          else if (dep->disvec[iter_id] == DEP_DIS_PLUS_ONE)
-            diff = 1;
-          else {
-            diff = 10;
-//            fprintf(stdout, "[ERROR] Unsupported dep distance in function: get_ivar_iters\n");
-//            exit(1);
-          }
-
+          int diff = dep->disvec[iter_id];
           acc_var_map[acc_id]->var_iters[iter_id]->iter_offset = acc_var_map[dep->src_acc->sym_id]->var_iters[iter_id]->iter_offset - diff;
         }
       }
@@ -174,13 +162,7 @@ void get_var_iters(int acc_id, struct stmt_access_var_pair **acc_var_map, PlutoP
       if (dep->src_acc == acc && acc_var_map[dep->dest_acc->sym_id]->var_name != NULL) {
         // write access 
         for (int iter_id = 0; iter_id < iter_num; iter_id++) {
-          int diff;
-          if (dep->disvec[iter_id] == DEP_DIS_MINUS_ONE)
-            diff = -1;
-          else if (dep->disvec[iter_id] == DEP_DIS_ZERO)
-            diff = 0;
-          else if (dep->disvec[iter_id] == DEP_DIS_PLUS_ONE)
-            diff = 1;
+          int diff = dep->disvec[iter_id];
 
           acc_var_map[acc_id]->var_iters[iter_id]->iter_name = strdup(iters[iter_id]);
           acc_var_map[acc_id]->var_iters[iter_id]->iter_offset = acc_var_map[dep->dest_acc->sym_id]->var_iters[iter_id]->iter_offset + diff;
@@ -188,13 +170,7 @@ void get_var_iters(int acc_id, struct stmt_access_var_pair **acc_var_map, PlutoP
       } else if (dep->dest_acc == acc && acc_var_map[dep->src_acc->sym_id]->var_name != NULL) {
         // read access
         for (int iter_id = 0; iter_id < iter_num; iter_id++) {
-          int diff;
-          if (dep->disvec[iter_id] == DEP_DIS_MINUS_ONE)
-            diff = -1;
-          else if (dep->disvec[iter_id] == DEP_DIS_ZERO)
-            diff = 0;
-          else if (dep->disvec[iter_id] == DEP_DIS_PLUS_ONE)
-            diff = 1;
+          int diff = dep->disvec[iter_id];
 
           acc_var_map[acc_id]->var_iters[iter_id]->iter_name = strdup(iters[iter_id]);
           acc_var_map[acc_id]->var_iters[iter_id]->iter_offset = acc_var_map[dep->src_acc->sym_id]->var_iters[iter_id]->iter_offset - diff;
@@ -964,7 +940,7 @@ void vsa_channel_dir_extract(PlutoProg *prog, VSA *vsa) {
       Dep *dep = prog->deps[j];
       /* RAR dep for operands */
       if (IS_RAR(dep->type) && !strcmp(dep->src_acc->name, op_name)) {
-        DepDis *space_dep_dis = (DepDis *)malloc(prog->array_dim * sizeof(DepDis));
+        int *space_dep_dis = (int *)malloc(prog->array_dim * sizeof(int));
         /* Collect dep dis components at space loops */
         int h;
         int space_dim = 0;
@@ -978,51 +954,51 @@ void vsa_channel_dir_extract(PlutoProg *prog, VSA *vsa) {
 
         /* Analyze the direction */
         if (prog->array_dim == 1) {
-          if (space_dep_dis[0] == DEP_DIS_PLUS_ONE) {
+          if (space_dep_dis[0] == 1) {
             op_channel_dirs[i] = "R";
-          } else if (space_dep_dis[0] == DEP_DIS_MINUS_ONE) {
+          } else if (space_dep_dis[0] == -1) {
             op_channel_dirs[i] = "L";
-          } else if (space_dep_dis[0] == DEP_DIS_ZERO) {
+          } else if (space_dep_dis[0] == 0) {
             op_channel_dirs[i] = "D";
           } else {
             fprintf(stdout, "[PSA] Error! Wrong dependence component at space loops!\n");
           }
         } else if (prog->array_dim == 2) {
-          if (space_dep_dis[0] == DEP_DIS_ZERO) {
-            if (space_dep_dis[1] == DEP_DIS_PLUS_ONE) {              
+          if (space_dep_dis[0] == 0) {
+            if (space_dep_dis[1] == 1) {              
               /* 0,1 */
               op_channel_dirs[i] = "R";
-            } else if (space_dep_dis[i] == DEP_DIS_ZERO) {
+            } else if (space_dep_dis[i] == 0) {
               /* 0,0 */
               /* TODO: In place - will be decided in the I/O elimination */
               op_channel_dirs[i] = "I"; 
-            } else if (space_dep_dis[i] == DEP_DIS_MINUS_ONE) {
+            } else if (space_dep_dis[i] == -1) {
               /* 0,-1 */
               op_channel_dirs[i] = "L";
             } else {
               fprintf(stdout, "[PSA] Error! Wrong dependence component at space loop!\n");
             }
-          } else if (space_dep_dis[0] == DEP_DIS_PLUS_ONE) {
-            if (space_dep_dis[1] == DEP_DIS_PLUS_ONE) {
+          } else if (space_dep_dis[0] == 1) {
+            if (space_dep_dis[1] == 1) {
               /* 1,1 */
               op_channel_dirs[i] = "DR";
-            } else if (space_dep_dis[1] == DEP_DIS_ZERO) {
+            } else if (space_dep_dis[1] == 0) {
               /* 1,0 */
               op_channel_dirs[i] = "D";
-            } else if (space_dep_dis[1] == DEP_DIS_MINUS_ONE) {
+            } else if (space_dep_dis[1] == -1) {
               /* 1,-1 */
               op_channel_dirs[i] = "DL";
             } else {
               fprintf(stdout, "[PSA] Error! Wrong dependence component at space loop!\n");
             }
-          } else if (space_dep_dis[0] == DEP_DIS_MINUS_ONE) {
-            if (space_dep_dis[1] == DEP_DIS_PLUS_ONE) {
+          } else if (space_dep_dis[0] == -1) {
+            if (space_dep_dis[1] == 1) {
               /* -1,1 */
               op_channel_dirs[i] = "UR";
-            } else if (space_dep_dis[1] == DEP_DIS_ZERO) {
+            } else if (space_dep_dis[1] == 0) {
               /* -1,0 */
               op_channel_dirs[i] = "U";
-            } else if (space_dep_dis[1] == DEP_DIS_MINUS_ONE) {
+            } else if (space_dep_dis[1] == -1) {
               /* -1,-1 */
               op_channel_dirs[i] = "UL";
             } else {
@@ -1044,7 +1020,7 @@ void vsa_channel_dir_extract(PlutoProg *prog, VSA *vsa) {
       Dep *dep = prog->deps[j];
       /* RAW dep for results */
       if (IS_RAW(dep->type) && !strcmp(dep->src_acc->name, res_name)) {
-        DepDis *space_dep_dis = (DepDis *)malloc(prog->array_dim * sizeof(DepDis));
+        int *space_dep_dis = (int *)malloc(prog->array_dim * sizeof(int));
         /* Collect dep dis components at space loop */
         int h;
         int space_dim = 0;
@@ -1058,51 +1034,51 @@ void vsa_channel_dir_extract(PlutoProg *prog, VSA *vsa) {
 
         /* Analyze the direction */
         if (prog->array_dim == 1) {
-          if (space_dep_dis[0] == DEP_DIS_PLUS_ONE) {
+          if (space_dep_dis[0] == 1) {
             res_channel_dirs[i] = "R";
-          } else if (space_dep_dis[0] == DEP_DIS_MINUS_ONE) {
+          } else if (space_dep_dis[0] == -1) {
             res_channel_dirs[i] = "L";
-          } else if (space_dep_dis[0] == DEP_DIS_ZERO) {
+          } else if (space_dep_dis[0] == 0) {
             res_channel_dirs[i] = "D";
           } else {
             fprintf(stdout, "[PSA] Error! Wrong dependence component at space loops!\n");
           }
         } else if (prog->array_dim == 2) {
-          if (space_dep_dis[0] == DEP_DIS_ZERO) {
-            if (space_dep_dis[1] == DEP_DIS_PLUS_ONE) {              
+          if (space_dep_dis[0] == 0) {
+            if (space_dep_dis[1] == 1) {
               /* 0,1 */
               res_channel_dirs[i] = "R";
-            } else if (space_dep_dis[i] == DEP_DIS_ZERO) {
+            } else if (space_dep_dis[i] == 0) {
               /* 0,0 */
               /* TODO: In place - will be decided in the I/O elimination */
               res_channel_dirs[i] = "I"; 
-            } else if (space_dep_dis[i] == DEP_DIS_MINUS_ONE) {
+            } else if (space_dep_dis[i] == -1) {
               /* 0,-1 */
               res_channel_dirs[i] = "L";
             } else {
               fprintf(stdout, "[PSA] Error! Wrong dependence component at space loop!\n");
             }
-          } else if (space_dep_dis[0] == DEP_DIS_PLUS_ONE) {
-            if (space_dep_dis[1] == DEP_DIS_PLUS_ONE) {
+          } else if (space_dep_dis[0] == 1) {
+            if (space_dep_dis[1] == 1) {
               /* 1,1 */
               res_channel_dirs[i] = "DR";
-            } else if (space_dep_dis[1] == DEP_DIS_ZERO) {
+            } else if (space_dep_dis[1] == 0) {
               /* 1,0 */
               res_channel_dirs[i] = "D";
-            } else if (space_dep_dis[1] == DEP_DIS_MINUS_ONE) {
+            } else if (space_dep_dis[1] == -1) {
               /* 1,-1 */
               res_channel_dirs[i] = "DL";
             } else {
               fprintf(stdout, "[PSA] Error! Wrong dependence component at space loop!\n");
             }
-          } else if (space_dep_dis[0] == DEP_DIS_MINUS_ONE) {
-            if (space_dep_dis[1] == DEP_DIS_PLUS_ONE) {
+          } else if (space_dep_dis[0] == -1) {
+            if (space_dep_dis[1] == 1) {
               /* -1,1 */
               res_channel_dirs[i] = "UR";
-            } else if (space_dep_dis[1] == DEP_DIS_ZERO) {
+            } else if (space_dep_dis[1] == 0) {
               /* -1,0 */
               res_channel_dirs[i] = "U";
-            } else if (space_dep_dis[1] == DEP_DIS_MINUS_ONE) {
+            } else if (space_dep_dis[1] == -1) {
               /* -1,-1 */
               res_channel_dirs[i] = "UL";
             } else {

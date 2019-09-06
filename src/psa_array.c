@@ -107,7 +107,7 @@ Dep *pluto_dep_prog_dup(Dep *d, int num_hyperplanes) {
 // #ifdef JIE_DEBUG
 //     fprintf(stdout, "[Debug] duplicate disvec.\n");
 // #endif
-    dep->disvec = (DepDis *)malloc(num_hyperplanes * sizeof(DepDis));
+    dep->disvec = (int *)malloc(num_hyperplanes * sizeof(int));
     for (i = 0; i < num_hyperplanes; i++) {
       dep->disvec[i] = d->disvec[i];
     }
@@ -507,7 +507,7 @@ PlutoProg *pluto_prog_dup(const PlutoProg *prog) {
   /* Systolic array num_rows, num_cols */
   new_prog->array_nrow = prog->array_nrow;
   new_prog->array_ncol = prog->array_ncol;
-
+  
   /* Systolic array row/col interleave factor */
   new_prog->array_il_enable = prog->array_il_enable;
   new_prog->array_il_factor[0] = prog->array_il_factor[0];
@@ -527,8 +527,60 @@ PlutoProg *pluto_prog_dup(const PlutoProg *prog) {
   return new_prog;
 }
 
+int get_dep_distance_isl(const Dep *dep, const PlutoProg *prog, int level) {
+  isl_ctx *ctx = isl_ctx_alloc();
+  isl_set *dpoly_set = isl_set_from_pluto_constraints(dep->dpolytope, ctx);
+  int npar = prog->npar;
+  int src = dep->src;
+  int dest = dep->dest;
+  Stmt *src_stmt = prog->stmts[src];
+  Stmt *dest_stmt = prog->stmts[dest];
+
+  int src_dim = src_stmt->dim;
+  int dest_dim = dest_stmt->dim;
+
+  // create isl_map for dependece distance
+  // dis = \phi(dest) - \phi(src)
+  // [dis | src_iter | dest_iter | param | 1]
+  PlutoConstraints *dis_cst = pluto_constraints_alloc(1, 1 + src_dim + dest_dim + npar + 1);
+  dis_cst->is_eq[0] = 1;
+  dis_cst->val[0][0] = 1;
+  for (int i = 1; i < src_dim + 1; i++)
+    dis_cst->val[0][i] = src_stmt->trans->val[level][i - 1];
+  for (int i = src_dim + 1; i < src_dim + 1 + dest_dim; i++)
+    dis_cst->val[0][i] = -dest_stmt->trans->val[level][i - src_dim - 1];
+  for (int i = src_dim + 1 + dest_dim; i < src_dim + 1 + dest_dim + npar; i++) {
+    dis_cst->val[0][i] = src_stmt->trans->val[level][i - 1 - dest_dim] -
+          dest_stmt->trans->val[level][i - 1 - src_dim];
+  }
+  dis_cst->val[0][src_dim + 1 + dest_dim + npar] = src_stmt->trans->val[level][src_dim + npar] - 
+          dest_stmt->trans->val[level][dest_dim + npar];
+  dis_cst->nrows = 1;
+
+  isl_map *dis_map = isl_map_from_pluto_constraints(dis_cst, ctx, src_dim + dest_dim, 1, npar);
+  isl_set *dis_set = isl_set_apply(dpoly_set, dis_map);
+
+  isl_printer *printer_str = isl_printer_to_str(ctx);
+  isl_printer_print_set(printer_str, dis_set);
+  char *tmp_str = isl_printer_get_str(printer_str);
+  isl_aff *dis_aff = isl_aff_read_from_str(ctx, tmp_str);
+  isl_val *dis_val = isl_aff_get_constant_val(dis_aff);
+  int dis = isl_val_get_num_si(dis_val);
+
+  isl_printer_free(printer_str);
+  free(tmp_str);
+  isl_aff_free(dis_aff);
+  isl_val_free(dis_val);
+  pluto_constraints_free(dis_cst);
+  isl_set_free(dis_set);
+  isl_ctx_free(ctx);
+
+  return dis;
+}
+
 /* 
  * Distance vector component at level 'level'
+ * NOTE: deprecated
  */
 DepDis get_dep_distance(const Dep *dep, const PlutoProg *prog, int level) {
   PlutoConstraints *cst;
@@ -722,10 +774,7 @@ DepDis get_dep_distance(const Dep *dep, const PlutoProg *prog, int level) {
   return DEP_STAR;    
 }
 
-/* 
- * Compute the dependence distance for each mapped hyperplane.
- */
-void psa_compute_dep_distances(PlutoProg *prog) {
+void psa_compute_dep_distances_isl(PlutoProg *prog) {
   int level;
 
   Dep **deps = prog->deps;
@@ -733,33 +782,61 @@ void psa_compute_dep_distances(PlutoProg *prog) {
 
   /* Clear invalid pointer value in transdeps */
   for (int i = 0; i < prog->ntransdeps; i++) {
-    //if (transdeps[i]->disvec != NULL) {
-    //  free(transdeps[i]->disvec);
-    //}
     transdeps[i]->disvec = NULL;
   }
 
-  for (int i = 0; i < prog->ndeps; i++) {    
+  for (int i = 0; i < prog->ndeps; i++) {
     if (deps[i]->disvec != NULL) {
       free(deps[i]->disvec);
     }
-    deps[i]->disvec = (DepDis *)malloc(prog->num_hyperplanes * sizeof(DepDis));
-    for (level = 0; level < prog->num_hyperplanes; level++) {
-      deps[i]->disvec[level] = get_dep_distance(deps[i], prog, level);
+    deps[i]->disvec = (int *)malloc(prog->num_hyperplanes * sizeof(int));
+    printf("dep %d src: %d dest: %d type: %d\n", i, deps[i]->src, deps[i]->dest, deps[i]->type);
+    for (level = 0; level < prog->num_hyperplanes; level++) {      
+       deps[i]->disvec[level] = get_dep_distance_isl(deps[i], prog, level);
+       printf("%d\n", deps[i]->disvec[level]);
     }
-// #ifdef JIE_DEBUG
-//     Dep *dep = deps[i];
-//     fprintf(stdout, "[Debug] id: %d\n", dep->id);
-//     fprintf(stdout, "[Debug] type: %d\n", dep->type);
-//     fprintf(stdout, "[Debug] name: %s\n", dep->src_acc->name);
-//     PlutoConstraints *dpolytope = dep->dpolytope;
-//     pluto_constraints_pretty_print(stdout, dpolytope);
-//     for (level = 0; level < prog->num_hyperplanes; level++) {
-//       fprintf(stdout, "[Debug] dep dis %d: %c\n", level, deps[i]->disvec[level]);
-//     }
-// #endif
   }
 }
+
+/* 
+ * Compute the dependence distance for each mapped hyperplane.
+ * NOTE: deprecated
+ */
+//void psa_compute_dep_distances(PlutoProg *prog) {
+//  int level;
+//
+//  Dep **deps = prog->deps;
+//  Dep **transdeps = prog->transdeps;
+//
+//  /* Clear invalid pointer value in transdeps */
+//  for (int i = 0; i < prog->ntransdeps; i++) {
+//    //if (transdeps[i]->disvec != NULL) {
+//    //  free(transdeps[i]->disvec);
+//    //}
+//    transdeps[i]->disvec = NULL;
+//  }
+//
+//  for (int i = 0; i < prog->ndeps; i++) {    
+//    if (deps[i]->disvec != NULL) {
+//      free(deps[i]->disvec);
+//    }
+//    deps[i]->disvec = (int *)malloc(prog->num_hyperplanes * sizeof(int));
+//    for (level = 0; level < prog->num_hyperplanes; level++) {
+//      deps[i]->disvec[level] = get_dep_distance(deps[i], prog, level);
+//    }
+//// #ifdef JIE_DEBUG
+////     Dep *dep = deps[i];
+////     fprintf(stdout, "[Debug] id: %d\n", dep->id);
+////     fprintf(stdout, "[Debug] type: %d\n", dep->type);
+////     fprintf(stdout, "[Debug] name: %s\n", dep->src_acc->name);
+////     PlutoConstraints *dpolytope = dep->dpolytope;
+////     pluto_constraints_pretty_print(stdout, dpolytope);
+////     for (level = 0; level < prog->num_hyperplanes; level++) {
+////       fprintf(stdout, "[Debug] dep dis %d: %c\n", level, deps[i]->disvec[level]);
+////     }
+//// #endif
+//  }
+//}
 
 /* 
  * Generate synchronized array 
@@ -786,7 +863,7 @@ PlutoProg **sa_candidates_generation_band_sync(Band *band, int array_dim,
     for (j = 0; j < prog->ndeps; j++) {
       Dep *dep = prog->deps[j];
       assert(dep->disvec != NULL);
-      if (!(dep->disvec[i] == DEP_DIS_ZERO || dep->disvec[i] == DEP_DIS_PLUS_ONE)) {
+      if (!(dep->disvec[i] == 0 || dep->disvec[i] == 1)) {
         break;
       }
     }
@@ -825,7 +902,7 @@ PlutoProg **sa_candidates_generation_band_sync(Band *band, int array_dim,
         }
         pluto_compute_dep_directions(new_prog);
         pluto_compute_dep_satisfaction(new_prog);
-        psa_compute_dep_distances(new_prog);
+        psa_compute_dep_distances_isl(new_prog);
 
         /* Update psa_hyp_type */
         psa_detect_hyperplane_types(new_prog, array_dim, 0);
@@ -884,7 +961,7 @@ PlutoProg **sa_candidates_generation_band_sync(Band *band, int array_dim,
             }
             pluto_compute_dep_directions(new_prog);
             pluto_compute_dep_satisfaction(new_prog);
-            psa_compute_dep_distances(new_prog);
+            psa_compute_dep_distances_isl(new_prog);
 
             /* Update psa_hyp_type */
             psa_detect_hyperplane_types(new_prog, array_dim, 0);
@@ -950,7 +1027,7 @@ PlutoProg **sa_candidates_generation_band_sync(Band *band, int array_dim,
                 }
                 pluto_compute_dep_directions(new_prog);
                 pluto_compute_dep_satisfaction(new_prog); 
-                psa_compute_dep_distances(new_prog);
+                psa_compute_dep_distances_isl(new_prog);
 
                 /* Update psa_hyp_type */
                 psa_detect_hyperplane_types(new_prog, array_dim, 0);
@@ -1003,7 +1080,7 @@ PlutoProg **sa_candidates_generation_band_async(Band *band, int array_dim,
     for (j = 0; j < prog->ndeps; j++) {
       Dep *dep = prog->deps[j];
       assert(dep->disvec != NULL);
-      if (!(dep->disvec[i] == DEP_DIS_ZERO || dep->disvec[i] == DEP_DIS_PLUS_ONE)) {
+      if (!(dep->disvec[i] == 0 || dep->disvec[i] == 1)) {
         break;
       }
     }
@@ -1029,7 +1106,7 @@ PlutoProg **sa_candidates_generation_band_async(Band *band, int array_dim,
 
         pluto_compute_dep_directions(new_prog);
         pluto_compute_dep_satisfaction(new_prog);
-        psa_compute_dep_distances(new_prog);
+        psa_compute_dep_distances_isl(new_prog);
 
         /* Update psa_hyp_type */
         psa_detect_hyperplane_types(new_prog, array_dim, 0);
@@ -1075,7 +1152,7 @@ PlutoProg **sa_candidates_generation_band_async(Band *band, int array_dim,
 
             pluto_compute_dep_directions(new_prog);
             pluto_compute_dep_satisfaction(new_prog);
-            psa_compute_dep_distances(new_prog);
+            psa_compute_dep_distances_isl(new_prog);
 
             /* Update psa_hyp_type */
             psa_detect_hyperplane_types(new_prog, array_dim, 0);
@@ -1128,7 +1205,7 @@ PlutoProg **sa_candidates_generation_band_async(Band *band, int array_dim,
     
                 pluto_compute_dep_directions(new_prog);
                 pluto_compute_dep_satisfaction(new_prog); 
-                psa_compute_dep_distances(new_prog);
+                psa_compute_dep_distances_isl(new_prog);
 
                 /* Update psa_hyp_type */
                 psa_detect_hyperplane_types(new_prog, array_dim, 0);
@@ -1177,7 +1254,7 @@ PlutoProg **sa_candidates_generation(PlutoProg *prog, int *nprogs_p) {
   unsigned nbands;
   Band **bands;
   /* Compute projected dependence components */
-  psa_compute_dep_distances(prog);
+  psa_compute_dep_distances_isl(prog);
 
   /* Grasp the outermost permutable loop bands */
   bands = pluto_get_outermost_permutable_bands(prog, &nbands);
@@ -1354,6 +1431,8 @@ void sa_candidates_smart_pick(PlutoProg **progs, int nprogs) {
 
   for (int i = 0; i < nprogs; i++) {
     PlutoProg *prog = progs[i];
+    pluto_transformations_pretty_print(prog);
+
     // scan through all depedences
     int ndeps = prog->ndeps;
     Dep **deps = prog->deps;
@@ -1371,7 +1450,7 @@ void sa_candidates_smart_pick(PlutoProg **progs, int nprogs) {
         }
 
         for (h = space_hyp_start; h < space_hyp_start + array_dim; h++) {
-          if (dep->disvec[h] != DEP_DIS_ZERO)
+          if (dep->disvec[h] != 0)
             break;
         }
         if (h < space_hyp_start + array_dim)

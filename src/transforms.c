@@ -305,7 +305,7 @@ void psa_tile_loop(PlutoProg *prog, Ploop *loop, int tile_factor,
   /* Detect properties after permuation */
   pluto_compute_dep_directions(prog);
   pluto_compute_dep_satisfaction(prog);
-  psa_compute_dep_distances(prog);
+  psa_compute_dep_distances_isl(prog);
 }
 
 /* Tile the single loop */
@@ -427,5 +427,5 @@ void psa_tile_loop_constant(PlutoProg *prog, Ploop *loop, int tile_factor,
 //  /* Detect properties after permuation */
 //  pluto_compute_dep_directions(prog);
 //  pluto_compute_dep_satisfaction(prog);
-//  psa_compute_dep_distances(prog);
+//  psa_compute_dep_distances_isl(prog);
 }
