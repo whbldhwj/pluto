@@ -139,6 +139,7 @@ bool is_dep_constant_at_level(Dep *dep, PlutoProg *prog, int level) {
   if (!isl_set_is_empty(dis_set)) {
     if (isl_set_is_singleton(dis_set)) {
       is_constant = true;
+     
       /*
       // to get the number, we use a trick here
       isl_printer *printer_str = isl_printer_to_str(ctx);
@@ -153,6 +154,7 @@ bool is_dep_constant_at_level(Dep *dep, PlutoProg *prog, int level) {
       isl_aff_free(dis_aff);
       isl_val_free(dis_val);
       */
+      
     } else {
       is_constant = false;
     }
@@ -187,6 +189,7 @@ bool systolic_array_dep_checker_isl(PlutoProg *prog) {
 
     bool is_uniform = true;
     for (int h = 0; h < prog->num_hyperplanes; h++) {
+//      printf("h: %d\n", h);
       if (!is_dep_constant_at_level(dep, prog, h)) {
         is_uniform = false;
         break;
@@ -483,6 +486,17 @@ PlutoProg **psa_reuse_adg_analysis(PlutoProg *prog, int *num_reuse_progs) {
       isl_mat *isl_acc_mat = pluto_matrix_to_isl_mat(trunc_acc_mat);
       isl_mat *isl_null_mat = isl_mat_right_kernel(isl_acc_mat); // compute the right kernel of the matrix
       PlutoMatrix *null_space = pluto_matrix_from_isl_mat(isl_null_mat);
+
+      // debug
+//      pluto_matrix_print(stdout, trunc_acc_mat);
+//      pluto_matrix_print(stdout, null_space);
+//      for (int row = 0; row < isl_mat_rows(null_space); row++) {
+//        for (int col = 0; col < isl_mat_cols(null_space); col++) {
+//          isl_val *val = isl_mat_get_element_val(null_space, row, col);
+//          printf("%d ", isl_val_get_num_si(val));
+//        }
+//        printf("\n");
+//      }
 
       isl_ctx *ctx = isl_mat_get_ctx(isl_null_mat);
       isl_mat_free(isl_null_mat);
@@ -926,8 +940,13 @@ PlutoConstraints *construct_rar_dep_polytope(PlutoMatrix *null_space, int idx, S
   new_polytope = pluto_constraints_add(new_polytope, src_domain); 
   new_polytope = pluto_constraints_add(new_polytope, dest_domain);
 
+//  pluto_constraints_pretty_print(stdout, new_polytope);
+
   // simplify the pluto constraint
-  pluto_constraints_simplify(new_polytope);
+  // we will do this later, as this will break the order of the constraints
+//  pluto_constraints_simplify(new_polytope);
+
+//  pluto_constraints_pretty_print(stdout, new_polytope);
 
   /* Free Memory */
   pluto_constraints_free(src_domain);

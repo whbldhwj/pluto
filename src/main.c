@@ -611,12 +611,6 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
  * Step: Dependence Analysis
  * *******************************************
  */
-/* Jie Added - Start */
-#ifdef PRINT_DEPS_PREV_TRANSFORM
-  psa_print_deps(prog);
-#endif
-/* Jie Added - End */
-
 /* Jie Added - Start */  
   fprintf(stdout, "[PSA] Filter out redundant dependences.\n");
   /* Filter out RAR dependences on scalar variables */
@@ -640,12 +634,6 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
     fprintf(stdout, "[pluto] Maximum domain dimensionality: %d\n", prog->nvar);
     fprintf(stdout, "[pluto] Number of parameters: %d\n", prog->npar);
   }
-
-  /* Jie Added - Start */
-#ifdef PRINT_DEPS_PREV_TRANSFORM
-//  psa_print_deps(prog);
-#endif
-  /* Jie Added - End */
 
   if (options->iss) {
     pluto_iss_dep(prog);
@@ -679,7 +667,7 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
   for (int reuse_prog_id = 0; reuse_prog_id < 1; reuse_prog_id++) {
     reuse_prog = reuse_progs[reuse_prog_id];
 
-#ifdef PRINT_DEPS_PREV_TRANSFROM
+#ifdef PRINT_DEPS_PREV_TRANSFORM
     psa_print_deps(reuse_prog);
 #endif    
 

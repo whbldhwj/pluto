@@ -3736,9 +3736,17 @@ bool psa_access_merge(struct stmt_access_pair *stmt_acc1, struct stmt_access_pai
     PlutoConstraints *acc_map1 = psa_compute_region_data(stmt_acc1->stmt, stmt_acc1->stmt->domain, stmt_acc1->acc, prog);
     PlutoConstraints *acc_map2 = psa_compute_region_data(stmt_acc2->stmt, stmt_acc1->stmt->domain, stmt_acc2->acc, prog);
 
+//    // debug
+//    pluto_constraints_pretty_print(stdout, stmt_acc1->stmt->domain);
+//    pluto_constraints_pretty_print(stdout, stmt_acc2->stmt->domain);
+//    pluto_matrix_print(stdout, stmt_acc1->acc->mat);
+//    pluto_matrix_print(stdout, stmt_acc2->acc->mat);
+//    pluto_constraints_pretty_print(stdout, acc_map1);
+//    pluto_constraints_pretty_print(stdout, acc_map2);
+
     for (int i = 0; i < stmt_acc1->acc->mat->nrows; i++) {
       pluto_constraints_add_dim(acc_map1, i, NULL);
-      pluto_constraints_interchange_cols(acc_map1, i, i + stmt_acc1->stmt->dim);      
+      pluto_constraints_interchange_cols(acc_map1, i, i + stmt_acc1->stmt->dim + i + 1);      
     }
     for (int i = 0; i < stmt_acc1->acc->mat->nrows; i++) {
       pluto_constraints_remove_dim(acc_map1, stmt_acc1->stmt->dim + stmt_acc1->acc->mat->nrows);
@@ -3746,18 +3754,32 @@ bool psa_access_merge(struct stmt_access_pair *stmt_acc1, struct stmt_access_pai
 
     for (int i = 0; i < stmt_acc2->acc->mat->nrows; i++) {
       pluto_constraints_add_dim(acc_map2, i, NULL);
-      pluto_constraints_interchange_cols(acc_map2, i, i + stmt_acc2->stmt->dim);
+      pluto_constraints_interchange_cols(acc_map2, i, i + stmt_acc2->stmt->dim + i + 1);
     }
     for (int i = 0; i < stmt_acc2->acc->mat->nrows; i++) {
       pluto_constraints_remove_dim(acc_map2, stmt_acc2->stmt->dim + stmt_acc2->acc->mat->nrows);
     }
 
+//    // debug
+//    pluto_constraints_pretty_print(stdout, acc_map1);
+//    pluto_constraints_pretty_print(stdout, acc_map2);
+
     // convert to isl_map
     isl_ctx *ctx = isl_ctx_alloc();
     isl_map *map1 = isl_map_from_pluto_constraints(acc_map1, ctx, stmt_acc1->stmt->dim, stmt_acc1->acc->mat->nrows, prog->npar);
-    isl_map *map2 = isl_map_from_pluto_constraints(acc_map2, ctx, stmt_acc2->stmt->dim, stmt_acc2->acc->mat->nrows, prog->npar);
+    isl_map *map2 = isl_map_from_pluto_constraints(acc_map2, ctx, stmt_acc2->stmt->dim, stmt_acc2->acc->mat->nrows, prog->npar);    
+
+//    // debug
+//    isl_printer *printer = isl_printer_to_file(ctx, stdout);
+//    isl_printer_print_map(printer, map1);
+//    printf("\n");
+//    isl_printer_print_map(printer, map2);
+//    printf("\n");
 
     bool is_equal = isl_map_is_equal(map1, map2);
+
+//    // debug
+//    isl_printer_free(printer);
 
     isl_map_free(map1);
     isl_map_free(map2);
