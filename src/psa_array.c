@@ -220,6 +220,7 @@ Graph *graph_dup(const Graph *graph) {
     ngraph->vertices[i].fcg_stmt_offset = graph->vertices[i].fcg_stmt_offset;
     ngraph->vertices[i].scc_id = graph->vertices[i].scc_id;
     ngraph->vertices[i].cc_id = graph->vertices[i].cc_id;
+    ngraph->vertices[i].dom_id = graph->vertices[i].dom_id;
   }
 
 // #ifdef JIE_DEBUG
@@ -292,6 +293,8 @@ Graph *graph_dup(const Graph *graph) {
           ngraph->ccs[i].vertices[j] = graph->ccs[i].vertices[j];
         }
       }
+      ngraph->ccs[i].dom_id = graph->ccs[i].dom_id;
+      ngraph->ccs[i].type = graph->ccs[i].type;
     }
   }
 
@@ -360,9 +363,11 @@ PlutoProg *pluto_prog_dup(const PlutoProg *prog) {
   new_prog->num_hyperplanes = prog->num_hyperplanes;
 
   /* Data dependences graph of the program */
-  if (prog->ddg != NULL)
+  if (prog->ddg != NULL) {
+    if (new_prog->ddg)
+      graph_free(new_prog->ddg);
     new_prog->ddg = graph_dup(prog->ddg);
-  else
+  } else
     new_prog->ddg = NULL;
 
 // #ifdef JIE_DEBUG

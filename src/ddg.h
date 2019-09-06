@@ -17,6 +17,11 @@ struct vertex {
   int scc_id;
   /* Id of the Connected Component this vertex belongs to */
   int cc_id;
+
+  /* dominator id */
+  /* In T2S generated access dependence graph, this gives the access function 
+   * that dominatees the current access function */
+  int dom_id;
 };
 typedef struct vertex Vertex;
 
@@ -65,6 +70,16 @@ struct cc {
 
   /* Acc Id's of the vertices in the CC */
   int *vertices;
+
+  /* Acc Id of the dominator acc in the CC */
+  int dom_id;
+
+  /* 
+   * Intermediate - 0 
+   * External W - 1
+   * External R - 2
+   */
+  int type;
 };
 typedef struct cc CC;
 

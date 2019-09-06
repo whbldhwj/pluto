@@ -24,8 +24,12 @@ bool is_dep_constant_at_level(Dep *dep, PlutoProg *prog, int level);
 void rar_scalar_filter(PlutoProg *prog);
 void rar_filter(PlutoProg *prog);
 PlutoProg **psa_reuse_analysis(PlutoProg *prog, int *num_reuse_progs);
+PlutoProg **psa_reuse_adg_analysis(PlutoProg *prog, int *num_reuse_progs);
+
 PlutoConstraints *construct_rar_dep_polytope(PlutoMatrix *null_space, int idx, Stmt *stmt);
 void construct_rar_dep(Dep **deps, PlutoMatrix *null_space, PlutoAccess *acc, Stmt *stmt, PlutoProg *prog);
 void reassociate_dep_stmt_acc(PlutoProg *prog);
+PlutoProg **psa_reuse_filter(PlutoProg **progs, int *num_progs);
+bool psa_prog_reuse_check(PlutoProg *prog);
 
 #endif

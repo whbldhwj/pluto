@@ -39,6 +39,7 @@ Graph *graph_alloc(int nVertices) {
   g->vertices = (Vertex *)malloc(nVertices * sizeof(Vertex));
   for (i = 0; i < nVertices; i++) {
     g->vertices[i].id = i;
+    g->vertices[i].dom_id = -1;
   }
 
   g->adj = pluto_matrix_alloc(nVertices, nVertices);

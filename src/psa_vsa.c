@@ -620,6 +620,27 @@ void acc_var_map_pretty_print(struct stmt_access_var_pair **acc_var_map, int num
   fprintf(stdout, "\n"); 
 }
 
+void adg_var_map_pretty_print(struct var_pair **adg_var_map, int num_entry) {
+  for (int i = 0; i < 10 + 30 + 30 + 10 + 3; i++) {
+    fprintf(stdout, "-");
+  }
+  fprintf(stdout, "\n");
+  fprintf(stdout, "%10s|", "cc_id");
+  fprintf(stdout, "%30s|", "var_name");
+  fprintf(stdout, "%30s|", "var_ref");
+  fprintf(stdout, "%10s\n", "e/i");
+  for (int i = 0; i < num_entry; i++) {
+    fprintf(stdout, "%10d|", i);
+    fprintf(stdout, "%30s|", adg_var_map[i]->var_name);
+    fprintf(stdout, "%30s|", adg_var_map[i]->var_ref);
+    fprintf(stdout, "%10d\n", adg_var_map[i]->ei);
+  }
+  for (int i = 0; i < 10 + 30 + 30 + 10 + 3; i++) {
+    fprintf(stdout, "-");
+  }
+  fprintf(stdout, "\n");
+}
+
 /* 
  * This function extracts the variables in the program and generates info:
  * - evar_num
@@ -695,19 +716,22 @@ void vsa_t2s_var_extract(PlutoProg *prog, VSA *vsa) {
   // If there are more than one access function in the component, then it is an intermediate variable
   // Additionally, if the access function is a write access, we will add the drain variable correspondingly.
 
-  Graph *adg = adg_create(prog);
-  adg_merge_rar(adg, prog);
-  prog->adg= adg;
-#ifdef PSA_VSA_DEBUG
-//  fprintf(stdout, "[Debug] Access dependence graph:\n");
-//  for (int i = 0; i < adg->adj->nrows; i++) {
-//    for (int j = 0; j < adg->adj->ncols; j++) {
-//      fprintf(stdout, "\t%d", adg->adj->val[i][j]);
-//    }
-//    fprintf(stdout, "\n");
-//  }
-#endif
-  adg_compute_cc(prog);
+//  Graph *adg = adg_create(prog);
+////  adg_merge_rar(adg, prog);
+//  adg_merge_racc(adg, prog);
+//  prog->adg= adg;
+//#ifdef PSA_VSA_DEBUG
+////  fprintf(stdout, "[Debug] Access dependence graph:\n");
+////  for (int i = 0; i < adg->adj->nrows; i++) {
+////    for (int j = 0; j < adg->adj->ncols; j++) {
+////      fprintf(stdout, "\t%d", adg->adj->val[i][j]);
+////    }
+////    fprintf(stdout, "\n");
+////  }
+//#endif
+//  adg_compute_cc(prog);
+
+  Graph *adg = prog->adg;
 
   // initialize the adg_var_map
   struct var_pair **adg_var_map = NULL;
@@ -755,6 +779,7 @@ void vsa_t2s_var_extract(PlutoProg *prog, VSA *vsa) {
   vsa->adg_var_map_num_entries = adg->num_ccs;
 #ifdef PSA_VSA_DEBUG
   acc_var_map_pretty_print(acc_var_map, total_accs);
+  adg_var_map_pretty_print(adg_var_map, adg->num_ccs);
 #endif  
 
   for (int i = 0; i < num_read_write_data; i++) {

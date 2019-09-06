@@ -1051,8 +1051,12 @@ void create_RAR_UREs(int cc_id, PlutoProg *prog, VSA *vsa) {
 //  pluto_constraints_pretty_print(stdout, new_union_domain);
 
   char *domain_str = pluto_constraints_to_t2s_format(new_union_domain, vsa, prog->num_hyperplanes, prog->npar, prog->params);
-  PlutoAccess *anchor_acc = vsa->acc_var_map[prog->adg->ccs[cc_id].vertices[prog->adg->ccs[cc_id].size - 1]]->acc;
-  Stmt *anchor_stmt = vsa->acc_var_map[prog->adg->ccs[cc_id].vertices[prog->adg->ccs[cc_id].size - 1]]->stmt;
+//  PlutoAccess *anchor_acc = vsa->acc_var_map[prog->adg->ccs[cc_id].vertices[prog->adg->ccs[cc_id].size - 1]]->acc;
+//  Stmt *anchor_stmt = vsa->acc_var_map[prog->adg->ccs[cc_id].vertices[prog->adg->ccs[cc_id].size - 1]]->stmt;
+  int anchor_acc_id = prog->adg->ccs[cc_id].dom_id;
+  PlutoAccess *anchor_acc = vsa->acc_var_map[anchor_acc_id]->acc;
+  Stmt *anchor_stmt = vsa->acc_var_map[anchor_acc_id]->stmt;
+
   char *var_name = vsa->acc_var_map[anchor_acc->sym_id]->var_name;
   URE *merge_URE = (URE *)malloc(sizeof(URE));
   URE_init(merge_URE);

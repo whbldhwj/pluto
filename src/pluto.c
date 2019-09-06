@@ -2268,10 +2268,83 @@ Graph *adg_create(PlutoProg *prog) {
 }
 /* Jie Added - End */
 
+/*
+ * Two read access functions are connected if they are of the same access function
+ * However, the front-end (e.g. PET) could change the access functions, making it difficult to directly compare the access matrix.
+ * We take the access function of acc1 and acc2, and build a map from the iterator domain of acc1.
+ * If two maps equal, then, we will say that acc2 dominates acc1.
+ * We will try different combinations of the access functions for a given array, and find the common dominators.
+ * The common dominator and the access functions that it dominates are connected together.
+ */
+void adg_merge_racc(Graph *g, PlutoProg *prog) {
+  struct stmt_access_pair ***racc_stmts;
+  int *num_stmts_per_racc;
+  int num_read_data;
+  racc_stmts = get_read_access_with_stmts(
+      prog->stmts, prog->nstmts, &num_read_data, &num_stmts_per_racc
+      );
+
+  for (int i = 0; i < num_read_data; i++) {
+    for (int j = 0; j < num_stmts_per_racc[i]; j++) {
+      PlutoAccess *acc1 = racc_stmts[i][j]->acc;
+      Stmt *stmt1 = racc_stmts[i][j]->stmt;
+
+      int n;
+      for (n = 0; n < prog->ndeps; n++) {
+        Dep *dep = prog->deps[n];
+        if (IS_RAW(dep->type) && dep->dest_acc == acc1) {
+          break;
+        }
+      }
+
+      // excluding intermediate variables
+      if (n < prog->ndeps) {
+        continue;
+      }
+
+      for (int k = j + 1; k < num_stmts_per_racc[i]; k++) {
+        PlutoAccess *acc2 = racc_stmts[i][k]->acc;
+        Stmt *stmt2 = racc_stmts[i][k]->stmt;
+
+        int n;
+        for (n = 0; n < prog->ndeps; n++) {
+          Dep *dep = prog->deps[n];
+          if (IS_RAW(dep->type) && dep->dest_acc == acc2) {
+            break;
+          }          
+        }
+        if (n < prog->ndeps)
+          continue;
+
+        // these two statements should have the same number of iterators and hyperplanes
+        if (stmt1->dim != stmt2->dim || stmt1->trans->nrows != stmt2->trans->nrows)
+          continue;
+
+        if (psa_access_merge(racc_stmts[i][j], racc_stmts[i][k], prog)) {
+          g->adj->val[acc1->sym_id][acc2->sym_id] += 1;
+          g->vertices[acc1->sym_id].dom_id = acc2->sym_id;
+        } else if (psa_access_merge(racc_stmts[i][k], racc_stmts[i][j], prog)) {
+          g->adj->val[acc2->sym_id][acc1->sym_id] += 1;
+          g->vertices[acc2->sym_id].dom_id = acc1->sym_id;
+        }
+      }
+    }
+  }
+
+  for (int i = 0; i < num_read_data; i++) {
+    for (int j = 0; j < num_stmts_per_racc[i]; j++) {
+      free(racc_stmts[i][j]);
+    }
+    free(racc_stmts[i]);
+  }
+  free(racc_stmts);
+  free(num_stmts_per_racc);  
+}
+
 /* Jie Added - Start */
 /*
  * Two read access functions are connected if they are of the same access function
- * However, the front-end (e.g. PET) could change the access functions, making it different to directly compare the access matrix.
+ * However, the front-end (e.g. PET) could change the access functions, making it difficult to directly compare the access matrix.
  * We take the access function of acc1 and acc2, and build a map from the iterator domain of acc1.
  * If two maps equal, then, we can safely say these two access functions are the same.
  * This is a temporary fix and has problems. For example, comparing <A[i][0], A[i][k]> in the MM will merge them, however,
@@ -2486,6 +2559,41 @@ void adg_compute_cc(PlutoProg *prog) {
     for (int n = 0; n < g->nVertices; n++) {
       if (g->vertices[n].cc_id == i) {
         g->ccs[i].vertices[idx++] = n;
+      }
+    }
+    /* Update the dom_id in the CC */
+    for (int n = 0; n < g->ccs[i].size; n++) {
+      int dom_id = g->vertices[g->ccs[i].vertices[n]].dom_id;
+      if (dom_id < 0) {
+        g->ccs[i].dom_id = g->ccs[i].vertices[n];
+      }
+    }
+    /* Update the type */
+    int n;
+    for (n = 0; n < prog->ndeps; n++) {
+      Dep *dep = prog->deps[n];
+      if (IS_RAW(dep->type)) {
+        if (dep->src_acc->sym_id == g->ccs[i].vertices[0] || dep->dest_acc->sym_id == g->ccs[i].vertices[0]) {
+          g->ccs[i].type = 0;
+          break;
+        }        
+      }
+    }
+    if (n == prog->ndeps) {
+      for (int j = 0; j < prog->nstmts; j++) {
+        Stmt *stmt = prog->stmts[j];
+        for (int k = 0; k < stmt->nreads; k++) {
+          if (stmt->reads[k]->sym_id == g->ccs[i].vertices[0]) {
+            g->ccs[i].type = 2;
+            break;
+          }
+        }
+        for (int k = 0; k < stmt->nwrites; k++) {
+          if (stmt->writes[k]->sym_id == g->ccs[i].vertices[0]) {
+            g->ccs[i].type = 1;
+            break;
+          }
+        }
       }
     }
   }

@@ -108,9 +108,7 @@ bool is_dep_constant_at_level(Dep *dep, PlutoProg *prog, int level) {
   int src_dim = src_stmt->dim;
   int dest_dim = dest_stmt->dim;
 
-  isl_printer *printer = isl_printer_to_file(ctx, stdout);
-//  isl_printer_print_set(printer, dpoly_set);
-//  printf("\n");
+//  isl_printer *printer = isl_printer_to_file(ctx, stdout);
 
   // create isl_map for dependece distance
   // dis = \phi(dest) - \phi(src)
@@ -130,21 +128,18 @@ bool is_dep_constant_at_level(Dep *dep, PlutoProg *prog, int level) {
                   dest_stmt->trans->val[level][dest_dim + npar];
   dis_cst->nrows = 1;
 
-//  pluto_constraints_pretty_print(stdout, dis_cst);
   isl_map *dis_map = isl_map_from_pluto_constraints(dis_cst, ctx, src_dim + dest_dim, 1, npar);
-
-//  isl_printer_print_map(printer, dis_map);
-//  printf("\n");
-
   isl_set *dis_set = isl_set_apply(dpoly_set, dis_map);
 
-  isl_printer_print_set(printer, dis_set);
-  printf("\n");
+//  isl_printer_print_set(printer, dis_set);
+//  printf("\n");
+
   // check if the set constains only one single element
   bool is_constant;
   if (!isl_set_is_empty(dis_set)) {
     if (isl_set_is_singleton(dis_set)) {
       is_constant = true;
+      /*
       // to get the number, we use a trick here
       isl_printer *printer_str = isl_printer_to_str(ctx);
       isl_printer_print_set(printer_str, dis_set);
@@ -157,6 +152,7 @@ bool is_dep_constant_at_level(Dep *dep, PlutoProg *prog, int level) {
       free(tmp_str);
       isl_aff_free(dis_aff);
       isl_val_free(dis_val);
+      */
     } else {
       is_constant = false;
     }
@@ -164,7 +160,7 @@ bool is_dep_constant_at_level(Dep *dep, PlutoProg *prog, int level) {
     is_constant = false;
   }
 
-  isl_printer_free(printer);
+//  isl_printer_free(printer);
   pluto_constraints_free(dis_cst);
   isl_set_free(dis_set);
   isl_ctx_free(ctx);
@@ -187,9 +183,7 @@ bool systolic_array_dep_checker_isl(PlutoProg *prog) {
   int n;
   for (n = 0; n < ndeps; n++) {
     Dep *dep = deps[n];
-    printf("%d type: %d src: %d dest: %d arr: %s\n", n, dep->type, dep->src, dep->dest, dep->src_acc->name);
-//    PlutoConstraints *tdpoly = pluto_get_transformed_dpoly(dep, prog->stmts[dep->src], prog->stmts[dep->dest]);
-//    pluto_constraints_pretty_print(stdout, tdpoly);
+//    printf("%d type: %d src: %d dest: %d arr: %s\n", n, dep->type, dep->src, dep->dest, dep->src_acc->name);
 
     bool is_uniform = true;
     for (int h = 0; h < prog->num_hyperplanes; h++) {
@@ -369,6 +363,278 @@ bool systolic_array_dep_checker(PlutoProg *prog) {
 //  return is_uniform;
 //}
 
+bool psa_prog_reuse_check(PlutoProg *prog) {
+  for (int i = 0; i < prog->adg->num_ccs; i++) {
+    if (prog->adg->ccs[i].type == 2) {
+      // external read access
+      int base_acc_id = prog->adg->ccs[i].vertices[0];
+      Dep *base_dep = NULL;
+      for (int n = 0; n < prog->ndeps; n++) {
+        Dep *dep = prog->deps[n];
+        if (IS_RAR(dep->type)) {
+          if (dep->src_acc->sym_id == base_acc_id) {
+            base_dep = dep;
+            break;
+          }
+        }
+      }
+
+      for (int j = 1; j < prog->adg->ccs[i].size; j++) {
+        int cmp_acc_id = prog->adg->ccs[i].vertices[j];
+        Dep *cmp_dep = NULL;
+        for (int n = 0; n < prog->ndeps; n++) {
+          Dep *dep = prog->deps[n];
+          if (IS_RAR(dep->type)) {
+            if (dep->src_acc->sym_id == cmp_acc_id) {
+              cmp_dep = dep;
+              break;
+            }
+          }
+        }
+
+        PlutoConstraints *base_dpoly = base_dep->dpolytope;
+        PlutoConstraints *cmp_dpoly = cmp_dep->dpolytope;
+        int base_dim = prog->stmts[base_dep->src]->dim;
+        int cmp_dim = prog->stmts[cmp_dep->src]->dim;
+        assert(base_dim == cmp_dim);
+        // compare the base_dim x ncols elements
+        for (int row = 0; row < base_dim; row++) 
+          for (int col = 0; col < base_dpoly->ncols; col++) {
+            if (base_dpoly->val[row][col] != cmp_dpoly->val[row][col])
+              return false;
+          }
+      }
+    }
+  }
+  return true;
+}
+
+/* 
+ * For all access in the same adg CC,
+ * check if their share the same reuse direction by checking if the first
+ * stmt->dim rows equal,
+ * if not, we will delete this program
+ */
+PlutoProg **psa_reuse_filter(PlutoProg **progs, int *num_progs) {
+  PlutoProg **new_progs = NULL;
+  int num_new_progs = 0;
+
+  for (int i = 0; i < *num_progs; i++) {
+    PlutoProg *prog = progs[i];
+    if (psa_prog_reuse_check(prog)) {
+      num_new_progs += 1;
+      new_progs = realloc(new_progs, num_new_progs * sizeof(PlutoProg *));
+      new_progs[num_new_progs - 1] = progs[i];
+    } else {
+      pluto_prog_free(progs[i]);
+    }
+  }
+
+  free(progs);
+  *num_progs = num_new_progs;
+  return new_progs;
+}
+
+/*
+ * This function analyszes the self-temporal-reuse of each external read access.
+ * The detected reuse dependence will be added as teh RAR dependences to the program.
+ * Depending on the number of RAR dependences found for each array reference, there could be 
+ * numerous array candidates generated.
+ * All the read access in the same CC in the ADG (access dependence graph) will be assigned 
+ * the same reuse direction.
+ */
+PlutoProg **psa_reuse_adg_analysis(PlutoProg *prog, int *num_reuse_progs) {
+  // step 1: calculate the self-temporal reuse for each external read access.
+  Dep ***rar_deps = NULL;
+  int num_reuse_operand = 0;
+  int *ndep_per_racc = NULL;
+
+  struct stmt_access_pair ***racc_stmts;
+  int *num_stmts_per_racc;
+  int num_read_data;
+  racc_stmts = get_read_access_with_stmts(
+      prog->stmts, prog->nstmts, &num_read_data, &num_stmts_per_racc
+      );
+
+  for (int i = 0; i < prog->adg->num_ccs; i++) {
+    if (prog->adg->ccs[i].type == 2) {
+      // external read access
+      int acc_id = prog->adg->ccs[i].dom_id;
+      PlutoAccess *dom_acc;
+      for (int ii = 0; ii < num_read_data; ii++) {
+        for (int jj = 0; jj < num_stmts_per_racc[ii]; jj++) {
+          if (racc_stmts[ii][jj]->acc->sym_id == acc_id) {
+            dom_acc = racc_stmts[ii][jj]->acc;
+            break;
+          }
+        }
+      }
+
+      // compute the null space of the access function
+      PlutoMatrix *acc_mat = dom_acc->mat;
+      // peel off the param and constant columns
+      int npar = prog->npar;
+      PlutoMatrix *trunc_acc_mat = pluto_matrix_alloc(acc_mat->nrows, acc_mat->ncols - npar - 1);
+      for (int row = 0; row < trunc_acc_mat->nrows; row++)
+        for (int col = 0; col < trunc_acc_mat->ncols; col++) {
+          trunc_acc_mat->val[row][col] = acc_mat->val[row][col];
+        }
+
+      isl_mat *isl_acc_mat = pluto_matrix_to_isl_mat(trunc_acc_mat);
+      isl_mat *isl_null_mat = isl_mat_right_kernel(isl_acc_mat); // compute the right kernel of the matrix
+      PlutoMatrix *null_space = pluto_matrix_from_isl_mat(isl_null_mat);
+
+      isl_ctx *ctx = isl_mat_get_ctx(isl_null_mat);
+      isl_mat_free(isl_null_mat);
+      isl_ctx_free(ctx);
+      pluto_matrix_free(trunc_acc_mat);
+
+      int nsol = null_space->ncols;
+      if (nsol > 0) {
+        for (int j = 0; j < prog->adg->ccs[i].size; j++) {
+          num_reuse_operand++;
+          rar_deps = (Dep ***)realloc(rar_deps, num_reuse_operand * sizeof(Dep **));
+          rar_deps[num_reuse_operand - 1] = (Dep **)malloc(nsol * sizeof(Dep *));
+          // find the acc and stmt
+          PlutoAccess *acc;
+          Stmt *stmt;
+          for (int ii = 0; ii < num_read_data; ii++) 
+            for (int jj = 0; jj < num_stmts_per_racc[ii]; jj++) {
+              if (racc_stmts[ii][jj]->acc->sym_id == prog->adg->ccs[i].vertices[j]) {
+                acc = racc_stmts[ii][jj]->acc;
+                stmt = racc_stmts[ii][jj]->stmt;
+                break;
+              }
+            }
+          construct_rar_dep(rar_deps[num_reuse_operand - 1], null_space, acc, stmt, prog);
+          ndep_per_racc = (int *)realloc(ndep_per_racc, num_reuse_operand * sizeof(int));
+          ndep_per_racc[num_reuse_operand - 1] = nsol;
+        }
+      }
+    
+      pluto_matrix_free(null_space);
+    }
+  }
+
+  for (int i = 0; i < num_read_data; i++) {
+    for (int j = 0; j < num_stmts_per_racc[i]; j++) {
+      free(racc_stmts[i][j]);
+    }
+    free(racc_stmts[i]);
+  }
+  free(racc_stmts);
+  free(num_stmts_per_racc);
+
+  // Step 2: build the program variants
+  int prog_num = 1;
+  PlutoProg **new_progs = NULL;
+
+  // If there is reuse
+  if (num_reuse_operand > 0) {
+    for (int i = 0; i < num_reuse_operand; i++) 
+      prog_num *= ndep_per_racc[i];
+  
+    int **rar_dep_list = (int **)malloc(prog_num * sizeof(int*));
+    for (int i = 0; i < prog_num; i++) {
+      rar_dep_list[i] = (int*)malloc(num_reuse_operand * sizeof(int));
+    }
+  
+    // generate different combinations of rar dep indexes
+    int dup_times = prog_num;
+    int rep_times = 1;
+  
+#ifdef PSA_DEP_DEBUG
+    fprintf(stdout, "%d\n", prog_num);
+#endif
+  
+    for (int i = 0; i < num_reuse_operand; i++) {
+      dup_times = dup_times / ndep_per_racc[i];
+      for (int p = 0; p < rep_times; p++) {
+        for (int j = 0; j < ndep_per_racc[i]; j++)
+          for (int q = 0; q < dup_times; q++) {
+#ifdef PSA_DEP_DEBUG
+            fprintf(stdout, "(%d, %d)\n", p * ndep_per_racc[i] * dup_times + j * dup_times + q, i);
+#endif
+            rar_dep_list[p * ndep_per_racc[i] * dup_times + j * dup_times + q][i] = j;
+          }
+      }
+  
+      rep_times *= ndep_per_racc[i];
+    }
+  
+    new_progs = (PlutoProg **)malloc(prog_num * sizeof(PlutoProg *));
+    for (int i = 0; i < prog_num; i++) {
+      new_progs[i] = pluto_prog_dup(prog);
+      new_progs[i]->deps = realloc(new_progs[i]->deps, (new_progs[i]->ndeps + num_reuse_operand) * sizeof(Dep *));
+      for (int j = new_progs[i]->ndeps; j < new_progs[i]->ndeps + num_reuse_operand; j++) {
+#ifdef PSA_DEP_DEBUG
+        fprintf(stdout, "(%d, %d)\n", j - new_progs[i]->ndeps, rar_dep_list[i][j - new_progs[i]->ndeps]);
+#endif
+        new_progs[i]->deps[j] = pluto_dep_dup(rar_deps[j - new_progs[i]->ndeps][rar_dep_list[i][j - new_progs[i]->ndeps]]);
+        new_progs[i]->deps[j]->id = j;
+      }
+      new_progs[i]->ndeps = new_progs[i]->ndeps + num_reuse_operand;
+  
+      // reassociate the dep and stmts
+      reassociate_dep_stmt_acc(new_progs[i]);
+    }
+#ifdef PSA_DEP_DEBUG  
+    fprintf(stdout, "[PSA] Print out the dependences.\n");
+    fprintf(stdout, "[PSA] Total number of dependences: %d\n", new_progs[0]->ndeps);
+    for (int i = 0; i < new_progs[0]->ndeps; i++) {
+      Dep *dep = new_progs[0]->deps[i];
+      fprintf(stdout, "***********************\n");
+      fprintf(stdout, "[PSA] Dependences ID: %d\n", i);
+      fprintf(stdout, "[PSA] Src stmt ID: %d\n", dep->src);
+      fprintf(stdout, "[PSA] Dest stmt ID: %d\n", dep->dest);
+      if (IS_WAR(dep->type)) {
+        fprintf(stdout, "[PSA] Dep type: WAR\n");
+      } else if (IS_WAW(dep->type)) {
+        fprintf(stdout, "[PSA] Dep type: WAW\n");
+      } else if (IS_RAW(dep->type)) {
+        fprintf(stdout, "[PSA] Dep type: RAW\n");
+      } else if (IS_RAR(dep->type)) {
+        fprintf(stdout, "[PSA] Dep type: RAR\n");
+      }
+      PlutoAccess *acc = dep->src_acc;
+      fprintf(stdout, "[PSA] Arr name: %s\n", acc->name);    
+  
+      PlutoConstraints* dpolytope = dep->dpolytope;
+      pluto_constraints_pretty_print(stdout, dpolytope);
+      fprintf(stdout, "***********************\n");
+    }
+#endif
+  
+    *num_reuse_progs = prog_num;
+
+    /* Free Memory */
+    for (int i = 0; i < prog_num; i++) {
+      free(rar_dep_list[i]);
+    }
+    free(rar_dep_list);
+    rar_dep_list = NULL;
+    /* Free Memory */
+  } else {
+    new_progs = (PlutoProg **)malloc(prog_num * sizeof(PlutoProg *));
+    new_progs[0] = prog;
+    *num_reuse_progs = prog_num;
+  }
+
+  /* Free Memory */
+  for (int i = 0; i < num_reuse_operand; i++) {
+    for (int j = 0; j < ndep_per_racc[i]; j++) {
+      pluto_dep_free(rar_deps[i][j]);
+    }
+    free(rar_deps[i]);
+  }
+  free(rar_deps);
+  free(ndep_per_racc);
+  /* Free Memory */
+
+  return new_progs;
+
+}
+
 /*
  * This function analyzes the self-temporal-reuse of each external read access.
  * The detected reuse dependence will be added as the RAR dependences to the program.
@@ -428,9 +694,25 @@ PlutoProg **psa_reuse_analysis(PlutoProg *prog, int *num_reuse_progs) {
           trunc_acc_mat->val[row][col] = acc_mat->val[row][col];
         }
 
-      isl_mat *isl_acc_mat = pluto_matrix_to_isl_mat(trunc_acc_mat);      
+//      pluto_matrix_print(stdout, trunc_acc_mat);
+
+      isl_mat *isl_acc_mat = pluto_matrix_to_isl_mat(trunc_acc_mat);     
+
+//      int rows = isl_mat_rows(isl_acc_mat);
+//      int cols = isl_mat_cols(isl_acc_mat);
+//      for (int r = 0; r < rows; r++) {
+//        for (int c = 0; c < cols; c++) {
+//          isl_val *val = isl_mat_get_element_val(isl_acc_mat, r, c);
+//          printf("%d ", isl_val_get_num_si(val));
+//          isl_val_free(val);
+//        }
+//        printf("\n");
+//      }
+
       isl_mat *isl_null_mat = isl_mat_right_kernel(isl_acc_mat); // compute the right kernel of the matrix
       PlutoMatrix *null_space = pluto_matrix_from_isl_mat(isl_null_mat);
+
+//      pluto_matrix_print(stdout, null_space);
 
       /* Free Memory */
       isl_ctx *ctx = isl_mat_get_ctx(isl_null_mat);

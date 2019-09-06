@@ -3662,6 +3662,7 @@ PlutoAccess *pluto_access_dup(const PlutoAccess *acc) {
   nacc->mat = pluto_matrix_dup(acc->mat);
   nacc->name = strdup(acc->name);
   nacc->sym_id = acc->sym_id;
+  nacc->cc_id = acc->cc_id;
 
   return nacc;
 }
@@ -3733,7 +3734,7 @@ bool psa_access_merge(struct stmt_access_pair *stmt_acc1, struct stmt_access_pai
     return is_equal;
   } else {
     PlutoConstraints *acc_map1 = psa_compute_region_data(stmt_acc1->stmt, stmt_acc1->stmt->domain, stmt_acc1->acc, prog);
-    PlutoConstraints *acc_map2 = psa_compute_region_data(stmt_acc2->stmt, stmt_acc2->stmt->domain, stmt_acc2->acc, prog);
+    PlutoConstraints *acc_map2 = psa_compute_region_data(stmt_acc2->stmt, stmt_acc1->stmt->domain, stmt_acc2->acc, prog);
 
     for (int i = 0; i < stmt_acc1->acc->mat->nrows; i++) {
       pluto_constraints_add_dim(acc_map1, i, NULL);
@@ -5493,7 +5494,8 @@ Stmt *pluto_stmt_dup(const Stmt *stmt) {
   nstmt->first_tile_dim = stmt->first_tile_dim;
   nstmt->last_tile_dim = stmt->last_tile_dim;
   nstmt->type = stmt->type;
-  nstmt->ploop_id = stmt->ploop_id;  
+  nstmt->ploop_id = stmt->ploop_id; 
+  nstmt->untouched = stmt->untouched;
   /* Jie Added - End */
 
   nstmt->dim_orig = stmt->dim_orig;

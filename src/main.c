@@ -652,12 +652,21 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
   }
 
   /* Jie Added - Start */
+  /* Create the access dependence graph */
+  Graph *adg = adg_create(prog);
+  adg_merge_racc(adg, prog);
+  prog->adg = adg;
+  adg_compute_cc(prog);
+  /* Jie Added - End */
+
+  /* Jie Added - Start */
   /* Analyze the data reuse and add RAR dependences */
   PlutoProg **reuse_progs;
   PlutoProg *reuse_prog;
   int num_reuse_progs;
   if (options->dsa != 2) {
-    reuse_progs = psa_reuse_analysis(prog, &num_reuse_progs);
+    reuse_progs = psa_reuse_adg_analysis(prog, &num_reuse_progs);
+    reuse_progs = psa_reuse_filter(reuse_progs, &num_reuse_progs);
   } else {
     reuse_progs = (PlutoProg **)malloc(1 * sizeof(PlutoProg *));
     reuse_progs[0] = pluto_prog_dup(prog);
@@ -665,7 +674,6 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
   }
   fprintf(stdout, "[PSA] %d programs generated after reuse analysis.\n", num_reuse_progs);
   /* Jie Added - End */ 
-
 
 //  for (int reuse_prog_id = 0; reuse_prog_id < num_reuse_progs; reuse_prog_id++) {
   for (int reuse_prog_id = 0; reuse_prog_id < 1; reuse_prog_id++) {
