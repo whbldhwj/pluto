@@ -527,7 +527,8 @@ void vsa_URE_extract(PlutoProg *prog, VSA *vsa) {
       bool is_CC_RAR = 0;
       if (!is_inter) {
         // external variable
-        PlutoAccess *acc = vsa->acc_var_map[prog->adg->ccs[cc_id].vertices[0]]->acc;
+        //PlutoAccess *acc = vsa->acc_var_map[prog->adg->ccs[cc_id].vertices[0]]->acc;
+        PlutoAccess *acc = vsa->acc_var_map[prog->adg->ccs[cc_id].dom_id]->acc;
         for (int n = 0; n < prog->ndeps; n++) {
           if (IS_RAR(prog->deps[n]->type)) {
             if (prog->deps[n]->src_acc == acc) {
@@ -666,6 +667,8 @@ char *create_stmt_domain_str(Stmt *stmt, PlutoProg *prog, VSA *vsa) {
  * This function builds the iteration domain for loop instances that first read the data
  * based on the RAR dependence
  * target_iters = read_iters - (RAR dest_iters);
+ * If there is no RAR dependence for this access function, naturally we will return the 
+ * original iteration domain.
  */ 
 PlutoConstraints *get_RAR_domain(Stmt *stmt, PlutoAccess *acc, PlutoProg *prog, VSA *vsa) {
   PlutoConstraints *new_domain = pluto_get_new_domain(stmt);
@@ -676,6 +679,10 @@ PlutoConstraints *get_RAR_domain(Stmt *stmt, PlutoAccess *acc, PlutoProg *prog, 
   for (int i = 0; i < prog->ndeps; i++) {
     Dep *dep = prog->deps[i];
     if (IS_RAR(dep->type) && dep->src_acc == acc) {
+      /* Check if the dependency is empty */
+      if (pluto_constraints_is_empty(dep->dpolytope))
+        continue;
+
       Stmt *src_stmt = prog->stmts[dep->src];
       Stmt *dest_stmt = prog->stmts[dep->dest];
       PlutoConstraints *tdpoly = pluto_get_transformed_dpoly(dep, src_stmt, dest_stmt);

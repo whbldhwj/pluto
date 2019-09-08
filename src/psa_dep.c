@@ -187,6 +187,10 @@ bool systolic_array_dep_checker_isl(PlutoProg *prog) {
     Dep *dep = deps[n];
 //    printf("%d type: %d src: %d dest: %d arr: %s\n", n, dep->type, dep->src, dep->dest, dep->src_acc->name);
 
+    if (IS_RAR(dep->type)) {
+      continue;
+    }
+
     bool is_uniform = true;
     for (int h = 0; h < prog->num_hyperplanes; h++) {
 //      printf("h: %d\n", h);
@@ -414,14 +418,16 @@ bool psa_prog_reuse_check(PlutoProg *prog) {
 
 /* 
  * For all access in the same adg CC,
- * check if their share the same reuse direction by checking if the first
+ * 1. check if their share the same reuse direction by checking if the first
  * stmt->dim rows equal,
  * if not, we will delete this program
+ * 2. check if the RAR polytope is non-empty, if it's empty, delete it.
  */
 PlutoProg **psa_reuse_filter(PlutoProg **progs, int *num_progs) {
   PlutoProg **new_progs = NULL;
   int num_new_progs = 0;
 
+  // check if all the access in the same CC share the same direction
   for (int i = 0; i < *num_progs; i++) {
     PlutoProg *prog = progs[i];
     if (psa_prog_reuse_check(prog)) {
@@ -431,6 +437,31 @@ PlutoProg **psa_reuse_filter(PlutoProg **progs, int *num_progs) {
     } else {
       pluto_prog_free(progs[i]);
     }
+  }
+
+  // check if the RAR polytope is non-empty
+  for (int i = 0; i < num_new_progs; i++) {
+    PlutoProg *prog = new_progs[i];
+    Dep **new_deps = NULL;
+    int num_new_deps = 0;
+
+    for (int n = 0; n < prog->ndeps; n++) {
+      Dep *dep = prog->deps[n];
+      if (IS_RAR(dep->type)) {
+        if (pluto_constraints_is_empty(dep->dpolytope)) {
+         // We will need to skip this RAR
+         pluto_dep_free(dep);
+         continue;
+        } 
+      }
+      num_new_deps++;
+      new_deps = realloc(new_deps, num_new_deps * sizeof(Dep *));
+      new_deps[num_new_deps - 1] = dep;
+    }
+
+    free(prog->deps);
+    prog->deps = new_deps;
+    prog->ndeps = num_new_deps;
   }
 
   free(progs);

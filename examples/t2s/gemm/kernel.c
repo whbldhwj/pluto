@@ -15,7 +15,7 @@
 //#pragma endscop
 //}
 
-///* DSA Form 1 */
+/* DSA Form 1 */
 void dsa_kernel(data_t A[I + 1][K + 1], data_t B[K + 1][J + 1], data_t C[I + 1][J + 1]) {
   data_t C_ext[8 + 1][8 + 1][8 + 1];
 #pragma scop

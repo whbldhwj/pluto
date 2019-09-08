@@ -8,6 +8,7 @@
 
 /*
  * This function extracts the I/O information from the program
+ * TODO: handle cases where one access is neither associated with RAR nor RAW
  */
 void vsa_IO_extract(PlutoProg *prog, VSA *vsa) {
   int *num_stmts_per_acc; // indexed by data variable

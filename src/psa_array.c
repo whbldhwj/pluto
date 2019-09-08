@@ -790,10 +790,10 @@ void psa_compute_dep_distances_isl(PlutoProg *prog) {
       free(deps[i]->disvec);
     }
     deps[i]->disvec = (int *)malloc(prog->num_hyperplanes * sizeof(int));
-    printf("dep %d src: %d dest: %d type: %d\n", i, deps[i]->src, deps[i]->dest, deps[i]->type);
+//    printf("dep %d src: %d dest: %d type: %d\n", i, deps[i]->src, deps[i]->dest, deps[i]->type);
     for (level = 0; level < prog->num_hyperplanes; level++) {      
        deps[i]->disvec[level] = get_dep_distance_isl(deps[i], prog, level);
-       printf("%d\n", deps[i]->disvec[level]);
+//       printf("%d\n", deps[i]->disvec[level]);
     }
   }
 }
@@ -1431,7 +1431,7 @@ void sa_candidates_smart_pick(PlutoProg **progs, int nprogs) {
 
   for (int i = 0; i < nprogs; i++) {
     PlutoProg *prog = progs[i];
-    pluto_transformations_pretty_print(prog);
+//    pluto_transformations_pretty_print(prog);
 
     // scan through all depedences
     int ndeps = prog->ndeps;
