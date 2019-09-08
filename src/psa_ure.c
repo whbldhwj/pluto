@@ -1033,9 +1033,71 @@ PlutoConstraints *get_anchor_domain(PlutoProg *prog) {
   return domain;
 }
 
+/*
+ * RAR URE is the in the form of: A(t1, t2, ...) = select(domain_str, new_acc_str, A(t1 - 1, ...))
+ * We will first example if the new_acc_str and the new_var_str are the same between two access functions
+ * in the same CC, if so, they can be merged together to form one RAR UREs, otherwise, will need to create 
+ * a new RAR URE.
+ * Currently, if a second RAR URE is needed, we will abort the execution.
+ * When testing if the new_acc_str equals, we will use the anchor access function.
+ * And when testing if the new_var_str sequals, we will test the RAR depdis vector.
+ */
+void create_RAR_UREs_new(int cc_id, PlutoProg *prog, VSA *vsa) {
+
+}
+
 void create_RAR_UREs(int cc_id, PlutoProg *prog, VSA *vsa) {
   // create a union of all statements' iteration domains which is used to simplify the URE domain
   PlutoConstraints *anchor_domain = get_anchor_domain(prog);
+
+  // check if it is possible to fuse all RAR UREs for this CC together
+  int anchor_acc_id = prog->adg->ccs[cc_id].dom_id;
+  PlutoAccess *anchor_acc = vsa->acc_var_map[anchor_acc_id]->acc;
+  Stmt *anchor_stmt = vsa->acc_var_map[anchor_acc_id]->stmt;
+
+  for (int i = 0; i < prog->adg->ccs[cc_id].size; i++) {
+    PlutoAccess *acc1 = vsa->acc_var_map[prog->adg->ccs[cc_id].vertices[i]]->acc;
+    Stmt *stmt1 = vsa->acc_var_map[prog->adg->ccs[cc_id].vertices[i]]->stmt;
+    int *disvec1 = NULL;
+    for (int n = 0; n < prog->ndeps; n++) {
+      Dep *dep = prog->deps[n];
+      if (IS_RAR(dep->type)) {
+        if (dep->src_acc == acc1) {
+          disvec1 = dep->disvec;
+        }
+      }
+    }
+
+    for (int j = i + 1; j < prog->adg->ccs[cc_id].size; j++) {
+      PlutoAccess *acc2 = vsa->acc_var_map[prog->adg->ccs[cc_id].vertices[j]]->acc;
+      Stmt *stmt2 = vsa->acc_var_map[prog->adg->ccs[cc_id].vertices[j]]->stmt;
+      int *disvec2 = NULL;
+      for (int n = 0; n < prog->ndeps; n++) {
+        Dep *dep = prog->deps[n];
+        if (IS_RAR(dep->type)) {
+          if (dep->src_acc == acc2) {
+            disvec2 = dep->disvec;
+          }
+        }
+      }
+
+      // compare the access function
+      char *new_acc_str1 = create_new_acc_str(stmt1, anchor_acc, prog, vsa);
+      char *new_acc_str2 = create_new_acc_str(stmt2, anchor_acc, prog, vsa);
+      if (strcmp(new_acc_str1, new_acc_str2)) {
+        fprintf(stdout, "[PSA] Error: Access string differs. Can't merge RAR UREs.\n");
+        exit(1);
+      }
+
+      // compare the dependences
+      for (int h = 0; h < vsa->t2s_iter_num; h++) {
+        if (disvec1 != NULL && disvec2 != NULL && disvec1[h] != disvec2[h]) {
+          fprintf(stdout, "[PSA] Error: Dependence differs. Can't merge RAR UREs.\n");
+          exit(1);
+        }
+      }      
+    }
+  }
 
   int URE_num = vsa->URE_num;
   // unionize the domain str of all stmts
@@ -1058,11 +1120,6 @@ void create_RAR_UREs(int cc_id, PlutoProg *prog, VSA *vsa) {
 //  pluto_constraints_pretty_print(stdout, new_union_domain);
 
   char *domain_str = pluto_constraints_to_t2s_format(new_union_domain, vsa, prog->num_hyperplanes, prog->npar, prog->params);
-//  PlutoAccess *anchor_acc = vsa->acc_var_map[prog->adg->ccs[cc_id].vertices[prog->adg->ccs[cc_id].size - 1]]->acc;
-//  Stmt *anchor_stmt = vsa->acc_var_map[prog->adg->ccs[cc_id].vertices[prog->adg->ccs[cc_id].size - 1]]->stmt;
-  int anchor_acc_id = prog->adg->ccs[cc_id].dom_id;
-  PlutoAccess *anchor_acc = vsa->acc_var_map[anchor_acc_id]->acc;
-  Stmt *anchor_stmt = vsa->acc_var_map[anchor_acc_id]->stmt;
 
   char *var_name = vsa->acc_var_map[anchor_acc->sym_id]->var_name;
   URE *merge_URE = (URE *)malloc(sizeof(URE));
@@ -1232,8 +1289,51 @@ void create_drain_UREs(Stmt *stmt, PlutoAccess *acc, PlutoProg *prog, VSA *vsa) 
   } 
 }
 
+/*
+ * When generating UREs, we will replace the external acc with its references.
+ * As for intermediate accs, if it's associated with multiple RAWs, we will examine 
+ * if the depdis equals for these RAWs. If not, we will need to split them and generte
+ * multiple select conditions.
+ * Currently if the URE needs to be splitted, we will generate one warning and abort the program.
+ */
+void stmt_to_UREs_new(Stmt *stmt, PlutoProg *prog, VSA *vsa) {
+
+}
+
 void stmt_to_UREs(Stmt *stmt, PlutoProg *prog, VSA *vsa) {
   char *domain_str = create_stmt_domain_str(stmt, prog, vsa);
+
+  // test if the URE needs to be splitted
+  for (int i = 0; i < stmt->nreads; i++) {
+    if (vsa->acc_var_map[stmt->reads[i]->sym_id]->ei == 1) {
+      // intermediate access
+      PlutoAccess *acc = stmt->reads[i];
+      int **disvecs = NULL;
+      int num_deps = 0;
+      for (int n = 0; n < prog->ndeps; n++) {
+        Dep *dep = prog->deps[n];
+        if (IS_RAW(dep->type) && dep->dest_acc == acc) {
+          num_deps++;
+          disvecs = realloc(disvecs, num_deps * sizeof(int *));
+          disvecs[num_deps - 1] = dep->disvec;
+        }
+      }
+    
+      if (num_deps > 0) {
+        for (int j = 0; j < num_deps; j++)
+          for (int k = j + 1; k < num_deps; k++) {
+            for (int h = 0; h < vsa->t2s_iter_num; h++) {
+              if (disvecs[j][h] != disvecs[k][h]) {
+                fprintf(stdout, "[PSA] Stmt UREs need to be splitted.\n");
+                exit(1);
+              }
+            }
+          }
+      }
+
+      free(disvecs);
+    }
+  }
 
   int wacc_cnt = 0;
   int racc_cnt = 0;
