@@ -1157,6 +1157,7 @@ Graph *adg_create(PlutoProg *prog);
 void adg_compute_cc(PlutoProg *prog);
 void adg_merge_rar(Graph *g, PlutoProg *prog);
 void adg_merge_racc(Graph *g, PlutoProg *prog);
+void adg_remerge_racc(Graph *g, PlutoProg *prog, VSA *vsa);
 /* Jie Added - End */
 int ddg_sccs_direct_connected(Graph *g, PlutoProg *prog, int scc1, int scc2);
 int cut_between_sccs(PlutoProg *prog, Graph *ddg, int scc1, int scc2);

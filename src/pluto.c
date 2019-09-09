@@ -1108,7 +1108,7 @@ void psa_detect_hyperplane_types_stmtwise(PlutoProg *prog, int array_dim, int ar
           break;
         }
       } else {
-        stmt->psa_hyp_types[i] = PSA_H_SCALAR;
+        stmt->psa_hyp_types[i2] = PSA_H_SCALAR;
       }
     }
     for (i = i1; i <= i2; i++) {
@@ -2269,6 +2269,72 @@ Graph *adg_create(PlutoProg *prog) {
 /* Jie Added - End */
 
 /*
+ * This function remerges the read accesses by further comparing if the new_acc_str and disvec equal
+ * between two access functions. 
+ * This function should be called after the Pluto's algorithm.
+ */
+void adg_remerge_racc(Graph *g, PlutoProg *prog, VSA *vsa) {
+  // reset the adjacency matrix
+  for (int i = 0; i < g->nVertices; i++)
+    for (int j = 0; j < g->nVertices; j++) {
+      g->adj->val[i][j] = 0;
+    }
+  
+  // Inside each CC, we reconnect the access function if they share the same
+  // new_acc_str and disvec.
+  // However, we will still set the dom_id of each access function by the original dom_id
+  // of the CC.
+  for (int cc_id = 0; cc_id < g->num_ccs; cc_id++) {
+    int dom_id = g->ccs[cc_id].dom_id;
+    PlutoAccess *dom_acc = vsa->acc_var_map[dom_id]->acc;
+    for (int i = 0; i < g->ccs[cc_id].size; i++) {
+      int acc_id1 = g->ccs[cc_id].vertices[i];
+      PlutoAccess *acc1 = vsa->acc_var_map[acc_id1]->acc;
+      Stmt *stmt1 = vsa->acc_var_map[acc_id1]->stmt;
+      int *disvec1 = NULL;
+      for (int n = 0; n < prog->ndeps; n++) {
+        Dep *dep = prog->deps[n];
+        if (IS_RAR(dep->type)) {
+          if (dep->src_acc == acc1)
+            disvec1 = dep->disvec;
+        }
+      }
+
+      for (int j = i + 1; j < g->ccs[cc_id].size; j++) {
+        int acc_id2 = g->ccs[cc_id].vertices[j];
+        PlutoAccess *acc2 = vsa->acc_var_map[acc_id2]->acc;
+        Stmt *stmt2 = vsa->acc_var_map[acc_id2]->stmt;
+        int *disvec2 = NULL;
+        for (int n = 0; n < prog->ndeps; n++) {
+          Dep *dep = prog->deps[n];
+          if (IS_RAR(dep->type)) {
+            if (dep->src_acc == acc2) 
+              disvec2 = dep->disvec;
+          }
+        }
+
+        char *new_acc_str1 = create_new_acc_str(stmt1, dom_acc, prog, vsa);
+        char *new_acc_str2 = create_new_acc_str(stmt2, dom_acc, prog, vsa);
+        if (!strcmp(new_acc_str1, new_acc_str2)) {
+          if (disvec1 != NULL && disvec2 != NULL) {
+            int h;
+            for (h = 0; h < vsa->t2s_iter_num; h++) {
+              if (disvec1[h] != disvec2[h])
+                break;
+            }
+            if (h == vsa->t2s_iter_num) {
+              g->adj->val[acc1->sym_id][acc2->sym_id] += 1;
+            }
+          } else {
+            g->adj->val[acc1->sym_id][acc2->sym_id] += 1;
+          }
+        }
+      }
+    }
+  }
+}
+
+/*
  * Two read access functions are connected if they are of the same access function
  * However, the front-end (e.g. PET) could change the access functions, making it difficult to directly compare the access matrix.
  * We take the access function of acc1 and acc2, and build a map from the iterator domain of acc1.
@@ -2550,6 +2616,7 @@ void adg_compute_cc(PlutoProg *prog) {
   }
   g->num_ccs = num_cc;
   // update the ccs
+  g->ccs = realloc(g->ccs, num_cc * sizeof(CC));
   for (i = 0; i < g->num_ccs; i++) {
     g->ccs[i].max_dim = get_max_dim_in_cc(prog, i);
     g->ccs[i].size = get_cc_size(prog, i);
@@ -2562,14 +2629,24 @@ void adg_compute_cc(PlutoProg *prog) {
       }
     }
     /* Update the dom_id in the CC */
-    for (int n = 0; n < g->ccs[i].size; n++) {
+    int n;
+    for (n = 0; n < g->ccs[i].size; n++) {
       int dom_id = g->vertices[g->ccs[i].vertices[n]].dom_id;
       if (dom_id < 0) {
         g->ccs[i].dom_id = g->ccs[i].vertices[n];
+        break;
       }
     }
+    if (n == g->ccs[i].size) {
+      g->ccs[i].dom_id = g->vertices[g->ccs[i].vertices[0]].dom_id;
+    } else if (n < g->ccs[i].size) {
+      // update the dom_id for all vertices in the CC
+      for (int v = 0; v < g->ccs[i].size; v++) {
+        g->vertices[g->ccs[i].vertices[v]].dom_id = g->ccs[i].dom_id;
+      }
+    }
+
     /* Update the type */
-    int n;
     for (n = 0; n < prog->ndeps; n++) {
       Dep *dep = prog->deps[n];
       if (IS_RAW(dep->type)) {

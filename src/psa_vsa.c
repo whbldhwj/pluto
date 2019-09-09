@@ -707,21 +707,6 @@ void vsa_t2s_var_extract(PlutoProg *prog, VSA *vsa) {
 //#endif
 //  adg_compute_cc(prog);
 
-  Graph *adg = prog->adg;
-
-  // initialize the adg_var_map
-  struct var_pair **adg_var_map = NULL;
-  adg_var_map = (struct var_pair **)malloc(adg->num_ccs * sizeof(struct var_pair *));
-  // initialization
-  for (int i = 0; i < adg->num_ccs; i++) {
-    adg_var_map[i] = (struct var_pair *)malloc(sizeof(struct var_pair));
-    adg_var_map[i]->var_name = NULL;
-    adg_var_map[i]->var_ref = NULL;
-    adg_var_map[i]->dvar_name = NULL;
-    adg_var_map[i]->ei = -1;
-    adg_var_map[i]->d = 0;
-  }
-
   for (int i = 0; i < num_read_write_data; i++)
     for (int j = 0; j < num_stmts_per_acc[i]; j++) {
       struct stmt_access_pair *acc_stmt = acc_stmts[i][j];
@@ -743,15 +728,40 @@ void vsa_t2s_var_extract(PlutoProg *prog, VSA *vsa) {
 //      }
     }
 
+  vsa->acc_var_map = acc_var_map;
+  vsa->acc_var_map_num_entries = total_accs;
+
+  // update the adg
+  Graph *adg = prog->adg;
+  adg_remerge_racc(adg, prog, vsa);
+  // free the old cc
+  if (adg->ccs) {
+    for (int i = 0; i < adg->num_ccs; i++) {
+      free(adg->ccs[i].vertices);
+    }
+  }
+  adg_compute_cc(prog);
+
+  // initialize the adg_var_map
+  struct var_pair **adg_var_map = NULL;
+  adg_var_map = (struct var_pair **)malloc(adg->num_ccs * sizeof(struct var_pair *));
+  // initialization
+  for (int i = 0; i < adg->num_ccs; i++) {
+    adg_var_map[i] = (struct var_pair *)malloc(sizeof(struct var_pair));
+    adg_var_map[i]->var_name = NULL;
+    adg_var_map[i]->var_ref = NULL;
+    adg_var_map[i]->dvar_name = NULL;
+    adg_var_map[i]->ei = -1;
+    adg_var_map[i]->d = 0;
+  }
+
   // update the var_name, var_ref, var_iters by DFS in each CC
   for (int i = 0; i < prog->adg->num_ccs; i++) {
     int cc_id = prog->adg->ccs[i].id;
     update_t2s_var(acc_var_map, adg_var_map, total_accs, cc_id, prog, vsa);
   }
 
-  vsa->acc_var_map = acc_var_map;
   vsa->adg_var_map = adg_var_map;
-  vsa->acc_var_map_num_entries = total_accs;
   vsa->adg_var_map_num_entries = adg->num_ccs;
 #ifdef PSA_VSA_DEBUG
   acc_var_map_pretty_print(acc_var_map, total_accs);

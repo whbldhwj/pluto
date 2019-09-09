@@ -24,8 +24,8 @@ Var t1, t2, t3;
 Func B_CC0_E(FUNC_S), A_CC1_E(FUNC_S), C_CC3_E(FUNC_S), C_ext_CC2_I(FUNC_S), APP(FUNC_S);
 
 // UREs
-B_CC0_E(t1, t2, t3) = select((t2 - 1 == 0 && t1 - t3 - 3 >= 0) || (-t1 + t3 + 2 == 0 && t2 - 1 == 0), B(t1 - t2 - t3, t3), B_CC0_E(t1 - 1, t2 - 1, t3));
-A_CC1_E(t1, t2, t3) = select((t3 - 1 == 0 && t1 - t2 - 3 >= 0) || (t3 - 1 == 0 && -t1 + t2 + 2 == 0), A(t2, t1 - t2 - t3), A_CC1_E(t1 - 1, t2, t3 - 1));
+B_CC0_E(t1, t2, t3) = select((t2 - 1 == 0 && t1 - t3 - 3 >= 0) || (-t1 + t3 + 2 == 0 && t2 - 1 == 0), B(t1 - t2 - t3, t3), select((t2 - 2 >= 0 && t1 - t2 - t3 - 2 >= 0) || (-t1 + t2 + t3 + 1 == 0 && t2 - 2 >= 0), B_CC0_E(t1 - 1, t2 - 1, t3), B_CC0_E(t1, t2, t3)));
+A_CC1_E(t1, t2, t3) = select((t3 - 1 == 0 && t1 - t2 - 3 >= 0) || (t3 - 1 == 0 && -t1 + t2 + 2 == 0), A(t2, t1 - t2 - t3), select((t1 - t2 - t3 - 2 >= 0 && t3 - 2 >= 0) || (-t1 + t2 + t3 + 1 == 0 && t1 - t2 - 3 >= 0), A_CC1_E(t1 - 1, t2, t3 - 1), A_CC1_E(t1, t2, t3)));
 C_ext_CC2_I(t1, t2, t3) = select((-t1 + t2 + t3 + 1 == 0), (A_CC1_E(t1, t2, t3) * B_CC0_E(t1, t2, t3)), select((t1 - t2 - t3 - 2 >= 0), (C_ext_CC2_I(t1 - 1, t2, t3) + (A_CC1_E(t1, t2, t3) * B_CC0_E(t1, t2, t3))), C_ext_CC2_I(t1, t2, t3)));
 C_CC3_E(t1, t2, t3) = select((-t1 + t2 + t3 + 8 == 0), C_ext_CC2_I(t1, t2, t3), C_CC3_E(t1, t2, t3));
 APP(t1, t2, t3) = C_CC3_E(t1, t2, t3);

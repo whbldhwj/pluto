@@ -181,6 +181,10 @@ int pluto_constraints_get_const_lb(const PlutoConstraints *cnst, int depth,
 int pluto_constraints_is_empty(const PlutoConstraints *cst);
 int pluto_constraints_are_equal(const PlutoConstraints *cst1,
                                 const PlutoConstraints *cst2);
+/* Jie Added - Start */
+int pluto_constraints_are_equal_isl(const PlutoConstraints *cst1,
+                                    const PlutoConstraints *cst2);
+/* Jie Added - End */
 
 PlutoConstraints *pluto_constraints_empty(int ncols);
 PlutoConstraints *pluto_constraints_universe(int ncols);

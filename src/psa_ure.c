@@ -1047,14 +1047,33 @@ void create_RAR_UREs_new(int cc_id, PlutoProg *prog, VSA *vsa) {
 }
 
 void create_RAR_UREs(int cc_id, PlutoProg *prog, VSA *vsa) {
-  // create a union of all statements' iteration domains which is used to simplify the URE domain
+  /* create a union of all statements' iteration domains which is used to simplify the URE domain */
   PlutoConstraints *anchor_domain = get_anchor_domain(prog);
 
-  // check if it is possible to fuse all RAR UREs for this CC together
-  int anchor_acc_id = prog->adg->ccs[cc_id].dom_id;
-  PlutoAccess *anchor_acc = vsa->acc_var_map[anchor_acc_id]->acc;
-  Stmt *anchor_stmt = vsa->acc_var_map[anchor_acc_id]->stmt;
+  /* Obtain the anchor acc and stmt and dom acc */
+  int dom_acc_id = prog->adg->ccs[cc_id].dom_id;
+  PlutoAccess *dom_acc = vsa->acc_var_map[dom_acc_id]->acc;
+  PlutoAccess *anchor_acc = vsa->acc_var_map[prog->adg->ccs[cc_id].vertices[0]]->acc;
+  /* 
+   * It is possible that there is no RAR with the anchor_acc,
+   * in this case, we will need to iterate the CC and select the one with RAR
+   */
+  for (int i = 0; i < prog->adg->ccs[cc_id].size; i++) {
+    PlutoAccess *acc = vsa->acc_var_map[prog->adg->ccs[cc_id].vertices[i]]->acc;
+    for (int n = 0; n < prog->ndeps; n++) {
+      Dep *dep = prog->deps[n];
+      if (IS_RAR(dep->type)) {
+        if (dep->src_acc == acc || dep->dest_acc == acc) {
+          anchor_acc = acc;
+          break;
+        }
+      }
+    }
+  }
 
+  Stmt *anchor_stmt = vsa->acc_var_map[prog->adg->ccs[cc_id].vertices[0]]->stmt;
+
+  /* check if it is possible to fuse all RAR UREs for this CC together */
   for (int i = 0; i < prog->adg->ccs[cc_id].size; i++) {
     PlutoAccess *acc1 = vsa->acc_var_map[prog->adg->ccs[cc_id].vertices[i]]->acc;
     Stmt *stmt1 = vsa->acc_var_map[prog->adg->ccs[cc_id].vertices[i]]->stmt;
@@ -1082,25 +1101,29 @@ void create_RAR_UREs(int cc_id, PlutoProg *prog, VSA *vsa) {
       }
 
       // compare the access function
-      char *new_acc_str1 = create_new_acc_str(stmt1, anchor_acc, prog, vsa);
-      char *new_acc_str2 = create_new_acc_str(stmt2, anchor_acc, prog, vsa);
+      char *new_acc_str1 = create_new_acc_str(stmt1, dom_acc, prog, vsa);
+      char *new_acc_str2 = create_new_acc_str(stmt2, dom_acc, prog, vsa);
       if (strcmp(new_acc_str1, new_acc_str2)) {
         fprintf(stdout, "[PSA] Error: Access string differs. Can't merge RAR UREs.\n");
-        exit(1);
+//        exit(1);
       }
 
       // compare the dependences
       for (int h = 0; h < vsa->t2s_iter_num; h++) {
         if (disvec1 != NULL && disvec2 != NULL && disvec1[h] != disvec2[h]) {
           fprintf(stdout, "[PSA] Error: Dependence differs. Can't merge RAR UREs.\n");
-          exit(1);
+//          exit(1);
         }
-      }      
+      }     
+
+      free(new_acc_str1);
+      free(new_acc_str2);
     }
   }
 
+  /* Start to generate URE */
   int URE_num = vsa->URE_num;
-  // unionize the domain str of all stmts
+  /* Obtain the domain to read from external memory */
   PlutoConstraints *union_domain = NULL;
   for (int i = 0; i < prog->adg->ccs[cc_id].size; i++) {
     PlutoAccess *acc = vsa->acc_var_map[prog->adg->ccs[cc_id].vertices[i]]->acc;
@@ -1116,16 +1139,47 @@ void create_RAR_UREs(int cc_id, PlutoProg *prog, VSA *vsa) {
     pluto_constraints_free(rar_domain);
   }
 
+  /* Simplify the domain */
   PlutoConstraints *new_union_domain = pluto_constraints_simplify_context_isl(union_domain, anchor_domain);
 //  pluto_constraints_pretty_print(stdout, new_union_domain);
+  
+  // Collect the domain of statements in the current CC
+  PlutoConstraints *cc_domain = NULL;
+  for (int i = 0; i < prog->adg->ccs[cc_id].size; i++) {
+    Stmt *stmt = vsa->acc_var_map[prog->adg->ccs[cc_id].vertices[i]]->stmt;
+    PlutoConstraints *new_stmt_domain = pluto_get_new_domain(stmt);
+    if (cc_domain == NULL) {
+      if (new_stmt_domain != NULL)
+        cc_domain = pluto_constraints_dup(new_stmt_domain);
+    } else {
+      if (new_stmt_domain != NULL) {
+        cc_domain = pluto_constraints_unionize_isl(cc_domain, new_stmt_domain);
+      }
+    }
+    pluto_constraints_free(new_stmt_domain);
+  }
+
+  /* 
+   * Compare if the CC domain equals the anchor_domain,
+   * If equal, we only need to create one level of URE
+   * A(t1,t2) = select(new_union_domain, A[][], A(t1,t2-1))
+   * else, we need to create two levels of URE
+   * A(t1,t2) = select(new_union_domian, A[][], select(cc_domain - new_union_domain, A(t1,t2-1), A(t1,t2)))
+   */
+  bool is_equal = pluto_constraints_are_equal_isl(cc_domain, anchor_domain) || pluto_constraints_are_equal_isl(cc_domain, union_domain);
+//  // debug
+//  pluto_constraints_pretty_print(stdout, cc_domain);
+//  pluto_constraints_pretty_print(stdout, anchor_domain);
 
   char *domain_str = pluto_constraints_to_t2s_format(new_union_domain, vsa, prog->num_hyperplanes, prog->npar, prog->params);
-
   char *var_name = vsa->acc_var_map[anchor_acc->sym_id]->var_name;
   URE *merge_URE = (URE *)malloc(sizeof(URE));
   URE_init(merge_URE);
   merge_URE->id = vsa->URE_num;  
-  merge_URE->wrap_level = 1;
+  if (is_equal)
+    merge_URE->wrap_level = 1;
+  else
+    merge_URE->wrap_level = 2;
   merge_URE->name = create_URE_name(get_vsa_URE_names(vsa->UREs, vsa->URE_num), vsa->URE_num, var_name);
   merge_URE->select_cond = realloc(merge_URE->select_cond, merge_URE->wrap_level * sizeof(char *));
   merge_URE->select_LHS = realloc(merge_URE->select_LHS, merge_URE->wrap_level * sizeof(char *));
@@ -1133,22 +1187,26 @@ void create_RAR_UREs(int cc_id, PlutoProg *prog, VSA *vsa) {
 
   char *new_acc_str;
   if (anchor_stmt->untouched) 
-    new_acc_str = create_orig_acc_str(anchor_stmt, anchor_acc, prog, vsa);
+    new_acc_str = create_orig_acc_str(anchor_stmt, dom_acc, prog, vsa);
   else
-    new_acc_str = create_new_acc_str(anchor_stmt, anchor_acc, prog, vsa);
+    new_acc_str = create_new_acc_str(anchor_stmt, dom_acc, prog, vsa);
   char *var_ref = vsa->acc_var_map[anchor_acc->sym_id]->var_ref;
   IterExp **var_iters = vsa->acc_var_map[anchor_acc->sym_id]->var_iters;
 
   IterExp **var_iters_RHS = (IterExp **)malloc(vsa->t2s_iter_num * sizeof(IterExp *));
+  // initialize the iters
+  for (int iter_id = 0; iter_id < vsa->t2s_iter_num; iter_id++) {
+    var_iters_RHS[iter_id] = (IterExp *)malloc(sizeof(IterExp));
+    var_iters_RHS[iter_id]->iter_name = strdup(var_iters[iter_id]->iter_name);
+    var_iters_RHS[iter_id]->iter_offset = 0;
+  }
+  // update the iters
   for (int i = 0; i < prog->ndeps; i++) {
     Dep *dep = prog->deps[i];
     if (IS_RAR(dep->type)) {
       if (dep->src_acc == anchor_acc || dep->dest_acc == anchor_acc) {
         for (int iter_id = 0; iter_id < vsa->t2s_iter_num; iter_id++) {
-          var_iters_RHS[iter_id] = (IterExp *)malloc(sizeof(IterExp));
           int diff = dep->disvec[iter_id];
-
-          var_iters_RHS[iter_id]->iter_name = strdup(var_iters[iter_id]->iter_name);
           var_iters_RHS[iter_id]->iter_offset = var_iters[iter_id]->iter_offset - diff;
         }
       }
@@ -1159,15 +1217,34 @@ void create_RAR_UREs(int cc_id, PlutoProg *prog, VSA *vsa) {
   sprintf(var_ref_RHS, "%s(%s)", var_name, str_tmp);
   free(str_tmp);
   
-  merge_URE->select_cond[merge_URE->wrap_level - 1] = strdup(domain_str);
-  merge_URE->select_LHS[merge_URE->wrap_level - 1] = strdup(new_acc_str);
-  merge_URE->select_RHS[merge_URE->wrap_level - 1] = strdup(var_ref_RHS);
-  merge_URE->LHS = strdup(var_ref); 
+  merge_URE->select_cond[0] = strdup(domain_str);
+  merge_URE->select_LHS[0] = strdup(new_acc_str);
+  if (merge_URE->wrap_level == 1)
+    merge_URE->select_RHS[0] = strdup(var_ref_RHS);
+  else {
+    merge_URE->select_RHS[0] = strdup(var_ref);
+    PlutoConstraints *new_domain = pluto_constraints_difference_isl(cc_domain, union_domain);
+    PlutoConstraints *new_domain_simplify = pluto_constraints_simplify_context_isl(new_domain, anchor_domain);
+    char *domain_str = pluto_constraints_to_t2s_format(new_domain_simplify, vsa, prog->num_hyperplanes, prog->npar, prog->params);
+    
+    merge_URE->select_cond[1] = strdup(domain_str);
+    merge_URE->select_LHS[1] = strdup(var_ref_RHS);
+    merge_URE->select_RHS[1] = strdup(var_ref);
 
+    free(domain_str);
+    pluto_constraints_free(new_domain);
+    pluto_constraints_free(new_domain_simplify);
+  }
+
+  merge_URE->LHS = strdup(var_ref);
+
+  /* Generate URE text */
   merge_URE->text = create_URE_text(merge_URE);
 
+  /* Add URE */
   vsa->UREs = URE_add(vsa->UREs, &vsa->URE_num, merge_URE);
 
+  /* Memory cleanup */
   for (int i = 0; i < vsa->t2s_iter_num; i++) {
     free(var_iters_RHS[i]->iter_name);
     free(var_iters_RHS[i]);
@@ -1175,6 +1252,7 @@ void create_RAR_UREs(int cc_id, PlutoProg *prog, VSA *vsa) {
 
   free(new_acc_str);
   free(var_iters_RHS);
+  pluto_constraints_free(cc_domain);
   pluto_constraints_free(anchor_domain);
   pluto_constraints_free(union_domain);
   pluto_constraints_free(new_union_domain);
@@ -1308,14 +1386,14 @@ void stmt_to_UREs(Stmt *stmt, PlutoProg *prog, VSA *vsa) {
     if (vsa->acc_var_map[stmt->reads[i]->sym_id]->ei == 1) {
       // intermediate access
       PlutoAccess *acc = stmt->reads[i];
-      int **disvecs = NULL;
+      Dep **deps = NULL;
       int num_deps = 0;
       for (int n = 0; n < prog->ndeps; n++) {
         Dep *dep = prog->deps[n];
         if (IS_RAW(dep->type) && dep->dest_acc == acc) {
           num_deps++;
-          disvecs = realloc(disvecs, num_deps * sizeof(int *));
-          disvecs[num_deps - 1] = dep->disvec;
+          deps = realloc(deps, num_deps * sizeof(Dep *));
+          deps[num_deps - 1] = dep;
         }
       }
     
@@ -1323,15 +1401,15 @@ void stmt_to_UREs(Stmt *stmt, PlutoProg *prog, VSA *vsa) {
         for (int j = 0; j < num_deps; j++)
           for (int k = j + 1; k < num_deps; k++) {
             for (int h = 0; h < vsa->t2s_iter_num; h++) {
-              if (disvecs[j][h] != disvecs[k][h]) {
+              if (deps[j]->disvec[h] != deps[k]->disvec[h]) {
                 fprintf(stdout, "[PSA] Stmt UREs need to be splitted.\n");
-                exit(1);
+//                exit(1);
               }
             }
           }
       }
 
-      free(disvecs);
+      free(deps);
     }
   }
 

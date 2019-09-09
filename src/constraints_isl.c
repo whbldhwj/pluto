@@ -121,29 +121,13 @@ PlutoConstraints *pluto_constraints_difference_isl(const PlutoConstraints *cst1,
 
   isl_ctx *ctx = isl_ctx_alloc();
   isl_set *set1, *set2;
-
-  //bset1 = isl_basic_set_from_pluto_constraints(ctx, cst1);
-  //bset2 = isl_basic_set_from_pluto_constraints(ctx, cst2);
-  //bset3 = isl_set_subtract(bset1, bset2);
   
   set1 = isl_set_from_pluto_constraints(cst1, ctx);
   set2 = isl_set_from_pluto_constraints(cst2, ctx);
   set1 = isl_set_subtract(set1, set2);
 
-  assert(!isl_set_is_empty(set1));
-  
-  //PlutoConstraints *diffcst = isl_basic_set_to_pluto_constraints(bset3);    
   PlutoConstraints *diffcst = isl_set_to_pluto_constraints(set1); 
-
-  pluto_constraints_free(cst1);
-
-// #ifdef JIE_DEBUG
-//   fprintf(stdout, "[Debug] Diff:\n");
-//   pluto_constraints_pretty_print(stdout, diffcst);
-// #endif
-
   isl_set_free(set1);
-  //isl_set_free(set2);  
   isl_ctx_free(ctx);
 
   return diffcst;  
@@ -584,4 +568,17 @@ pluto_constraints_intersect_isl(PlutoConstraints *cst1,
   pluto_constraints_free(icst);
 
   return cst1;
+}
+
+int pluto_constraints_are_equal_isl(const PlutoConstraints *cst1,
+                                    const PlutoConstraints *cst2) {
+  PlutoConstraints *diff = pluto_constraints_difference_isl(cst1, cst2);
+  int are_constraints_equal = pluto_constraints_is_empty(diff);
+  pluto_constraints_free(diff);
+  if (are_constraints_equal) {
+    diff = pluto_constraints_difference_isl(cst2, cst1);
+    are_constraints_equal = pluto_constraints_is_empty(diff);
+    pluto_constraints_free(diff);
+  }
+  return are_constraints_equal;
 }
