@@ -9,17 +9,17 @@ int t1, t2, t3, t4, t5, t6;
 /* Start of CLooG code */
 for (t1=1;t1<=8;t1++) {
   for (t2=1;t2<=8;t2++) {
-    S1(t1,t2,1,1);
+    S1(t2,t1,1,1);
     for (t4=2;t4<=3;t4++) {
-      S4(t1,t2,1,t4);
+      S4(t2,t1,1,t4);
     }
     for (t3=2;t3<=3;t3++) {
-      S2(t1,t2,t3,1);
+      S2(t2,t1,t3,1);
       for (t4=t3+2;t4<=t3+3;t4++) {
-        S3(t1,t2,t3,(-t3+t4));
+        S3(t2,t1,t3,(-t3+t4));
       }
     }
-    S5(t1,t2,3,3);
+    S5(t2,t1,3,3);
   }
 }
 /* End of CLooG code */

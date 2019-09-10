@@ -12,20 +12,20 @@
 
 int main(){
   // declarations
-  data_t X[R + 2 + 1][S + 2 + 1];
+  data_t X[R + 3 + 1][S + 3 + 1];
   data_t W[3 + 1][3 + 1];
   data_t Z[R + 1][S + 1];
   data_t Z_dsa[R + 1][S + 1];
 
   // data initialization
-  for (int r = 0; r < R + 2 + 1; r++)
-    for (int s = 0; s < S + 2 + 1; s++) {
-      X[r][s] = (float)rand() / RAND_MAX;
+  for (int r = 0; r < R + 3 + 1; r++)
+    for (int s = 0; s < S + 3 + 1; s++) {
+      X[r][s] = r;
     }
 
   for (int i = 0; i < 3 + 1; i++)
     for (int j = 0; j < 3 + 1; j++) {
-      W[i][j] = (float)rand() / RAND_MAX;
+      W[i][j] = i;
     }
 
   for (int r = 1; r < R + 1; r++)
@@ -50,12 +50,16 @@ int main(){
   // comparison
   int err = 0;
   float thres = 0.001;
-  for (int r = 1; r < R + 1; r++) 
+  for (int r = 1; r < R + 1; r++) {
     for (int s = 1; s < S + 1; s++) {
       if (fabs(Z_dsa[r][s] - Z[r][s]) > thres) {
         err++;
-      }
+      }     
+      printf("%d(%d) ", Z_dsa[r][s], Z[r][s]);
     }
+    printf("\n");
+  }
+  printf("\n");
 
   if (err) {
     printf("Test failed with %d errors!\n", err);
