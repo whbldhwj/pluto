@@ -678,35 +678,6 @@ void vsa_t2s_var_extract(PlutoProg *prog, VSA *vsa) {
     }
   }
 
-//  char *iters = "t1";;
-//  for (int i = 1; i < band_width; i++) {  
-//    char iter_tmp[6];
-//    sprintf(iter_tmp, ", t%d", i + 1);
-//    iters = concat(iters, iter_tmp);
-//  }
-
-  // Build the access dependence graph. Each node in the graph is one unique access function in the program.
-  // Then compute the connected components of the graph, all the accesses in the same componenet will 
-  // use the same variable name, the variable is named as [arr_name]_CC[cc_id]_[E/I][D]
-  // If there is only access function in the component, then it is an external variable
-  // If there are more than one access function in the component, then it is an intermediate variable
-  // Additionally, if the access function is a write access, we will add the drain variable correspondingly.
-
-//  Graph *adg = adg_create(prog);
-////  adg_merge_rar(adg, prog);
-//  adg_merge_racc(adg, prog);
-//  prog->adg= adg;
-//#ifdef PSA_VSA_DEBUG
-////  fprintf(stdout, "[Debug] Access dependence graph:\n");
-////  for (int i = 0; i < adg->adj->nrows; i++) {
-////    for (int j = 0; j < adg->adj->ncols; j++) {
-////      fprintf(stdout, "\t%d", adg->adj->val[i][j]);
-////    }
-////    fprintf(stdout, "\n");
-////  }
-//#endif
-//  adg_compute_cc(prog);
-
   for (int i = 0; i < num_read_write_data; i++)
     for (int j = 0; j < num_stmts_per_acc[i]; j++) {
       struct stmt_access_pair *acc_stmt = acc_stmts[i][j];

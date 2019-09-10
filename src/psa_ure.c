@@ -549,7 +549,7 @@ void vsa_URE_extract(PlutoProg *prog, VSA *vsa) {
   // with the same URE name, merge two using the select clause
   for (int stmt_id = 0; stmt_id < prog->nstmts; stmt_id++) {
     Stmt *stmt = prog->stmts[stmt_id];
-    stmt_to_UREs(stmt, prog, vsa); 
+    stmt_to_UREs_new(stmt, prog, vsa); 
   }
   
   // create drain UREs
@@ -1372,16 +1372,268 @@ void create_drain_UREs(Stmt *stmt, PlutoAccess *acc, PlutoProg *prog, VSA *vsa) 
  * As for intermediate accs, if it's associated with multiple RAWs, we will examine 
  * if the depdis equals for these RAWs. If not, we will need to split them and generte
  * multiple select conditions.
- * Currently if the URE needs to be splitted, we will generate one warning and abort the program.
  */
 void stmt_to_UREs_new(Stmt *stmt, PlutoProg *prog, VSA *vsa) {
+  /* test if the UREs need to be splitted */
+  Dep *** split_deps = NULL;
+  PlutoAccess **split_accs = NULL;
+  int num_split_accs = 0;
+  int *num_split_deps_per_acc = 0;
+  bool *is_acc_split = NULL;
 
+  for (int i = 0; i < stmt->nreads; i++) {
+    if (vsa->acc_var_map[stmt->reads[i]->sym_id]->ei == 1) {
+      // intermediate access
+      PlutoAccess *acc = stmt->reads[i];
+      num_split_accs++;
+      split_deps = realloc(split_deps, num_split_accs * sizeof(Dep **));
+      split_accs = realloc(split_accs, num_split_accs * sizeof(PlutoAccess *));
+      num_split_deps_per_acc = realloc(num_split_deps_per_acc, num_split_accs * sizeof(int));
+      is_acc_split = realloc(is_acc_split, num_split_accs * sizeof(bool));
+
+      split_accs[num_split_accs - 1] = acc;
+      is_acc_split[num_split_accs - 1] = false;
+
+      Dep **deps = NULL;
+      int num_deps = 0;
+      for (int n = 0; n < prog->ndeps; n++) {
+        Dep *dep = prog->deps[n];
+        if (IS_RAW(dep->type) && dep->dest_acc == acc) {
+          num_deps++;
+          deps = realloc(deps, num_deps * sizeof(Dep *));
+          deps[num_deps - 1] = dep;
+        }
+      }
+    
+      split_deps[num_split_accs - 1] = deps;
+      num_split_deps_per_acc[num_split_accs - 1] = num_deps;
+
+      if (num_deps > 0) {
+        for (int j = 0; j < num_deps; j++)
+          for (int k = j + 1; k < num_deps; k++) {
+            for (int h = 0; h < vsa->t2s_iter_num; h++) {
+              if (deps[j]->disvec[h] != deps[k]->disvec[h]) {
+                fprintf(stdout, "[PSA] Stmt UREs need to be splitted.\n");
+                is_acc_split[num_split_accs - 1] = true;
+//                exit(1);
+              }
+            }
+          }
+      }      
+    }
+  }
+
+  /* 
+   * TODO: We only handle the case with one intermediate accesses, multiple accesses will be
+   * supported in the future
+   */
+  if (num_split_accs == 0) {
+    char *domain_str = create_stmt_domain_str(stmt, prog, vsa);       
+    stmt_to_URE_single(domain_str, stmt, prog, vsa);
+    free(domain_str); 
+  } else if (num_split_accs == 1) {
+    if (!is_acc_split[0]) {
+      // update the vsa->acc_var_map
+      // update the domain
+      char *domain_str = create_stmt_domain_str(stmt, prog, vsa);
+      stmt_to_URE_single(domain_str, stmt, prog, vsa);
+      free(domain_str);
+    } else {
+      for (int i = 0; i < num_split_deps_per_acc[0]; i++) {
+        // update the vsa->acc_var_map
+        PlutoAccess *acc = split_accs[0];
+        Dep *dep = split_deps[0][i];
+        for (int iter_id = 0; iter_id < vsa->t2s_iter_num; iter_id++) {
+          int diff = dep->disvec[iter_id];
+          vsa->acc_var_map[acc->sym_id]->var_iters[iter_id]->iter_offset = -diff;
+        }
+        char var_ref[50];
+        char *str_tmp = get_iter_str(vsa->acc_var_map[acc->sym_id]->var_iters, vsa->t2s_iter_num);
+        sprintf(var_ref, "%s(%s)", vsa->acc_var_map[acc->sym_id]->var_name, str_tmp);
+        free(str_tmp);
+
+        free(vsa->acc_var_map[acc->sym_id]->var_ref);
+        vsa->acc_var_map[acc->sym_id]->var_ref = strdup(var_ref);
+
+        // update the domain
+        PlutoConstraints *tdpoly = pluto_get_transformed_dpoly(dep, prog->stmts[dep->src], prog->stmts[dep->dest]);
+        // project out the source iters
+        pluto_constraints_project_out_isl_single(tdpoly, 0, prog->stmts[dep->src]->trans->nrows);
+        // get the anchor domain
+        PlutoConstraints *anchor_domain = get_anchor_domain(prog);
+        PlutoConstraints *new_domain_simplify = pluto_constraints_simplify_context_isl(tdpoly, anchor_domain);
+        char *domain_str = pluto_constraints_to_t2s_format(new_domain_simplify, vsa, stmt->trans->nrows, prog->npar, prog->params);
+
+        stmt_to_URE_single(domain_str, stmt, prog, vsa);
+
+        pluto_constraints_free(tdpoly);
+        pluto_constraints_free(anchor_domain);
+        pluto_constraints_free(new_domain_simplify);
+        free(domain_str);
+      }
+    }
+  } else if (num_split_accs > 1) {
+    // generate different combinations of deps
+    // for each combination
+    //   update the vsa->acc_var_map
+    //   update the domain
+    //   call stmt_to_URE_single
+    fprintf(stdout, "[PSA] Error! Multiple intermediate accesses not supported yet!\n");
+    exit(1);
+  }
+
+  // free up memory
+  for (int i = 0; i < num_split_accs; i++) {
+    free(split_deps[i]);
+  }
+  free(split_deps);
+  free(split_accs);
+  free(num_split_deps_per_acc);
+  free(is_acc_split);
+}
+
+void stmt_to_URE_single(char *domain_str, Stmt *stmt, PlutoProg *prog, VSA *vsa) {
+  int wacc_cnt = 0;
+  int racc_cnt = 0;
+  char *text = strdup(stmt->text);
+
+  // PET will assign out-of-order IDs to access functions in the statement
+  // In order to parse all references, we will iteratively run multiple 
+  // times untill we substitute all references in the original statement
+  while(wacc_cnt != stmt->nwrites || racc_cnt != stmt->nreads) {
+    char *new_text = "";
+    char ch;
+    int loc = 0;
+    while((ch = text[loc]) != '\0') {      
+      PlutoAccess *tmp_acc;
+      if (wacc_cnt != stmt->nwrites)
+        tmp_acc = stmt->writes[wacc_cnt];
+      else if (racc_cnt != stmt->nreads) 
+        tmp_acc = stmt->reads[racc_cnt];
+      else
+        tmp_acc = NULL;
+      
+      if (tmp_acc != NULL) {
+        char *tmp_acc_name;
+        tmp_acc_name = tmp_acc->name;
+        char substr[strlen(tmp_acc_name) + 1];
+        memcpy(substr, text + loc, PLMIN(strlen(tmp_acc_name), strlen(text) - loc)* sizeof(char));
+        substr[strlen(tmp_acc_name)] = '\0';
+        if (!strcmp(substr, tmp_acc_name) && text[loc + strlen(tmp_acc_name)] == '[') {
+          new_text = concat(new_text, vsa->acc_var_map[tmp_acc->sym_id]->var_ref);
+          loc += strlen(tmp_acc_name);
+          // skip the brackets
+          int dim = tmp_acc->mat->nrows;
+          int dim_cnt = 0;
+          while((ch = text[loc]) != '\0') {
+            if (ch == ']')
+              dim_cnt += 1;
+            loc++;
+            if (dim_cnt == dim)
+              break;
+          }
+          if (wacc_cnt != stmt->nwrites)
+            wacc_cnt++;
+          else if (racc_cnt != stmt->nreads)
+            racc_cnt++;
+        } else {
+          char ch_str[2];
+          ch_str[0] = ch;
+          ch_str[1] = '\0';
+          new_text = concat(new_text, ch_str);
+          loc++;
+        }
+      } else {
+        char ch_str[2];
+        ch_str[0] = ch;
+        ch_str[1] = '\0';
+        new_text = concat(new_text, ch_str);
+        loc++;
+      }
+
+    }
+    if (text)
+      free(text);
+    text = strdup(new_text);   
+    free(new_text);
+  }
+
+  char *var_name = vsa->acc_var_map[stmt->writes[0]->sym_id]->var_name;
+  URE *stmt_URE = NULL;
+  bool new_URE = true;
+  // check if this variable is already defined
+  for (int i = 0; i < vsa->URE_num; i++) {
+    if (!strcmp(vsa->UREs[i]->name, var_name)) {
+      stmt_URE = vsa->UREs[i];
+      new_URE = false;
+      break;
+    }
+  }
+  if (stmt_URE) {
+    stmt_URE->wrap_level++;
+    stmt_URE->select_cond = realloc(stmt_URE->select_cond, stmt_URE->wrap_level * sizeof(char *));
+    stmt_URE->select_LHS = realloc(stmt_URE->select_LHS, stmt_URE->wrap_level * sizeof(char *));
+    stmt_URE->select_RHS = realloc(stmt_URE->select_RHS, stmt_URE->wrap_level * sizeof(char *));
+    stmt_URE->select_cond[stmt_URE->wrap_level - 1] = strdup(domain_str);
+    stmt_URE->select_RHS[stmt_URE->wrap_level - 1] = strdup(vsa->acc_var_map[stmt->writes[0]->sym_id]->var_ref);
+  } else {
+    stmt_URE = (URE *)malloc(sizeof(URE));
+    URE_init(stmt_URE);
+    stmt_URE->id = vsa->URE_num;
+    char **URE_names = get_vsa_URE_names(vsa->UREs, vsa->URE_num);
+    stmt_URE->name = create_URE_name(URE_names, vsa->URE_num, var_name);
+    stmt_URE->LHS = strdup(vsa->acc_var_map[stmt->writes[0]->sym_id]->var_ref);
+    stmt_URE->wrap_level = 1;
+    stmt_URE->select_cond = realloc(stmt_URE->select_cond, stmt_URE->wrap_level * sizeof(char *));
+    stmt_URE->select_LHS = realloc(stmt_URE->select_LHS, stmt_URE->wrap_level * sizeof(char *));
+    stmt_URE->select_RHS = realloc(stmt_URE->select_RHS, stmt_URE->wrap_level * sizeof(char *));
+    stmt_URE->select_cond[stmt_URE->wrap_level - 1] = strdup(domain_str);
+    stmt_URE->select_RHS[stmt_URE->wrap_level - 1] = strdup(stmt_URE->LHS);
+
+    for (int i = 0; i < vsa->URE_num; i++) {
+      free(URE_names[i]);
+    }
+    free(URE_names);
+  }
+
+  char *new_text = "";
+  char ch;
+  int loc = 0;
+  while((ch = text[loc]) != ';') {
+    if (ch == '=') {
+      while(text[++loc] == ' ') {
+        
+      }
+      while((ch = text[loc]) != ';') {
+        char tmp[2];
+        tmp[0] = ch;
+        tmp[1] = '\0';
+        new_text = concat(new_text, tmp);          
+
+        loc++;
+      }
+    } else {
+      loc++;
+    }
+  }
+
+  stmt_URE->select_LHS[stmt_URE->wrap_level - 1] = strdup(new_text);
+  char *str_tmp = create_URE_text(stmt_URE);
+  free(stmt_URE->text);
+  stmt_URE->text = str_tmp;
+
+  if (new_URE)
+    vsa->UREs = URE_add(vsa->UREs, &vsa->URE_num, stmt_URE);
+
+  free(text);
+  free(new_text);
+//  free(domain_str);
 }
 
 void stmt_to_UREs(Stmt *stmt, PlutoProg *prog, VSA *vsa) {
   char *domain_str = create_stmt_domain_str(stmt, prog, vsa);
 
-  // test if the URE needs to be splitted
+  /* test if the URE needs to be splitted */
   for (int i = 0; i < stmt->nreads; i++) {
     if (vsa->acc_var_map[stmt->reads[i]->sym_id]->ei == 1) {
       // intermediate access
