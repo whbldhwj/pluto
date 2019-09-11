@@ -602,6 +602,31 @@ void vsa_URE_extract(PlutoProg *prog, VSA *vsa) {
 //  }
 }
 
+int get_URE_update_level(char **URE_names, int URE_num, char *var_name) {
+  int update_level = 0;  
+  for (int i = 0; i < URE_num; i++) {
+    char *cur_name = URE_names[i];
+    if (strlen(cur_name) >= strlen(var_name)) {
+      char cur_name_prefix[strlen(cur_name) + 1];
+      char ch;
+      int loc = 0;
+      while((ch = cur_name[loc]) != '\0') {
+        if (ch == '.')
+          break;
+        else {
+          cur_name_prefix[loc] = cur_name[loc];
+          loc++;
+        }
+      }
+      cur_name_prefix[loc] = '\0';
+      if (!strcmp(cur_name_prefix, var_name))
+        update_level++;
+    }
+  }
+ 
+  return update_level;
+}
+
 char *create_URE_name(char **URE_names, int URE_num, char *var_name) {  
   int update_level = 0;  
   for (int i = 0; i < URE_num; i++) {
@@ -990,18 +1015,21 @@ char *pluto_constraints_to_t2s_format(const PlutoConstraints *cst, VSA *vsa, int
 void URE_init(URE *ure) {
   ure->name = NULL;
   ure->id = -1;
-  ure->wrap_level = 1;
+  ure->wrap_level = 0;
+  ure->update_level = 0;
   ure->text = NULL;
   ure->select_cond = NULL;
   ure->select_LHS = NULL;
   ure->select_RHS = NULL;
   ure->LHS = NULL;
+  ure->RHS = NULL;
 }
 
 void URE_free(URE *ure) {
   free(ure->text);
   free(ure->name);
   free(ure->LHS);
+  free(ure->RHS);
   for (int i = 0; i < ure->wrap_level; i++) {
     free(ure->select_cond[i]);
     free(ure->select_LHS[i]);
@@ -1123,6 +1151,29 @@ void create_RAR_UREs(int cc_id, PlutoProg *prog, VSA *vsa) {
 
   /* Start to generate URE */
   int URE_num = vsa->URE_num;
+
+  /* 
+   * First add a placeholder URE
+   * A(t1, t2) = 0
+   */
+  {
+    URE *init_URE = (URE *)malloc(sizeof(URE));
+    URE_init(init_URE);
+    init_URE->id = vsa->URE_num;
+    init_URE->wrap_level = 0;
+    char *var_name = vsa->acc_var_map[anchor_acc->sym_id]->var_name;
+    init_URE->name = create_URE_name(get_vsa_URE_names(vsa->UREs, vsa->URE_num), vsa->URE_num, var_name);
+    init_URE->update_level = get_URE_update_level(get_vsa_URE_names(vsa->UREs, vsa->URE_num), vsa->URE_num, var_name);
+    char *var_ref = vsa->acc_var_map[anchor_acc->sym_id]->var_ref;
+    init_URE->LHS = strdup(var_ref);
+    char RHS[10];
+    sprintf(RHS, "0");
+    init_URE->RHS = strdup(RHS);
+    init_URE->text = create_URE_text(init_URE);
+    /* Add URE */
+    vsa->UREs = URE_add(vsa->UREs, &vsa->URE_num, init_URE);
+  }
+
   /* Obtain the domain to read from external memory */
   PlutoConstraints *union_domain = NULL;
   for (int i = 0; i < prog->adg->ccs[cc_id].size; i++) {
@@ -1181,6 +1232,7 @@ void create_RAR_UREs(int cc_id, PlutoProg *prog, VSA *vsa) {
   else
     merge_URE->wrap_level = 2;
   merge_URE->name = create_URE_name(get_vsa_URE_names(vsa->UREs, vsa->URE_num), vsa->URE_num, var_name);
+  merge_URE->update_level = get_URE_update_level(get_vsa_URE_names(vsa->UREs, vsa->URE_num), vsa->URE_num, var_name);
   merge_URE->select_cond = realloc(merge_URE->select_cond, merge_URE->wrap_level * sizeof(char *));
   merge_URE->select_LHS = realloc(merge_URE->select_LHS, merge_URE->wrap_level * sizeof(char *));
   merge_URE->select_RHS = realloc(merge_URE->select_RHS, merge_URE->wrap_level * sizeof(char *));
@@ -1263,19 +1315,22 @@ char *create_URE_text(URE *ure) {
   char *text = "";
   text = concat(text, ure->LHS);
   text = concat(text, " = ");
-    
-  for (int i = 0; i < ure->wrap_level; i++) {
-    text = concat(text, "select(");
-    text = concat(text, ure->select_cond[i]);
-    text = concat(text, ", ");
-    text = concat(text, ure->select_LHS[i]);
-    text = concat(text, ", ");
-  }
-  for (int i = ure->wrap_level - 1; i >= 0; i--) {
-    if (i == ure->wrap_level - 1) {
-      text = concat(text, ure->select_RHS[i]);
+  if (ure->wrap_level == 0) {
+    text = concat(text, ure->RHS);
+  } else {
+    for (int i = 0; i < ure->wrap_level; i++) {
+      text = concat(text, "select(");
+      text = concat(text, ure->select_cond[i]);
+      text = concat(text, ", ");
+      text = concat(text, ure->select_LHS[i]);
+      text = concat(text, ", ");
     }
-    text = concat(text, ")");
+    for (int i = ure->wrap_level - 1; i >= 0; i--) {
+      if (i == ure->wrap_level - 1) {
+        text = concat(text, ure->select_RHS[i]);
+      }
+      text = concat(text, ")");
+    }
   }
   text = concat(text, ";");
 
@@ -1292,6 +1347,24 @@ void create_collect_UREs(int cc_id, PlutoProg *prog, VSA *vsa) {
   }
   LHS = concat(LHS, ")");
 
+  {
+    /* Create one place holder URE
+     * APP() = 0
+     */
+    URE *init_URE = (URE *)malloc(sizeof(URE));
+    URE_init(init_URE);
+    init_URE->id = vsa->URE_num;
+    init_URE->name = strdup("APP");
+    init_URE->wrap_level = 0;
+    init_URE->LHS = strdup(LHS);
+    char RHS[10];
+    sprintf(RHS, "0");
+    init_URE->RHS = strdup(RHS);
+    init_URE->text = create_URE_text(init_URE);
+    init_URE->update_level = 0;
+    vsa->UREs = URE_add(vsa->UREs, &vsa->URE_num, init_URE);
+  }
+
   char *RHS = strdup(vsa->acc_var_map[prog->adg->ccs[cc_id].vertices[0]]->var_ref);
 
   char *text = "";
@@ -1303,9 +1376,10 @@ void create_collect_UREs(int cc_id, PlutoProg *prog, VSA *vsa) {
   URE *collect_URE = (URE *)malloc(sizeof(URE));
   URE_init(collect_URE);
   collect_URE->id = vsa->URE_num;
-  collect_URE->name = strdup("APP");
+  collect_URE->name = strdup("APP.update(0)");
   collect_URE->text = strdup(text);
   collect_URE->wrap_level = 0;
+  collect_URE->update_level = 1;
 
   vsa->UREs = URE_add(vsa->UREs, &vsa->URE_num, collect_URE);
 
@@ -1559,41 +1633,68 @@ void stmt_to_URE_single(char *domain_str, Stmt *stmt, PlutoProg *prog, VSA *vsa)
   }
 
   char *var_name = vsa->acc_var_map[stmt->writes[0]->sym_id]->var_name;
-  URE *stmt_URE = NULL;
+
+  /* Wrapping is not supported as it will results in correctness problem when multiple statements are fused together */
+//  URE *stmt_URE = NULL;
+//  bool new_URE = true;
+//  // check if this variable is already defined
+//  for (int i = 0; i < vsa->URE_num; i++) {
+//    if (!strcmp(vsa->UREs[i]->name, var_name)) {
+//      stmt_URE = vsa->UREs[i];
+//      new_URE = false;
+//      break;
+//    }
+//  }
+//  if (stmt_URE) {
+//    stmt_URE->wrap_level++;
+//    stmt_URE->select_cond = realloc(stmt_URE->select_cond, stmt_URE->wrap_level * sizeof(char *));
+//    stmt_URE->select_LHS = realloc(stmt_URE->select_LHS, stmt_URE->wrap_level * sizeof(char *));
+//    stmt_URE->select_RHS = realloc(stmt_URE->select_RHS, stmt_URE->wrap_level * sizeof(char *));
+//    stmt_URE->select_cond[stmt_URE->wrap_level - 1] = strdup(domain_str);
+//    stmt_URE->select_RHS[stmt_URE->wrap_level - 1] = strdup(vsa->acc_var_map[stmt->writes[0]->sym_id]->var_ref);
+//  } else {
+//    stmt_URE = (URE *)malloc(sizeof(URE));
+//    URE_init(stmt_URE);
+//    stmt_URE->id = vsa->URE_num;
+//    char **URE_names = get_vsa_URE_names(vsa->UREs, vsa->URE_num);
+//    stmt_URE->name = create_URE_name(URE_names, vsa->URE_num, var_name);
+//    stmt_URE->update_level = get_URE_update_level(URE_names, vsa->URE_num, var_name);
+//    stmt_URE->LHS = strdup(vsa->acc_var_map[stmt->writes[0]->sym_id]->var_ref);
+//    stmt_URE->wrap_level = 1;
+//    stmt_URE->select_cond = realloc(stmt_URE->select_cond, stmt_URE->wrap_level * sizeof(char *));
+//    stmt_URE->select_LHS = realloc(stmt_URE->select_LHS, stmt_URE->wrap_level * sizeof(char *));
+//    stmt_URE->select_RHS = realloc(stmt_URE->select_RHS, stmt_URE->wrap_level * sizeof(char *));
+//    stmt_URE->select_cond[stmt_URE->wrap_level - 1] = strdup(domain_str);
+//    stmt_URE->select_RHS[stmt_URE->wrap_level - 1] = strdup(stmt_URE->LHS);
+//
+//    for (int i = 0; i < vsa->URE_num; i++) {
+//      free(URE_names[i]);
+//    }
+//    free(URE_names);
+//  }
+
   bool new_URE = true;
   // check if this variable is already defined
   for (int i = 0; i < vsa->URE_num; i++) {
     if (!strcmp(vsa->UREs[i]->name, var_name)) {
-      stmt_URE = vsa->UREs[i];
       new_URE = false;
       break;
     }
   }
-  if (stmt_URE) {
-    stmt_URE->wrap_level++;
-    stmt_URE->select_cond = realloc(stmt_URE->select_cond, stmt_URE->wrap_level * sizeof(char *));
-    stmt_URE->select_LHS = realloc(stmt_URE->select_LHS, stmt_URE->wrap_level * sizeof(char *));
-    stmt_URE->select_RHS = realloc(stmt_URE->select_RHS, stmt_URE->wrap_level * sizeof(char *));
-    stmt_URE->select_cond[stmt_URE->wrap_level - 1] = strdup(domain_str);
-    stmt_URE->select_RHS[stmt_URE->wrap_level - 1] = strdup(vsa->acc_var_map[stmt->writes[0]->sym_id]->var_ref);
-  } else {
-    stmt_URE = (URE *)malloc(sizeof(URE));
-    URE_init(stmt_URE);
-    stmt_URE->id = vsa->URE_num;
-    char **URE_names = get_vsa_URE_names(vsa->UREs, vsa->URE_num);
-    stmt_URE->name = create_URE_name(URE_names, vsa->URE_num, var_name);
-    stmt_URE->LHS = strdup(vsa->acc_var_map[stmt->writes[0]->sym_id]->var_ref);
-    stmt_URE->wrap_level = 1;
-    stmt_URE->select_cond = realloc(stmt_URE->select_cond, stmt_URE->wrap_level * sizeof(char *));
-    stmt_URE->select_LHS = realloc(stmt_URE->select_LHS, stmt_URE->wrap_level * sizeof(char *));
-    stmt_URE->select_RHS = realloc(stmt_URE->select_RHS, stmt_URE->wrap_level * sizeof(char *));
-    stmt_URE->select_cond[stmt_URE->wrap_level - 1] = strdup(domain_str);
-    stmt_URE->select_RHS[stmt_URE->wrap_level - 1] = strdup(stmt_URE->LHS);
-
-    for (int i = 0; i < vsa->URE_num; i++) {
-      free(URE_names[i]);
-    }
-    free(URE_names);
+  if (new_URE) {
+    /* Create a placeholder URE */
+    URE *init_URE = (URE *)malloc(sizeof(URE));
+    URE_init(init_URE);
+    init_URE->id = vsa->URE_num;
+    init_URE->wrap_level = 0;
+    init_URE->name = create_URE_name(get_vsa_URE_names(vsa->UREs, vsa->URE_num), vsa->URE_num, var_name);
+    init_URE->update_level = get_URE_update_level(get_vsa_URE_names(vsa->UREs, vsa->URE_num), vsa->URE_num, var_name);
+    init_URE->LHS = strdup(vsa->acc_var_map[stmt->writes[0]->sym_id]->var_ref);
+    char RHS[10];
+    sprintf(RHS, "0");
+    init_URE->RHS = strdup(RHS);
+    init_URE->text = create_URE_text(init_URE);
+    vsa->UREs = URE_add(vsa->UREs, &vsa->URE_num, init_URE);
   }
 
   char *new_text = "";
@@ -1617,13 +1718,33 @@ void stmt_to_URE_single(char *domain_str, Stmt *stmt, PlutoProg *prog, VSA *vsa)
     }
   }
 
+  URE *stmt_URE = (URE *)malloc(sizeof(URE));
+  URE_init(stmt_URE);
+  stmt_URE->id = vsa->URE_num;
+  char **URE_names = get_vsa_URE_names(vsa->UREs, vsa->URE_num);
+  stmt_URE->name = create_URE_name(URE_names, vsa->URE_num, var_name);
+  stmt_URE->update_level = get_URE_update_level(URE_names, vsa->URE_num, var_name);
+  for (int i = 0; i < vsa->URE_num; i++) {
+    free(URE_names[i]);
+  }
+  free(URE_names);
+
+  stmt_URE->LHS = strdup(vsa->acc_var_map[stmt->writes[0]->sym_id]->var_ref);
+  stmt_URE->wrap_level = 1;
+  stmt_URE->select_cond = realloc(stmt_URE->select_cond, stmt_URE->wrap_level * sizeof(char *));
+  stmt_URE->select_LHS = realloc(stmt_URE->select_LHS, stmt_URE->wrap_level * sizeof(char *));
+  stmt_URE->select_RHS = realloc(stmt_URE->select_RHS, stmt_URE->wrap_level * sizeof(char *));
+  stmt_URE->select_cond[stmt_URE->wrap_level - 1] = strdup(domain_str);
   stmt_URE->select_LHS[stmt_URE->wrap_level - 1] = strdup(new_text);
-  char *str_tmp = create_URE_text(stmt_URE);
+  stmt_URE->select_RHS[stmt_URE->wrap_level - 1] = strdup(vsa->acc_var_map[stmt->writes[0]->sym_id]->var_ref);
+
+  char *str_tmp = create_URE_text(stmt_URE);  
   free(stmt_URE->text);
   stmt_URE->text = str_tmp;
+  vsa->UREs = URE_add(vsa->UREs, &vsa->URE_num, stmt_URE);
 
-  if (new_URE)
-    vsa->UREs = URE_add(vsa->UREs, &vsa->URE_num, stmt_URE);
+//  if (new_URE)
+//    vsa->UREs = URE_add(vsa->UREs, &vsa->URE_num, stmt_URE);
 
   free(text);
   free(new_text);

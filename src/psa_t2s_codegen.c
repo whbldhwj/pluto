@@ -106,13 +106,39 @@ void psa_t2s_codegen(FILE *fp, const VSA *vsa) {
   fprintf(fp, ";\n");
 
   fprintf(fp, "APP.merge_defs(");
-  for (int i = 0; i < vsa->URE_num - 1; i++) {
-    if (i == 0) {
-      fprintf(fp, vsa->UREs[i]->name);
-    } else {
-      fprintf(fp, ", %s", vsa->UREs[i]->name);
+  fprintf(fp, "{");
+  bool is_first_URE = true;
+  for (int i = 0; i < vsa->URE_num; i++) {
+    if (vsa->UREs[i]->update_level > 0) {
+      if (is_first_URE) {
+        fprintf(fp, "%s", vsa->UREs[i]->name);
+        is_first_URE = false;
+      } else {
+        fprintf(fp, ", %s", vsa->UREs[i]->name);        
+      }
     }
   }
+  fprintf(fp, "}, {");
+  is_first_URE = true;
+  for (int i = 0; i < vsa->URE_num - 2; i++) {
+    if (vsa->UREs[i]->update_level == 0) {
+      if (is_first_URE) {
+        fprintf(fp, "%s", vsa->UREs[i]->name);
+        is_first_URE = false;
+      } else {
+        fprintf(fp, ", %s", vsa->UREs[i]->name);        
+      }
+    }
+  }
+  fprintf(fp, "}");
+
+//  for (int i = 0; i < vsa->URE_num - 2; i++) {
+//    if (i == 0) {
+//      fprintf(fp, vsa->UREs[i]->name);
+//    } else {
+//      fprintf(fp, ", %s", vsa->UREs[i]->name);
+//    }
+//  }
   fprintf(fp, ")\n");
   fprintf(fp, "   .reorder_inward(");
   for (int i = 0; i < vsa->t2s_iter_num; i++) {

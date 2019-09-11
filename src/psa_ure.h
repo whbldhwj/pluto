@@ -31,6 +31,7 @@ void URE_free(URE *ure);
 PlutoConstraints *get_anchor_domain(PlutoProg *prog);
 char *create_URE_name(char **URE_names, int URE_num, char *var_name);
 char *create_URE_text(URE *ure);
+int get_URE_update_level(char **URE_names, int URE_num, char *var_name); 
 char *create_new_acc_str(Stmt *stmt, PlutoAccess *acc, PlutoProg *prog, VSA *vsa);
 char *create_orig_acc_str(Stmt *stmt, PlutoAccess *acc, PlutoProg *prog, VSA *vsa);
 char *create_new_acc_ref_str(Stmt *stmt, PlutoAccess *acc, PlutoProg *prog, VSA *vsa);

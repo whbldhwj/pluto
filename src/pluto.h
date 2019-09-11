@@ -396,6 +396,12 @@ struct ure {
   // LHS
   char *LHS;
 
+  // RHS
+  char *RHS;
+
+  // URE update level
+  int update_level;
+
   // URE wrap level
   int wrap_level;
 

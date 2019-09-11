@@ -24,19 +24,33 @@ Var t1, t2, t3, t4;
 Func W_CC0_E(FUNC_S), X_CC1_E(FUNC_S), X_CC3_E(FUNC_S), W_CC4_E(FUNC_S), X_CC5_E(FUNC_S), W_CC6_E(FUNC_S), Z_CC7_E(FUNC_S), Z_ext_CC2_I(FUNC_S), APP(FUNC_S);
 
 // UREs
+W_CC0_E(t1, t2, t3, t4) = 0;
 W_CC0_E(t1, t2, t3, t4) = select((-t2 + t4 + 2 == 0 && t3 - 1 == 0 && t2 - 4 >= 0 && -t2 + 5 >= 0) || (t4 - 1 == 0 && t3 - 1 == 0 && t2 - 3 == 0), W(t3, t4), select((t3 - 1 == 0 && t4 - 2 >= 0 && -t4 + 3 >= 0 && t2 - t4 - 3 >= 0) || (t4 - 1 == 0 && t3 - 1 == 0 && t2 - 4 >= 0), W_CC0_E(t1, t2 - 1, t3, t4), W_CC0_E(t1, t2, t3, t4)));
+X_CC1_E(t1, t2, t3, t4) = 0;
 X_CC1_E(t1, t2, t3, t4) = select((t3 - 1 == 0 && -t4 + 3 >= 0 && t4 - 2 >= 0) || (t4 - 1 == 0 && t3 - 1 == 0), X(t2 - t4, t1 + t4), X_CC1_E(t1, t2, t3, t4));
+X_CC3_E(t1, t2, t3, t4) = 0;
 X_CC3_E(t1, t2, t3, t4) = select((t4 - 4 == 0 && t3 - 2 == 0) || (t4 - 5 == 0 && t3 - 3 == 0 && t2 - 16 == 0), X(t2 - t4, t1 - t3 + t4 - 1), select((t4 - 5 == 0 && t3 - 3 == 0 && -t2 + 15 >= 0), X_CC3_E(t1, t2 - 1, t3 - 1, t4 - 1), X_CC3_E(t1, t2, t3, t4)));
+W_CC4_E(t1, t2, t3, t4) = 0;
 W_CC4_E(t1, t2, t3, t4) = select((-t2 + 2 * t4 - 1 == 0 && -t2 + 2 * t3 + 3 == 0 && t2 - 7 >= 0), W(t3, -t3 + t4 - 1), select((-t3 + t4 - 2 == 0 && t3 - 2 >= 0 && t2 - 2 * t3 - 4 >= 0), W_CC4_E(t1, t2 - 1, t3, t4), W_CC4_E(t1, t2, t3, t4)));
+X_CC5_E(t1, t2, t3, t4) = 0;
 X_CC5_E(t1, t2, t3, t4) = select((t3 - 2 == 0 && t4 - 4 >= 0) || (-t2 + t4 + 11 == 0 && t3 - 3 == 0 && t2 - 16 >= 0), X(t2 - t4, t1 - t3 + t4), select((t3 - 3 == 0 && -t2 + t4 + 10 >= 0 && t4 - 5 >= 0), X_CC5_E(t1, t2 - 1, t3 - 1, t4 - 1), X_CC5_E(t1, t2, t3, t4)));
+W_CC6_E(t1, t2, t3, t4) = 0;
 W_CC6_E(t1, t2, t3, t4) = select((-t2 + t3 + t4 + 1 == 0 && t3 - 2 >= 0 && t2 - 2 * t3 - 3 >= 0), W(t3, -t3 + t4), select((-t3 + t4 - 2 >= 0 && t2 - t3 - t4 - 2 >= 0 && t3 - 2 >= 0), W_CC6_E(t1, t2 - 1, t3, t4), W_CC6_E(t1, t2, t3, t4)));
-Z_ext_CC2_I(t1, t2, t3, t4) = select((t4 - 1 == 0 && t3 - 1 == 0), (X_CC1_E(t1, t2, t3, t4) * W_CC0_E(t1, t2, t3, t4)), select((t4 - 4 == 0 && t3 - 2 == 0), (Z_ext_CC2_I(t1, t2 - 2, t3 - 1, t4 - 1) + (X_CC3_E(t1, t2, t3, t4) * W_CC4_E(t1, t2, t3, t4))), select((t4 - 5 == 0 && t3 - 3 == 0), (Z_ext_CC2_I(t1, t2 - 1, t3 - 1, t4) + (X_CC3_E(t1, t2, t3, t4) * W_CC4_E(t1, t2, t3, t4))), select((-t3 + t4 - 2 == 0 && t3 - 2 >= 0), (Z_ext_CC2_I(t1, t2, t3, t4) + (X_CC5_E(t1, t2, t3, t4) * W_CC6_E(t1, t2, t3, t4))), select((-t3 + t4 - 3 == 0 && t3 - 2 >= 0), (Z_ext_CC2_I(t1, t2 - 1, t3, t4 - 1) + (X_CC5_E(t1, t2, t3, t4) * W_CC6_E(t1, t2, t3, t4))), select((t3 - 1 == 0 && -t4 + 3 >= 0 && t4 - 2 >= 0), (Z_ext_CC2_I(t1, t2 - 1, t3, t4 - 1) + (X_CC1_E(t1, t2, t3, t4) * W_CC0_E(t1, t2, t3, t4))), Z_ext_CC2_I(t1, t2, t3, t4)))))));
+Z_ext_CC2_I(t1, t2, t3, t4) = 0;
+Z_ext_CC2_I(t1, t2, t3, t4) = select((t4 - 1 == 0 && t3 - 1 == 0), (X_CC1_E(t1, t2, t3, t4) * W_CC0_E(t1, t2, t3, t4)), Z_ext_CC2_I(t1, t2, t3, t4));
+Z_ext_CC2_I(t1, t2, t3, t4) = select((t4 - 4 == 0 && t3 - 2 == 0), (Z_ext_CC2_I(t1, t2 - 2, t3 - 1, t4 - 1) + (X_CC3_E(t1, t2, t3, t4) * W_CC4_E(t1, t2, t3, t4))), Z_ext_CC2_I(t1, t2, t3, t4));
+Z_ext_CC2_I(t1, t2, t3, t4) = select((t4 - 5 == 0 && t3 - 3 == 0), (Z_ext_CC2_I(t1, t2 - 1, t3 - 1, t4) + (X_CC3_E(t1, t2, t3, t4) * W_CC4_E(t1, t2, t3, t4))), Z_ext_CC2_I(t1, t2, t3, t4));
+Z_ext_CC2_I(t1, t2, t3, t4) = select((-t3 + t4 - 2 == 0 && t3 - 2 >= 0), (Z_ext_CC2_I(t1, t2, t3, t4) + (X_CC5_E(t1, t2, t3, t4) * W_CC6_E(t1, t2, t3, t4))), Z_ext_CC2_I(t1, t2, t3, t4));
+Z_ext_CC2_I(t1, t2, t3, t4) = select((-t3 + t4 - 3 == 0 && t3 - 2 >= 0), (Z_ext_CC2_I(t1, t2 - 1, t3, t4 - 1) + (X_CC5_E(t1, t2, t3, t4) * W_CC6_E(t1, t2, t3, t4))), Z_ext_CC2_I(t1, t2, t3, t4));
+Z_ext_CC2_I(t1, t2, t3, t4) = select((t3 - 1 == 0 && -t4 + 3 >= 0 && t4 - 2 >= 0), (Z_ext_CC2_I(t1, t2 - 1, t3, t4 - 1) + (X_CC1_E(t1, t2, t3, t4) * W_CC0_E(t1, t2, t3, t4))), Z_ext_CC2_I(t1, t2, t3, t4));
+Z_CC7_E(t1, t2, t3, t4) = 0;
 Z_CC7_E(t1, t2, t3, t4) = select((t4 - 6 == 0 && t3 - 3 == 0), Z_ext_CC2_I(t1, t2, t3, t4), Z_CC7_E(t1, t2, t3, t4));
+APP(t1, t2, t3, t4) = 0;
 APP(t1, t2, t3, t4) = Z_CC7_E(t1, t2, t3, t4);
 
 // Build the initial loop nest
 Var tloop1, tloop2;
-APP.merge_defs(W_CC0_E, X_CC1_E, X_CC3_E, W_CC4_E, X_CC5_E, W_CC6_E, Z_ext_CC2_I, Z_CC7_E)
+APP.merge_defs({W_CC0_E.update(0), X_CC1_E.update(0), X_CC3_E.update(0), W_CC4_E.update(0), X_CC5_E.update(0), W_CC6_E.update(0), Z_ext_CC2_I.update(0), Z_ext_CC2_I.update(1), Z_ext_CC2_I.update(2), Z_ext_CC2_I.update(3), Z_ext_CC2_I.update(4), Z_ext_CC2_I.update(5), Z_CC7_E.update(0), APP.update(0)}, {W_CC0_E, X_CC1_E, X_CC3_E, W_CC4_E, X_CC5_E, W_CC6_E, Z_ext_CC2_I, Z_CC7_E})
    .reorder_inward(t1, t2, t3, t4)
    .space_time_transform({t1, t2, t3, t4},
                          {tloop1, tloop2},
