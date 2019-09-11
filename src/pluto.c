@@ -2280,11 +2280,26 @@ void adg_remerge_racc(Graph *g, PlutoProg *prog, VSA *vsa) {
       g->adj->val[i][j] = 0;
     }
   
-  // Inside each CC, we reconnect the access function if they share the same
+  // connect the access in the External write and intermediate CC again
+  for (int cc_id = 0; cc_id < g->num_ccs; cc_id++) {
+    if (g->ccs[cc_id].type == 2 || g->ccs[cc_id].size == 1) 
+      continue;
+    for (int i = 0; i < g->ccs[cc_id].size; i++) {
+      int acc_id1 = g->ccs[cc_id].vertices[i];
+      for (int j = i + 1; j < g->ccs[cc_id].size; j++) {
+        int acc_id2 = g->ccs[cc_id].vertices[j];
+        g->adj->val[acc_id1][acc_id2] += 1;
+      }
+    }
+  }
+
+  // Inside each External read CC, we reconnect the access function if they share the same
   // new_acc_str and disvec.
   // However, we will still set the dom_id of each access function by the original dom_id
   // of the CC.
   for (int cc_id = 0; cc_id < g->num_ccs; cc_id++) {
+    if (g->ccs[cc_id].type != 2 || g->ccs[cc_id].size == 1) 
+      continue;
     int dom_id = g->ccs[cc_id].dom_id;
     PlutoAccess *dom_acc = vsa->acc_var_map[dom_id]->acc;
     for (int i = 0; i < g->ccs[cc_id].size; i++) {

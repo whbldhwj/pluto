@@ -15,6 +15,7 @@
 int t2s_compare_stmt_order(Stmt *stmt1, Stmt *stmt2, int band_width);
 //void create_RAR_UREs(Stmt *stmt, PlutoAccess *acc, PlutoProg *prog, VSA *vsa);
 PlutoConstraints *get_RAR_domain(Stmt *stmt, PlutoAccess *acc, PlutoProg *prog, VSA *vsa); 
+PlutoConstraints *get_WAW_domain(Stmt *stmt, PlutoAccess *acc, PlutoProg *prog, VSA *vsa);
 void create_RAR_UREs(int cc_id, PlutoProg *prog, VSA *vsa);
 void create_drain_UREs(Stmt *stmt, PlutoAccess *acc, PlutoProg *prog, VSA *vsa);
 void create_collect_UREs(int cc_id, PlutoProg *prog, VSA *vsa);

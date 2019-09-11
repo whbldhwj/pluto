@@ -9,10 +9,9 @@ using namespace std;
 
 int main(void) {
 // Input declarations
-ImageParam W(type_of<int>(), 2, "W");
-ImageParam X(type_of<int>(), 2, "X");
-ImageParam Z_ext(type_of<int>(), 4, "Z_ext");
 ImageParam Z(type_of<int>(), 2, "Z");
+ImageParam X(type_of<int>(), 2, "X");
+ImageParam W(type_of<int>(), 2, "W");
 
 // Input initialization
 
@@ -21,36 +20,24 @@ Var t1, t2, t3, t4;
 
 // Function declarations
 #define FUNC_S type_of<int>(), {t1, t2, t3, t4}, Place::Host
-Func W_CC0_E(FUNC_S), X_CC1_E(FUNC_S), X_CC3_E(FUNC_S), W_CC4_E(FUNC_S), X_CC5_E(FUNC_S), W_CC6_E(FUNC_S), Z_CC7_E(FUNC_S), Z_ext_CC2_I(FUNC_S), APP(FUNC_S);
+Func X_CC1_E(FUNC_S), W_CC2_E(FUNC_S), Z_CC0_I(FUNC_S), APP(FUNC_S);
 
 // UREs
-W_CC0_E(t1, t2, t3, t4) = 0;
-W_CC0_E(t1, t2, t3, t4) = select((-t2 + t4 + 2 == 0 && t3 - 1 == 0 && t2 - 4 >= 0 && -t2 + 5 >= 0) || (t4 - 1 == 0 && t3 - 1 == 0 && t2 - 3 == 0), W(t3, t4), select((t3 - 1 == 0 && t4 - 2 >= 0 && -t4 + 3 >= 0 && t2 - t4 - 3 >= 0) || (t4 - 1 == 0 && t3 - 1 == 0 && t2 - 4 >= 0), W_CC0_E(t1, t2 - 1, t3, t4), W_CC0_E(t1, t2, t3, t4)));
 X_CC1_E(t1, t2, t3, t4) = 0;
-X_CC1_E(t1, t2, t3, t4) = select((t3 - 1 == 0 && -t4 + 3 >= 0 && t4 - 2 >= 0) || (t4 - 1 == 0 && t3 - 1 == 0), X(t2 - t4, t1 + t4), X_CC1_E(t1, t2, t3, t4));
-X_CC3_E(t1, t2, t3, t4) = 0;
-X_CC3_E(t1, t2, t3, t4) = select((t4 - 4 == 0 && t3 - 2 == 0) || (t4 - 5 == 0 && t3 - 3 == 0 && t2 - 16 == 0), X(t2 - t4, t1 - t3 + t4 - 1), select((t4 - 5 == 0 && t3 - 3 == 0 && -t2 + 15 >= 0), X_CC3_E(t1, t2 - 1, t3 - 1, t4 - 1), X_CC3_E(t1, t2, t3, t4)));
-W_CC4_E(t1, t2, t3, t4) = 0;
-W_CC4_E(t1, t2, t3, t4) = select((-t2 + 2 * t4 - 1 == 0 && -t2 + 2 * t3 + 3 == 0 && t2 - 7 >= 0), W(t3, -t3 + t4 - 1), select((-t3 + t4 - 2 == 0 && t3 - 2 >= 0 && t2 - 2 * t3 - 4 >= 0), W_CC4_E(t1, t2 - 1, t3, t4), W_CC4_E(t1, t2, t3, t4)));
-X_CC5_E(t1, t2, t3, t4) = 0;
-X_CC5_E(t1, t2, t3, t4) = select((t3 - 2 == 0 && t4 - 4 >= 0) || (-t2 + t4 + 11 == 0 && t3 - 3 == 0 && t2 - 16 >= 0), X(t2 - t4, t1 - t3 + t4), select((t3 - 3 == 0 && -t2 + t4 + 10 >= 0 && t4 - 5 >= 0), X_CC5_E(t1, t2 - 1, t3 - 1, t4 - 1), X_CC5_E(t1, t2, t3, t4)));
-W_CC6_E(t1, t2, t3, t4) = 0;
-W_CC6_E(t1, t2, t3, t4) = select((-t2 + t3 + t4 + 1 == 0 && t3 - 2 >= 0 && t2 - 2 * t3 - 3 >= 0), W(t3, -t3 + t4), select((-t3 + t4 - 2 >= 0 && t2 - t3 - t4 - 2 >= 0 && t3 - 2 >= 0), W_CC6_E(t1, t2 - 1, t3, t4), W_CC6_E(t1, t2, t3, t4)));
-Z_ext_CC2_I(t1, t2, t3, t4) = 0;
-Z_ext_CC2_I(t1, t2, t3, t4) = select((t4 - 1 == 0 && t3 - 1 == 0), (X_CC1_E(t1, t2, t3, t4) * W_CC0_E(t1, t2, t3, t4)), Z_ext_CC2_I(t1, t2, t3, t4));
-Z_ext_CC2_I(t1, t2, t3, t4) = select((t4 - 4 == 0 && t3 - 2 == 0), (Z_ext_CC2_I(t1, t2 - 2, t3 - 1, t4 - 1) + (X_CC3_E(t1, t2, t3, t4) * W_CC4_E(t1, t2, t3, t4))), Z_ext_CC2_I(t1, t2, t3, t4));
-Z_ext_CC2_I(t1, t2, t3, t4) = select((t4 - 5 == 0 && t3 - 3 == 0), (Z_ext_CC2_I(t1, t2 - 1, t3 - 1, t4) + (X_CC3_E(t1, t2, t3, t4) * W_CC4_E(t1, t2, t3, t4))), Z_ext_CC2_I(t1, t2, t3, t4));
-Z_ext_CC2_I(t1, t2, t3, t4) = select((-t3 + t4 - 2 == 0 && t3 - 2 >= 0), (Z_ext_CC2_I(t1, t2, t3, t4) + (X_CC5_E(t1, t2, t3, t4) * W_CC6_E(t1, t2, t3, t4))), Z_ext_CC2_I(t1, t2, t3, t4));
-Z_ext_CC2_I(t1, t2, t3, t4) = select((-t3 + t4 - 3 == 0 && t3 - 2 >= 0), (Z_ext_CC2_I(t1, t2 - 1, t3, t4 - 1) + (X_CC5_E(t1, t2, t3, t4) * W_CC6_E(t1, t2, t3, t4))), Z_ext_CC2_I(t1, t2, t3, t4));
-Z_ext_CC2_I(t1, t2, t3, t4) = select((t3 - 1 == 0 && -t4 + 3 >= 0 && t4 - 2 >= 0), (Z_ext_CC2_I(t1, t2 - 1, t3, t4 - 1) + (X_CC1_E(t1, t2, t3, t4) * W_CC0_E(t1, t2, t3, t4))), Z_ext_CC2_I(t1, t2, t3, t4));
-Z_CC7_E(t1, t2, t3, t4) = 0;
-Z_CC7_E(t1, t2, t3, t4) = select((t4 - 6 == 0 && t3 - 3 == 0), Z_ext_CC2_I(t1, t2, t3, t4), Z_CC7_E(t1, t2, t3, t4));
+X_CC1_E(t1, t2, t3, t4) = select((t3 - 1 == 0 && -t2 + 2 * t4 - 2 >= 0) || (-t2 + t3 + t4 + 8 == 0 && t3 - 2 >= 0 && t2 - 3 * t3 - 17 >= 0), X((2 * t2 - 2 * t4) / 2, (2 * t1 - 2 * t2 - 2 * t3 + 4 * t4) / 2), select((-t2 - t3 + 2 * t4 - 1 >= 0 && -t2 + t3 + t4 + 7 >= 0 && t3 - 2 >= 0), X_CC1_E(t1, t2 - 1, t3 - 1, t4 - 1), X_CC1_E(t1, t2, t3, t4)));
+W_CC2_E(t1, t2, t3, t4) = 0;
+W_CC2_E(t1, t2, t3, t4) = select((-t2 + t3 + t4 + 1 == 0 && t2 - 3 * t3 - 3 >= 0), W((2 * t3) / 2, (-2 * t2 - 2 * t3 + 4 * t4) / 2), select((-t2 - t3 + 2 * t4 - 1 >= 0 && t2 - t3 - t4 - 2 >= 0), W_CC2_E(t1, t2 - 2, t3, t4 - 1), W_CC2_E(t1, t2, t3, t4)));
+Z_CC0_I(t1, t2, t3, t4) = 0;
+Z_CC0_I(t1, t2, t3, t4) = select((-t2 + 2 * t4 - 1 == 0 && t3 - 1 == 0), 0, Z_CC0_I(t1, t2, t3, t4));
+Z_CC0_I(t1, t2, t3, t4) = select((-t2 + 2 * t4 - 2 == 0 && t3 - 1 == 0), (Z_CC0_I(t1, t2 - 1, t3, t4 - 1) + (X_CC1_E(t1, t2, t3, t4) * W_CC2_E(t1, t2, t3, t4))), Z_CC0_I(t1, t2, t3, t4));
+Z_CC0_I(t1, t2, t3, t4) = select((-t2 - t3 + 2 * t4 - 2 >= 0), (Z_CC0_I(t1, t2 - 1, t3, t4 - 1) + (X_CC1_E(t1, t2, t3, t4) * W_CC2_E(t1, t2, t3, t4))), Z_CC0_I(t1, t2, t3, t4));
+Z_CC0_I(t1, t2, t3, t4) = select((-t2 - t3 + 2 * t4 - 1 == 0 && t3 - 2 >= 0), (Z_CC0_I(t1, t2 - 1, t3 - 1, t4) + (X_CC1_E(t1, t2, t3, t4) * W_CC2_E(t1, t2, t3, t4))), Z_CC0_I(t1, t2, t3, t4));
 APP(t1, t2, t3, t4) = 0;
-APP(t1, t2, t3, t4) = Z_CC7_E(t1, t2, t3, t4);
+APP(t1, t2, t3, t4) = select((-t2 + 2 * t4 - 6 == 0 && t3 - 3 == 0), Z_CC0_I(t1, t2, t3, t4), APP(t1, t2, t3, t4));
 
 // Build the initial loop nest
 Var tloop1, tloop2;
-APP.merge_defs({W_CC0_E.update(0), X_CC1_E.update(0), X_CC3_E.update(0), W_CC4_E.update(0), X_CC5_E.update(0), W_CC6_E.update(0), Z_ext_CC2_I.update(0), Z_ext_CC2_I.update(1), Z_ext_CC2_I.update(2), Z_ext_CC2_I.update(3), Z_ext_CC2_I.update(4), Z_ext_CC2_I.update(5), Z_CC7_E.update(0), APP.update(0)}, {W_CC0_E, X_CC1_E, X_CC3_E, W_CC4_E, X_CC5_E, W_CC6_E, Z_ext_CC2_I, Z_CC7_E})
+APP.merge_defs({X_CC1_E.update(0), W_CC2_E.update(0), Z_CC0_I.update(0), Z_CC0_I.update(1), Z_CC0_I.update(2), Z_CC0_I.update(3), APP.update(0)}, {X_CC1_E, W_CC2_E, Z_CC0_I})
    .reorder_inward(t1, t2, t3, t4)
    .space_time_transform({t1, t2, t3, t4},
                          {tloop1, tloop2},
@@ -64,16 +51,16 @@ APP.merge_defs({W_CC0_E.update(0), X_CC1_E.update(0), X_CC3_E.update(0), W_CC4_E
                           0, 0, 1, 0,
                           0, 0, 0, 1})
    .domain(t1, 1, 8, 1,
-           t2, 3, 17, 1,
-           t3, 1, 8, 1,
-           t4, 1, 8, 1,
+           t2, 5, 28, 1,
+           t3, 1, 3, 1,
+           t4, 3, 17, 1,
            tloop1, 1, 8, 1,
-           tloop2, 3, 17, 1);
+           tloop2, 5, 28, 1);
 
 // PE Optimization
 
 // CPU Realization
-Image<int> FPGA_output(8 + 1, 17 + 1, 8 + 1, 8 + 1);
+Image<int> FPGA_output(8 + 1, 28 + 1, 3 + 1, 17 + 1);
 APP.realize(FPGA_output);
 cout << "END" << endl;
 
@@ -81,15 +68,10 @@ cout << "END" << endl;
 
 /*
 // Build I/O network
-Func W_CC0_E_serializer(Place::Host), W_CC0_E_loader, W_CC0_E_feeder, X_CC1_E_serializer(Place::Host), X_CC1_E_loader, X_CC1_E_feeder, Z_ext_CC2_I_drainer, Z_ext_CC2_I_collector, Z_ext_CC2_I_unloader, Z_ext_CC2_I_deserializer(Place::Host), X_CC3_E_serializer(Place::Host), X_CC3_E_loader, X_CC3_E_feeder, W_CC4_E_serializer(Place::Host), W_CC4_E_loader, W_CC4_E_feeder, X_CC5_E_serializer(Place::Host), X_CC5_E_loader, X_CC5_E_feeder, W_CC6_E_serializer(Place::Host), W_CC6_E_loader, W_CC6_E_feeder, Z_CC7_E_drainer, Z_CC7_E_collector, Z_CC7_E_unloader, Z_CC7_E_deserializer(Place::Host);
-APP.isolate_consumer_chain(W_CC0_E, W_CC0_E_feeder, W_CC0_E_loader, W_CC0_E_serializer(Place::Host))
+Func Z_CC0_I_drainer, Z_CC0_I_collector, Z_CC0_I_unloader, Z_CC0_I_deserializer(Place::Host), X_CC1_E_serializer(Place::Host), X_CC1_E_loader, X_CC1_E_feeder, W_CC2_E_serializer(Place::Host), W_CC2_E_loader, W_CC2_E_feeder;
+APP.isolate_producer_chain(Z_CC0_I, Z_CC0_I_drainer, Z_CC0_I_collector, Z_CC0_I_unloader Z_CC0_I_deserializer(Place::Host))
    .isolate_consumer_chain(X_CC1_E, X_CC1_E_feeder, X_CC1_E_loader, X_CC1_E_serializer(Place::Host))
-   .isolate_producer_chain(Z_ext_CC2_I, Z_ext_CC2_I_drainer, Z_ext_CC2_I_collector, Z_ext_CC2_I_unloader Z_ext_CC2_I_deserializer(Place::Host))
-   .isolate_consumer_chain(X_CC3_E, X_CC3_E_feeder, X_CC3_E_loader, X_CC3_E_serializer(Place::Host))
-   .isolate_consumer_chain(W_CC4_E, W_CC4_E_feeder, W_CC4_E_loader, W_CC4_E_serializer(Place::Host))
-   .isolate_consumer_chain(X_CC5_E, X_CC5_E_feeder, X_CC5_E_loader, X_CC5_E_serializer(Place::Host))
-   .isolate_consumer_chain(W_CC6_E, W_CC6_E_feeder, W_CC6_E_loader, W_CC6_E_serializer(Place::Host))
-   .isolate_producer_chain(Z_CC7_E, Z_CC7_E_drainer, Z_CC7_E_collector, Z_CC7_E_unloader Z_CC7_E_deserializer(Place::Host));
+   .isolate_consumer_chain(W_CC2_E, W_CC2_E_feeder, W_CC2_E_loader, W_CC2_E_serializer(Place::Host));
 
 // I/O Optimization
 

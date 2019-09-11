@@ -224,7 +224,7 @@ char *create_new_acc_str(Stmt *stmt, PlutoAccess *acc, PlutoProg *prog, VSA *vsa
   // compute the new access function
   int *divs;
   PlutoMatrix *new_acc = pluto_get_new_access_func(stmt, acc->mat, &divs);
-//  pluto_matrix_print(stdout, new_acc);
+  pluto_matrix_print(stdout, new_acc);
 
   int npar = prog->npar;
   char **params = prog->params;
@@ -288,7 +288,7 @@ char *create_new_acc_str(Stmt *stmt, PlutoAccess *acc, PlutoProg *prog, VSA *vsa
             acc_str = concat(acc_str, exp);
             first_exp = !first_exp;
           } else {
-            if (new_acc->val[row][col] == -1)
+            if (new_acc->val[row][col] < 0)
               acc_str = concat(acc_str, " - ");
             else
               acc_str = concat(acc_str, " + ");
@@ -553,14 +553,13 @@ void vsa_URE_extract(PlutoProg *prog, VSA *vsa) {
   }
   
   // create drain UREs
-  // TODO
   if (prog->options->dsa == 0) {
     for (int stmt_id = 0; stmt_id < prog->nstmts; stmt_id++) {
       Stmt *stmt = prog->stmts[stmt_id];
       PlutoAccess *acc = stmt->writes[0];
-      create_drain_UREs(stmt, acc, prog, vsa);
+      create_drain_UREs_new(stmt, acc, prog, vsa);
     }
-  } else {
+  } else if (prog->options->dsa != 0) {
     // scan through adg, for external variable CC with write acc,
     // create one collection URE
     int num_ccs = prog->adg->num_ccs;
@@ -809,6 +808,30 @@ char *create_RAR_domain_str(Stmt *stmt, PlutoAccess *acc, PlutoProg *prog, VSA *
 
   pluto_constraints_free(new_domain);
   return const_str;
+}
+
+PlutoConstraints *get_WAW_domain(Stmt *stmt, PlutoAccess *acc, PlutoProg *prog, VSA *vsa) {
+  PlutoConstraints *new_domain = pluto_get_new_domain(stmt);
+
+  for (int i = 0; i < prog->ndeps; i++) {
+    Dep *dep = prog->deps[i];
+    if (IS_WAW(dep->type) && dep->src_acc == acc) {
+      Stmt *src_stmt = prog->stmts[dep->src];
+      Stmt *dest_stmt = prog->stmts[dep->dest];
+      PlutoConstraints *tdpoly = pluto_get_transformed_dpoly(dep, src_stmt, dest_stmt);
+      // Project out the dest iters
+      pluto_constraints_project_out_isl_single(tdpoly, src_stmt->trans->nrows, dest_stmt->trans->nrows);
+      new_domain = pluto_constraints_subtract(new_domain, tdpoly);
+      pluto_constraints_free(tdpoly);
+    }
+  }
+
+  if (pluto_constraints_is_empty(new_domain)) {
+    pluto_constraints_free(new_domain);
+    return NULL;
+  } 
+
+  return new_domain;
 }
 
 /* 
@@ -1388,6 +1411,83 @@ void create_collect_UREs(int cc_id, PlutoProg *prog, VSA *vsa) {
   free(text);
 }
 
+/* 
+ * Only used when dsa form = 0
+ */
+void create_drain_UREs_new(Stmt *stmt, PlutoAccess *acc, PlutoProg *prog, VSA *vsa) {
+  PlutoConstraints *waw_domain = get_WAW_domain(stmt, acc, prog, vsa);
+  if (waw_domain) {
+    PlutoConstraints *anchor_domain = get_anchor_domain(prog);
+    /* Simplify the domain */
+    PlutoConstraints *new_domain = pluto_constraints_simplify_context_isl(waw_domain, anchor_domain);
+    char *domain_str = pluto_constraints_to_t2s_format(new_domain, vsa, prog->num_hyperplanes, prog->npar, prog->params);
+
+    bool new_URE = true;
+    char var_name[10];
+    sprintf(var_name, "APP");
+
+    char *LHS = "";
+    LHS = concat(LHS, "APP(");
+    for (int i = 0; i < vsa->t2s_iter_num; i++) {
+      if (i > 0)
+        LHS = concat(LHS, ", ");
+      LHS = concat(LHS, vsa->t2s_iters[i]);
+    }
+    LHS = concat(LHS, ")");
+
+    /* check if this variable is already defined */
+    for (int i = 0; i < vsa->URE_num; i++) {
+      if (!strcmp(vsa->UREs[i]->name, var_name)) {
+        new_URE = false;
+        break;
+      }
+    }
+    if (new_URE) {
+      /* 
+       * Create the palce holder URE 
+       * APP() = 0
+       */
+      URE *init_URE = (URE *)malloc(sizeof(URE));
+      URE_init(init_URE);
+      init_URE->id = vsa->URE_num;
+      init_URE->name = strdup("APP");
+      init_URE->wrap_level = 0;
+      init_URE->update_level = 0;
+      init_URE->LHS = strdup(LHS);
+      init_URE->RHS = strdup("0");
+      init_URE->text = create_URE_text(init_URE);
+      vsa->UREs = URE_add(vsa->UREs, &vsa->URE_num, init_URE);
+    } 
+
+    /*
+     * Create URE
+     * APP() = select(domain_str, C(), APP())
+     */
+    URE *collect_URE = (URE *)malloc(sizeof(URE));
+    URE_init(collect_URE);
+    collect_URE->id = vsa->URE_num;
+    collect_URE->wrap_level = 1;
+    collect_URE->name = create_URE_name(get_vsa_URE_names(vsa->UREs, vsa->URE_num), vsa->URE_num, var_name);
+    collect_URE->update_level = get_URE_update_level(get_vsa_URE_names(vsa->UREs, vsa->URE_num), vsa->URE_num, var_name);
+    collect_URE->LHS = strdup(LHS);
+    collect_URE->select_cond = realloc(collect_URE->select_cond, collect_URE->wrap_level * sizeof(char *));
+    collect_URE->select_LHS = realloc(collect_URE->select_LHS, collect_URE->wrap_level * sizeof(char *));
+    collect_URE->select_RHS = realloc(collect_URE->select_RHS, collect_URE->wrap_level * sizeof(char *));
+    collect_URE->select_cond[collect_URE->wrap_level - 1] = strdup(domain_str);
+    collect_URE->select_LHS[collect_URE->wrap_level - 1] = strdup(vsa->acc_var_map[acc->sym_id]->var_ref);
+    collect_URE->select_RHS[collect_URE->wrap_level - 1] = strdup(LHS);
+    collect_URE->text = create_URE_text(collect_URE);
+    vsa->UREs = URE_add(vsa->UREs, &vsa->URE_num, collect_URE);
+
+    pluto_constraints_free(waw_domain);
+    pluto_constraints_free(anchor_domain);
+    pluto_constraints_free(new_domain);
+    free(domain_str);
+    free(LHS);
+  }
+}
+
+// Deprecated
 void create_drain_UREs(Stmt *stmt, PlutoAccess *acc, PlutoProg *prog, VSA *vsa) {
 //  *URE_num = 0;
 //  URE **UREs = (URE **)malloc(2 * sizeof(URE *));
