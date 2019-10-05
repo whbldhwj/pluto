@@ -2959,8 +2959,10 @@ PlutoOptions *pluto_options_alloc() {
 
   options->pet = 0;
 
-  /* Enable one dimension of concurrent startup by default */
-  options->diamondtile = 1;
+//  /* Enable one dimension of concurrent startup by default */
+//  options->diamondtile = 1;
+//  options->fulldiamondtile = 0;
+  options->diamondtile = 0;
   options->fulldiamondtile = 0;
 
   options->iss = 0;

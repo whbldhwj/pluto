@@ -24,16 +24,16 @@ Func X_CC1_E(FUNC_S), W_CC2_E(FUNC_S), Z_CC0_I(FUNC_S), APP(FUNC_S);
 
 // UREs
 X_CC1_E(t1, t2, t3, t4) = 0;
-X_CC1_E(t1, t2, t3, t4) = select((t3 - 1 == 0 && -t2 + 2 * t4 - 2 >= 0) || (-t2 + t3 + t4 + 8 == 0 && t3 - 2 >= 0 && t2 - 3 * t3 - 17 >= 0), X((2 * t2 - 2 * t4) / 2, (2 * t1 - 2 * t2 - 2 * t3 + 4 * t4) / 2), select((-t2 - t3 + 2 * t4 - 1 >= 0 && -t2 + t3 + t4 + 7 >= 0 && t3 - 2 >= 0), X_CC1_E(t1, t2 - 1, t3 - 1, t4 - 1), X_CC1_E(t1, t2, t3, t4)));
+X_CC1_E(t1, t2, t3, t4) = select((-t2 + t3 - 8 == 0 && t2 - 2 >= 0) || (t2 - 1 == 0 && t3 - 2 >= 0), X(t3, t1 - t2 - t3 + t4), select((t2 - t3 + 7 >= 0 && -t2 + t3 - 1 >= 0 && t2 - 2 >= 0), X_CC1_E(t1, t2 - 1, t3, t4 - 1), X_CC1_E(t1, t2, t3, t4)));
 W_CC2_E(t1, t2, t3, t4) = 0;
-W_CC2_E(t1, t2, t3, t4) = select((-t2 + t3 + t4 + 1 == 0 && t2 - 3 * t3 - 3 >= 0), W((2 * t3) / 2, (-2 * t2 - 2 * t3 + 4 * t4) / 2), select((-t2 - t3 + 2 * t4 - 1 >= 0 && t2 - t3 - t4 - 2 >= 0), W_CC2_E(t1, t2 - 2, t3, t4 - 1), W_CC2_E(t1, t2, t3, t4)));
+W_CC2_E(t1, t2, t3, t4) = select((-t2 + t3 - 1 == 0), W(t2, -t2 - t3 + t4), select((-t2 + t3 - 2 >= 0), W_CC2_E(t1, t2, t3 - 1, t4 - 1), W_CC2_E(t1, t2, t3, t4)));
 Z_CC0_I(t1, t2, t3, t4) = 0;
-Z_CC0_I(t1, t2, t3, t4) = select((-t2 + 2 * t4 - 1 == 0 && t3 - 1 == 0), 0, Z_CC0_I(t1, t2, t3, t4));
-Z_CC0_I(t1, t2, t3, t4) = select((-t2 + 2 * t4 - 2 == 0 && t3 - 1 == 0), (Z_CC0_I(t1, t2 - 1, t3, t4 - 1) + (X_CC1_E(t1, t2, t3, t4) * W_CC2_E(t1, t2, t3, t4))), Z_CC0_I(t1, t2, t3, t4));
-Z_CC0_I(t1, t2, t3, t4) = select((-t2 - t3 + 2 * t4 - 2 >= 0), (Z_CC0_I(t1, t2 - 1, t3, t4 - 1) + (X_CC1_E(t1, t2, t3, t4) * W_CC2_E(t1, t2, t3, t4))), Z_CC0_I(t1, t2, t3, t4));
-Z_CC0_I(t1, t2, t3, t4) = select((-t2 - t3 + 2 * t4 - 1 == 0 && t3 - 2 >= 0), (Z_CC0_I(t1, t2 - 1, t3 - 1, t4) + (X_CC1_E(t1, t2, t3, t4) * W_CC2_E(t1, t2, t3, t4))), Z_CC0_I(t1, t2, t3, t4));
+Z_CC0_I(t1, t2, t3, t4) = select((-t3 + t4 - 2 == 0 && t2 - 1 == 0 && -t3 + 8 >= 0), 0, Z_CC0_I(t1, t2, t3, t4));
+Z_CC0_I(t1, t2, t3, t4) = select((-t3 + t4 - 2 == 0 && t2 - 1 == 0 && t3 - 2 >= 0), (Z_CC0_I(t1, t2, t3 - 1, t4 - 1) + (X_CC1_E(t1, t2, t3, t4) * W_CC2_E(t1, t2, t3, t4))), Z_CC0_I(t1, t2, t3, t4));
+Z_CC0_I(t1, t2, t3, t4) = select((-t2 + t3 - 1 >= 0 && -t2 - t3 + t4 - 2 >= 0), (Z_CC0_I(t1, t2, t3, t4 - 1) + (X_CC1_E(t1, t2, t3, t4) * W_CC2_E(t1, t2, t3, t4))), Z_CC0_I(t1, t2, t3, t4));
+Z_CC0_I(t1, t2, t3, t4) = select((-t2 - t3 + t4 - 1 == 0 && t2 - 2 >= 0 && -t2 + t3 - 1 >= 0), (Z_CC0_I(t1, t2 - 1, t3 - 1, t4) + (X_CC1_E(t1, t2, t3, t4) * W_CC2_E(t1, t2, t3, t4))), Z_CC0_I(t1, t2, t3, t4));
 APP(t1, t2, t3, t4) = 0;
-APP(t1, t2, t3, t4) = select((-t2 + 2 * t4 - 6 == 0 && t3 - 3 == 0), Z_CC0_I(t1, t2, t3, t4), APP(t1, t2, t3, t4));
+APP(t1, t2, t3, t4) = select((-t3 + t4 - 6 == 0 && t2 - 3 == 0 && t3 - 4 >= 0), Z_CC0_I(t1, t2, t3, t4), APP(t1, t2, t3, t4));
 
 // Build the initial loop nest
 Var tloop1, tloop2;
@@ -51,16 +51,16 @@ APP.merge_defs({X_CC1_E.update(0), W_CC2_E.update(0), Z_CC0_I.update(0), Z_CC0_I
                           0, 0, 1, 0,
                           0, 0, 0, 1})
    .domain(t1, 1, 8, 1,
-           t2, 5, 28, 1,
-           t3, 1, 3, 1,
+           t2, 1, 3, 1,
+           t3, 1, 11, 1,
            t4, 3, 17, 1,
            tloop1, 1, 8, 1,
-           tloop2, 5, 28, 1);
+           tloop2, 1, 3, 1);
 
 // PE Optimization
 
 // CPU Realization
-Image<int> FPGA_output(8 + 1, 28 + 1, 3 + 1, 17 + 1);
+Image<int> FPGA_output(8 + 1, 3 + 1, 11 + 1, 17 + 1);
 APP.realize(FPGA_output);
 cout << "END" << endl;
 

@@ -24,15 +24,15 @@ Func B_CC1_E(FUNC_S), A_CC2_E(FUNC_S), C_CC0_I(FUNC_S), APP(FUNC_S);
 
 // UREs
 B_CC1_E(t1, t2, t3) = 0;
-B_CC1_E(t1, t2, t3) = select((t2 - 1 == 0), B(t1 - t2 - t3, t3), select((t2 - 2 >= 0), B_CC1_E(t1 - 1, t2 - 1, t3), B_CC1_E(t1, t2, t3)));
+B_CC1_E(t1, t2, t3) = select((t2 - 1 == 0), B(t1, t3), select((t2 - 2 >= 0), B_CC1_E(t1, t2 - 1, t3), B_CC1_E(t1, t2, t3)));
 A_CC2_E(t1, t2, t3) = 0;
-A_CC2_E(t1, t2, t3) = select((t3 - 1 == 0), A(t2, t1 - t2 - t3), select((t3 - 2 >= 0), A_CC2_E(t1 - 1, t2, t3 - 1), A_CC2_E(t1, t2, t3)));
+A_CC2_E(t1, t2, t3) = select((t3 - 1 == 0), A(t2, t1), select((t3 - 2 >= 0), A_CC2_E(t1, t2, t3 - 1), A_CC2_E(t1, t2, t3)));
 C_CC0_I(t1, t2, t3) = 0;
-C_CC0_I(t1, t2, t3) = select((-t1 + t2 + t3 + 1 == 0), 0, C_CC0_I(t1, t2, t3));
-C_CC0_I(t1, t2, t3) = select((-t1 + t2 + t3 + 1 == 0), (C_CC0_I(t1, t2, t3) + (A_CC2_E(t1, t2, t3) * B_CC1_E(t1, t2, t3))), C_CC0_I(t1, t2, t3));
-C_CC0_I(t1, t2, t3) = select((t1 - t2 - t3 - 2 >= 0), (C_CC0_I(t1 - 1, t2, t3) + (A_CC2_E(t1, t2, t3) * B_CC1_E(t1, t2, t3))), C_CC0_I(t1, t2, t3));
+C_CC0_I(t1, t2, t3) = select((t1 - 1 == 0), 0, C_CC0_I(t1, t2, t3));
+C_CC0_I(t1, t2, t3) = select((t1 - 1 == 0), (C_CC0_I(t1, t2, t3) + (A_CC2_E(t1, t2, t3) * B_CC1_E(t1, t2, t3))), C_CC0_I(t1, t2, t3));
+C_CC0_I(t1, t2, t3) = select((t1 - 2 >= 0), (C_CC0_I(t1 - 1, t2, t3) + (A_CC2_E(t1, t2, t3) * B_CC1_E(t1, t2, t3))), C_CC0_I(t1, t2, t3));
 APP(t1, t2, t3) = 0;
-APP(t1, t2, t3) = select((-t1 + t2 + t3 + 8 == 0), C_CC0_I(t1, t2, t3), APP(t1, t2, t3));
+APP(t1, t2, t3) = select((t1 - 8 == 0), C_CC0_I(t1, t2, t3), APP(t1, t2, t3));
 
 // Build the initial loop nest
 Var tloop1;
@@ -47,15 +47,15 @@ APP.merge_defs({B_CC1_E.update(0), A_CC2_E.update(0), C_CC0_I.update(0), C_CC0_I
                          {1, 0, 0,
                           0, 1, 0,
                           0, 0, 1})
-   .domain(t1, 3, 24, 1,
+   .domain(t1, 1, 8, 1,
            t2, 1, 8, 1,
            t3, 1, 8, 1,
-           tloop1, 3, 24, 1);
+           tloop1, 1, 8, 1);
 
 // PE Optimization
 
 // CPU Realization
-Image<int> FPGA_output(24 + 1, 8 + 1, 8 + 1);
+Image<int> FPGA_output(8 + 1, 8 + 1, 8 + 1);
 APP.realize(FPGA_output);
 cout << "END" << endl;
 

@@ -711,7 +711,17 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
     pluto_compute_dep_satisfaction(reuse_prog);
     pluto_detect_hyperplane_types(reuse_prog);
     pluto_detect_hyperplane_types_stmtwise(reuse_prog);
- 
+
+    for (int n = 0; n < reuse_prog->ndeps; n++) {
+      Dep *dep = reuse_prog->deps[n];
+      for (int s = 0; s < reuse_prog->num_hyperplanes; s++) {
+        if (dep->dirvec[s] != DEP_ZERO && dep->dirvec[s] != DEP_PLUS) {
+          fprintf(stdout, "Dep %d at %d less than zero!\n", n, s);
+          break;
+        }
+      }
+    }
+
     if (!options->silent) {
       fprintf(
           stdout,
@@ -864,8 +874,7 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
         if (IS_PSA_SUCCESS(ret)) {
           fprintf(stdout, "[PSA] Completed SIMD vectorization.\n");
           /* Print out transformations */
-          pluto_transformations_pretty_print(array_prog);
-          
+          pluto_transformations_pretty_print(array_prog);          
         } else {
           fprintf(stdout, "[PSA] Failed SIMD vectorization.\n");
         }
@@ -900,7 +909,10 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
       pluto_print_program(array_prog, srcFileName, "array_part");
   #endif
 #endif    
-     
+ 
+#ifdef PRINT_DEPS_POST_PE_OPTIMIZATION
+      psa_print_trans_deps(array_prog);
+#endif 
 /*
  * *******************************************
  * Stage: Code Generation
@@ -920,8 +932,8 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
       /* T2S_IO */
       vsa_t2s_IO_extract(array_prog, psa_vsa);
 #else 
-      /* IO */
-      vsa_IO_extract(array_prog, psa_vsa);
+//      /* IO */
+//      vsa_IO_extract(array_prog, psa_vsa);
       /* ARRAY_SHAPE */
       vsa_array_shape_extract(array_prog, psa_vsa);
 #endif      

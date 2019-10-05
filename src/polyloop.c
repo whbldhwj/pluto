@@ -678,7 +678,7 @@ Band *pluto_get_permutable_band(Ploop *loop, PlutoProg *prog) {
   do {
     for (i = 0; i < prog->ndeps; i++) {
       Dep *dep = prog->deps[i];
-      if (IS_RAR(dep->type))
+      if (options->rar == 0 && IS_RAR(dep->type))
         continue;
       assert(dep->satvec != NULL);
       /* Dependences satisfied outer to the band don't matter */

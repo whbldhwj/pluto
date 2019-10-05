@@ -3,19 +3,137 @@
 /* DSA Form 0 */
 // change paramters to constants
 // avoid using +=
+//void dsa_kernel(data_t X[R + 3 + 1][S + 3 + 1], data_t W[3 + 1][3 + 1], data_t Z[R + 1][S + 1]) {
+//#pragma scop  
+//  for (int r = 1; r < 8 + 1; r++)
+//    for (int s = 1; s < 8 + 1; s++) {
+//      for (int i = 1; i < 3 + 1; i++)
+//        for (int j = 1; j < 3 + 1; j++) {
+//          if (i == 1 && j == 1) 
+//            Z[r][s] = 0;
+//          Z[r][s] = Z[r][s] + X[r + i][s + j] * W[i][j];
+//        }
+//    }
+//#pragma endscop  
+//}
+
 void dsa_kernel(data_t X[R + 3 + 1][S + 3 + 1], data_t W[3 + 1][3 + 1], data_t Z[R + 1][S + 1]) {
-#pragma scop  
-  for (int r = 1; r < 8 + 1; r++)
-    for (int s = 1; s < 8 + 1; s++) {
-      for (int i = 1; i < 3 + 1; i++)
-        for (int j = 1; j < 3 + 1; j++) {
-          if (i == 1 && j == 1) 
-            Z[r][s] = 0;
-          Z[r][s] = Z[r][s] + X[r + i][s + j] * W[i][j];
+  data_t X_CC1_E[8+1][3+1][11+1][17+1];
+  data_t W_CC2_E[8+1][3+1][11+1][17+1];
+  data_t Z_CC0_I[8+1][3+1][11+1][17+1];
+  data_t APP[8+1][3+1][11+1][17+1];
+
+  for (int t1 = 1; t1 <= 8; t1++)
+    for (int t2 = 1; t2 <= 3; t2++)
+      for (int t3 = 1; t3 <= 11; t3++)
+        for (int t4 = 1; t4 <= 17; t4++) {
+          X_CC1_E[t1][t2][t3][t4] = 0;
+          W_CC2_E[t1][t2][t3][t4] = 0;
+          Z_CC0_I[t1][t2][t3][t4] = 0;
+          APP[t1][t2][t3][t4] = 0;
         }
+
+  for (int t1 = 1; t1 <= 8; t1++)
+    for (int t2 = 1; t2 <= 3; t2++)
+      for (int t3 = 1; t3 <= 11; t3++) 
+        for (int t4 = 3; t4 <= 17; t4++) {
+          if ((-t2 + t3 - 8 == 0 && t2 - 2 >= 0) || (t2 - 1 == 0 && t3 - 2 >= 0)) {
+            X_CC1_E[t1][t2][t3][t4] = X[t3][t1 - t2 - t3 + t4];
+          } else if (t2 - t3 + 7 >= 0 && -t2 + t3 - 1 >= 0 && t2 - 2 >= 0){
+            X_CC1_E[t1][t2][t3][t4] = X_CC1_E[t1][t2 - 1][t3][t4 - 1];
+          }
+        }
+
+  for (int t1 = 1; t1 <= 8; t1++)
+    for (int t2 = 1; t2 <= 3; t2++)
+      for (int t3 = 1; t3 <= 11; t3++) 
+        for (int t4 = 3; t4 <= 17; t4++) {
+          if (-t2 + t3 - 1 == 0) {
+            W_CC2_E[t1][t2][t3][t4] = W[t2][-t2 - t3 + t4];
+          } else if (-t2 + t3 - 2 >= 0) {
+            W_CC2_E[t1][t2][t3][t4] = W_CC2_E[t1][t2][t3 - 1][t4 - 1];
+          }
+
+          if (-t3 + t4 - 2 == 0 && t2 - 1 == 0 && -t3 + 8 >= 0) {
+            Z_CC0_I[t1][t2][t3][t4] = 0;
+            if (t3 == 2 && t1 == 1) {
+              fprintf(stdout, "0(%d,%d,%d,%d) %d\n", t3, t1, t2, t4 - 1 - t3, Z_CC0_I[t1][t2][t3][t4]);
+            }
+          }
+          
+          if (-t3 + t4 - 2 == 0 && t2 - 1 == 0 && t3 - 2 >= 0) {
+            Z_CC0_I[t1][t2][t3][t4] = Z_CC0_I[t1][t2][t3 - 1][t4 - 1] + X_CC1_E[t1][t2][t3][t4] * W_CC2_E[t1][t2][t3][t4];
+            if (t3 - t2 == 2 && t1 == 1) {
+              fprintf(stdout, "1(%d,%d,%d,%d) %d (%d,%d,%d)\n", t3 - t2, t1, t2, t4 - t3 - t2, Z_CC0_I[t1][t2][t3][t4], Z_CC0_I[t1][t2][t3 - 1][t4 - 1], X_CC1_E[t1][t2][t3][t4], W_CC2_E[t1][t2][t3][t4]);
+            }
+          } else if (-t2 + t3 - 1 >= 0 && -t2 - t3 + t4 - 2 >= 0) {
+            Z_CC0_I[t1][t2][t3][t4] = Z_CC0_I[t1][t2][t3][t4 - 1] + X_CC1_E[t1][t2][t3][t4] * W_CC2_E[t1][t2][t3][t4];
+            if (t3 - t2 == 2 && t1 == 1) {
+              fprintf(stdout, "2(%d,%d,%d,%d) %d\n", t3 - t2, t1, t2, t4 - t3 - t2, Z_CC0_I[t1][t2][t3][t4]);
+            }
+          } else if (-t2 - t3 + t4 - 1 == 0 && t2 - 2 >= 0 && -t2 + t3 - 1 >= 0) {
+            Z_CC0_I[t1][t2][t3][t4] = Z_CC0_I[t1][t2 - 1][t3 - 1][t4] + X_CC1_E[t1][t2][t3][t4] * W_CC2_E[t1][t2][t3][t4];
+            if (t3 - t2 == 2 && t1 == 1) {
+              fprintf(stdout, "3(%d,%d,%d,%d) %d\n", t3 - t2, t1, t2, t4 - t3 - t2, Z_CC0_I[t1][t2][t3][t4]);
+            }
+          }
+
+          if (-t3 + t4 - 6 == 0 && t2 - 3 == 0 && t3 - 4 >= 0)
+            APP[t1][t2][t3][t4] = Z_CC0_I[t1][t2][t3][t4];
+        }
+
+  for (int r = 1; r <= R; r++)
+    for (int s = 1; s <= S; s++) {
+      Z[r][s] = APP[s][I][r + I][r + 2 * I + J];
     }
-#pragma endscop  
 }
+
+//void dsa_kernel(data_t X[R + 3 + 1][S + 3 + 1], data_t W[3 + 1][3 + 1], data_t Z[R + 1][S + 1]) {
+//  data_t X_CC1_E[8+1][8+1][3+1][17+1];
+//  data_t W_CC2_E[8+1][8+1][3+1][17+1];
+//  data_t Z_CC0_I[8+1][8+1][3+1][17+1];
+//  data_t APP[8+1][8+1][3+1][17+1];
+//
+//  for (int t1 = 1; t1 <= 8; t1++)
+////    for (int t2 = 1; t2 <= 8; t2++)
+//    for (int t2 = 8; t2 >= 1; t2--)
+//      for (int t3 = 1; t3 <= 3; t3++) 
+//        for (int t4 = 3; t4 <= 17; t4++) {
+//          if ((t2 - 8 == 0 && -2 * t3 + t4 - 9 >= 0) || (t3 - 1 == 0 && -t2 + t4 - 3 >= 0 && -t2 + 7 >= 0)) {
+//            X_CC1_E[t1][t2][t3][t4] = X[t2 + t3][t1 - t2 - 2 * t3 + t4];
+//          } else if (-t2 + 7 >= 0 && t3 - 2 >= 0 && -t2 - 2 * t3 + t4 - 1 >= 0){
+//            X_CC1_E[t1][t2][t3][t4] = X_CC1_E[t1][t2 + 1][t3 - 1][t4 - 1];
+//          }
+//        }
+//
+//  for (int t1 = 1; t1 <= 8; t1++)
+//    for (int t2 = 1; t2 <= 8; t2++)
+//      for (int t3 = 1; t3 <= 3; t3++) 
+//        for (int t4 = 3; t4 <= 17; t4++) {
+//          if (t2 - 1 == 0 && -2 * t3 + t4 - 2 >= 0) {
+//            W_CC2_E[t1][t2][t3][t4] = W[t3][-t2 - 2 * t3 + t4];
+//          } else if (t2 - 2 >= 0 && -t2 - 2 * t3 + t4 - 1 >= 0) {
+//            W_CC2_E[t1][t2][t3][t4] = W_CC2_E[t1][t2 - 1][t3][t4 - 1];
+//          }
+//
+//          if (-t2 + t4 - 2 == 0 && t3 - 1 == 0)
+//            Z_CC0_I[t1][t2][t3][t4] = 0;
+//          if (-t2 + t4 - 3 == 0 && t3 - 1 == 0)
+//            Z_CC0_I[t1][t2][t3][t4] = Z_CC0_I[t1][t2][t3][t4 - 1] + X_CC1_E[t1][t2][t3][t4] * W_CC2_E[t1][t2][t3][t4];
+//          else if (-t2 - 2 * t3 + t4 - 2 >= 0) 
+//            Z_CC0_I[t1][t2][t3][t4] = Z_CC0_I[t1][t2][t3][t4 - 1] + X_CC1_E[t1][t2][t3][t4] * W_CC2_E[t1][t2][t3][t4];
+//          else if (-t2 - 2 * t3 + t4 - 1 == 0 && t3 - 2 >= 0)
+//            Z_CC0_I[t1][t2][t3][t4] = Z_CC0_I[t1][t2][t3 - 1][t4] + X_CC1_E[t1][t2][t3][t4] * W_CC2_E[t1][t2][t3][t4];
+//
+//          if (-t2 + t4 - 9 == 0 && t3 - 3 == 0)
+//            APP[t1][t2][t3][t4] = Z_CC0_I[t1][t2][t3][t4];
+//        }
+//
+//  for (int r = 1; r <= R; r++)
+//    for (int s = 1; s <= S; s++) {
+//      Z[r][s] = APP[s][r][I][r + 2 * I + J];
+//    }
+//}
 
 /* DSA Form 1 */
 //void dsa_kernel(data_t X[R + 3 + 1][S + 3 + 1], data_t W[3 + 1][3 + 1], data_t Z[R + 1][S + 1]) {

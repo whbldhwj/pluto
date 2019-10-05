@@ -1369,6 +1369,7 @@ Ploop **psa_get_outermost_loops(const PlutoProg *prog,
 //void psa_redetect_hyperplane_types(PlutoProg *prog, int array_dim);                                
 void pluto_print_program(const PlutoProg *prog, char *srcFileName, char *suffix);
 void psa_print_deps(const PlutoProg *prog);
+void psa_print_trans_deps(const PlutoProg *prog);
 /* Jie Added - End */                                
 #endif
 #endif

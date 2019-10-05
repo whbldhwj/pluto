@@ -581,7 +581,7 @@ int psa_array_partition_optimize(PlutoProg *prog, VSA *vsa) {
   /* Detect properties after tiling */
   pluto_compute_dep_directions(prog);
   pluto_compute_dep_satisfaction(prog);
-  psa_compute_dep_distances_isl(prog);
+//  psa_compute_dep_distances_isl(prog);
 
   /* Re-detect hyperplane types (H_SCALAR, H_LOOP) */
   pluto_detect_hyperplane_types(prog);
@@ -598,7 +598,7 @@ int psa_array_partition_optimize(PlutoProg *prog, VSA *vsa) {
   /* Detect properties after permutation */
   pluto_compute_dep_directions(prog);
   pluto_compute_dep_satisfaction(prog);
-  psa_compute_dep_distances_isl(prog);  
+//  psa_compute_dep_distances_isl(prog);  
 
   /* Re-detect hyperplane types (H_SCALAR, H_LOOP) */
   pluto_detect_hyperplane_types(prog);

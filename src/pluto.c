@@ -3118,3 +3118,68 @@ void psa_print_deps(const PlutoProg *prog) {
     fprintf(stdout, "***********************\n");
   } 
 }
+
+void psa_print_trans_deps(const PlutoProg *prog) {
+  fprintf(stdout, "[PSA] Print out the dependences.\n");
+  fprintf(stdout, "[PSA] Total number of dependences: %d\n", prog->ndeps);
+  for (int i = 0; i < prog->ndeps; i++) {
+    Dep *dep = prog->deps[i];
+    fprintf(stdout, "***********************\n");
+    fprintf(stdout, "[PSA] Dependences ID: %d\n", i);
+    fprintf(stdout, "[PSA] Src stmt ID: %d\n", dep->src);
+    fprintf(stdout, "[PSA] Dest stmt ID: %d\n", dep->dest);
+    if (IS_WAR(dep->type)) {
+      fprintf(stdout, "[PSA] Dep type: WAR\n");
+    } else if (IS_WAW(dep->type)) {
+      fprintf(stdout, "[PSA] Dep type: WAW\n");
+    } else if (IS_RAW(dep->type)) {
+      fprintf(stdout, "[PSA] Dep type: RAW\n");
+    } else if (IS_RAR(dep->type)) {
+      fprintf(stdout, "[PSA] Dep type: RAR\n");
+    }
+    PlutoAccess *acc = dep->src_acc;
+    fprintf(stdout, "[PSA] Arr name: %s\n", acc->name);    
+
+    // examine the uniformity of the dependence
+    bool is_uniform = true;
+    for (int h = 0; h < prog->num_hyperplanes; h++) {
+      if (!is_dep_constant_at_level(dep, prog, h)) {
+        is_uniform = false;
+        break;
+      }
+    }
+    fprintf(stdout, "[PSA] Uniformity: %d\n", is_uniform);
+
+    //PlutoConstraints* dpolytope = dep->dpolytope;
+    //pluto_constraints_pretty_print(stdout, dpolytope);
+    PlutoConstraints *dpolytope = pluto_get_transformed_dpoly(dep, prog->stmts[dep->src], prog->stmts[dep->dest]);
+    pluto_constraints_pretty_print(stdout, dpolytope);
+    fprintf(stdout, "***********************\n");
+  }
+
+  fprintf(stdout, "[PSA] Total number of trans dependences: %d\n", prog->ntransdeps);
+  for (int i = 0; i < prog->ntransdeps; i++) {
+    Dep *dep = prog->transdeps[i];
+    fprintf(stdout, "***********************\n");
+    fprintf(stdout, "[PSA] Dependences ID: %d\n", i);
+    fprintf(stdout, "[PSA] Src stmt ID: %d\n", dep->src);
+    fprintf(stdout, "[PSA] Dest stmt ID: %d\n", dep->dest);
+    if (IS_WAR(dep->type)) {
+      fprintf(stdout, "[PSA] Dep type: WAR\n");
+    } else if (IS_WAW(dep->type)) {
+      fprintf(stdout, "[PSA] Dep type: WAW\n");
+    } else if (IS_RAW(dep->type)) {
+      fprintf(stdout, "[PSA] Dep type: RAW\n");
+    } else if (IS_RAR(dep->type)) {
+      fprintf(stdout, "[PSA] Dep type: RAR\n");
+    }
+    PlutoAccess *acc = dep->src_acc;
+    fprintf(stdout, "[PSA] Arr name: %s\n", acc->name);    
+
+    //PlutoConstraints* dpolytope = dep->dpolytope;
+    //pluto_constraints_pretty_print(stdout, dpolytope);
+    PlutoConstraints *dpolytope = pluto_get_transformed_dpoly(dep, prog->stmts[dep->src], prog->stmts[dep->dest]);
+    pluto_constraints_pretty_print(stdout, dpolytope);
+    fprintf(stdout, "***********************\n");
+  } 
+}

@@ -184,7 +184,8 @@ static void compute_permutability_constraints_dep(Dep *dep, PlutoProg *prog) {
   dest_offset = npar + 1 + dest_stmt * (nvar + 1);
 
   /* Permutability constraints */
-  if (!IS_RAR(dep->type)) {
+//  if (!IS_RAR(dep->type)) {
+  if (!(options->rar == 0 && IS_RAR(dep->type))) {
     /* Permutability constraints only for non-RAR deps */
     for (k = 0; k < tiling_valid_cst->nrows; k++) {
       pluto_constraints_add_constraint(cst, tiling_valid_cst->is_eq[k]);

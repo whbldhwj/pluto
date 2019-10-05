@@ -1,0 +1,60 @@
+{
+  "EVAR_NUM": 2,
+  "EDVAR_NUM": 0,
+  "IVAR_NUM": 1,
+  "IDVAR_NUM": 1,
+  "EVAR_NAMES": [
+    "X_CC1_E",
+    "W_CC2_E"
+  ],
+  "EDVAR_NAMES": [
+  ],
+  "EVAR_REFS": [
+    "X_CC1_E(t1, t2, t3, t4)",
+    "W_CC2_E(t1, t2, t3, t4)"
+  ],
+  "EDVAR_REFS": [
+  ],
+  "IVAR_NAMES": [
+    "Z_CC0_I"
+  ],
+  "IDVAR_NAMES": [
+    "Z_CC0_ID"
+  ],
+  "IVAR_REFS": [
+    "Z_CC0_I(t1, t2, t3, t4)"
+  ],
+  "IDVAR_REFS": [
+    "Z_CC0_ID(t1, t2, t3, t4)"
+  ],
+  "T2S_ITER_NUM": 4,
+  "T2S_ITERS": [
+    "t1",
+    "t2",
+    "t3",
+    "t4"
+  ],
+  "ARRAY_NUM": 3,
+  "ARRAYS": [
+    "Z",
+    "X",
+    "W"
+  ],
+  "URE_NUM": 11,
+  "URES": [
+    "X_CC1_E(t1, t2, t3, t4) = 0;",
+    "X_CC1_E(t1, t2, t3, t4) = select((t3 - 1 == 0 && -t2 + 2 * t4 - 2 >= 0) || (-t2 + t3 + t4 + 8 == 0 && t3 - 2 >= 0 && t2 - 3 * t3 - 17 >= 0), X((2 * t2 - 2 * t4) / 2, (2 * t1 - 2 * t2 - 2 * t3 + 4 * t4) / 2), select((-t2 - t3 + 2 * t4 - 1 >= 0 && -t2 + t3 + t4 + 7 >= 0 && t3 - 2 >= 0), X_CC1_E(t1, t2 - 1, t3 - 1, t4 - 1), X_CC1_E(t1, t2, t3, t4)));",
+    "W_CC2_E(t1, t2, t3, t4) = 0;",
+    "W_CC2_E(t1, t2, t3, t4) = select((-t2 + t3 + t4 + 1 == 0 && t2 - 3 * t3 - 3 >= 0), W((2 * t3) / 2, (-2 * t2 - 2 * t3 + 4 * t4) / 2), select((-t2 - t3 + 2 * t4 - 1 >= 0 && t2 - t3 - t4 - 2 >= 0), W_CC2_E(t1, t2 - 2, t3, t4 - 1), W_CC2_E(t1, t2, t3, t4)));",
+    "Z_CC0_I(t1, t2, t3, t4) = 0;",
+    "Z_CC0_I(t1, t2, t3, t4) = select((-t2 + 2 * t4 - 1 == 0 && t3 - 1 == 0), 0, Z_CC0_I(t1, t2, t3, t4));",
+    "Z_CC0_I(t1, t2, t3, t4) = select((-t2 + 2 * t4 - 2 == 0 && t3 - 1 == 0), (Z_CC0_I(t1, t2 - 1, t3, t4 - 1) + (X_CC1_E(t1, t2, t3, t4) * W_CC2_E(t1, t2, t3, t4))), Z_CC0_I(t1, t2, t3, t4));",
+    "Z_CC0_I(t1, t2, t3, t4) = select((-t2 - t3 + 2 * t4 - 2 >= 0), (Z_CC0_I(t1, t2 - 1, t3, t4 - 1) + (X_CC1_E(t1, t2, t3, t4) * W_CC2_E(t1, t2, t3, t4))), Z_CC0_I(t1, t2, t3, t4));",
+    "Z_CC0_I(t1, t2, t3, t4) = select((-t2 - t3 + 2 * t4 - 1 == 0 && t3 - 2 >= 0), (Z_CC0_I(t1, t2 - 1, t3 - 1, t4) + (X_CC1_E(t1, t2, t3, t4) * W_CC2_E(t1, t2, t3, t4))), Z_CC0_I(t1, t2, t3, t4));",
+    "APP(t1, t2, t3, t4) = 0;",
+    "APP(t1, t2, t3, t4) = select((-t2 + 2 * t4 - 6 == 0 && t3 - 3 == 0), Z_CC0_I(t1, t2, t3, t4), APP(t1, t2, t3, t4));"
+  ],
+  "DOMAIN_EXP_NUM": 0,
+  "DOMAIN_EXPS": [
+  ],
+}

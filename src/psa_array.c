@@ -897,9 +897,12 @@ PlutoProg **sa_candidates_generation_band_sync(Band *band, int array_dim,
 //            pluto_compute_dep_satisfaction(new_prog);
 //          }      
 //        }
+#ifdef SYNC_ARRAY_WAVEFRONT
         for (int level = 0; level < array_dim; level++) {
           psa_add_loops(new_prog, lastD - array_dim, level + lastD - array_dim + 1);
         }
+#endif        
+
         pluto_compute_dep_directions(new_prog);
         pluto_compute_dep_satisfaction(new_prog);
         psa_compute_dep_distances_isl(new_prog);
@@ -956,9 +959,12 @@ PlutoProg **sa_candidates_generation_band_sync(Band *band, int array_dim,
 //                pluto_compute_dep_satisfaction(new_prog);
 //              }      
 //            }
+#ifdef SYNC_ARRAY_WAVEFRONT
             for (int level = 0; level < array_dim; level++) {
               psa_add_loops(new_prog, lastD - array_dim, level + lastD - array_dim + 1);
             }
+#endif
+
             pluto_compute_dep_directions(new_prog);
             pluto_compute_dep_satisfaction(new_prog);
             psa_compute_dep_distances_isl(new_prog);
@@ -1021,10 +1027,13 @@ PlutoProg **sa_candidates_generation_band_sync(Band *band, int array_dim,
 //                    pluto_compute_dep_directions(new_prog);
 //                    pluto_compute_dep_satisfaction(new_prog);
 //                  }      
-//                } 
+//                }
+#ifdef SYNC_ARRAY_WAVEFRONT                
                 for (int level = 0; level < array_dim; level++) {
                   psa_add_loops(new_prog, lastD - array_dim, level + lastD - array_dim + 1);
                 }
+#endif
+
                 pluto_compute_dep_directions(new_prog);
                 pluto_compute_dep_satisfaction(new_prog); 
                 psa_compute_dep_distances_isl(new_prog);

@@ -6,6 +6,9 @@
 #ifndef _PSA_KNOB_H
 #define _PSA_KNOB_H
 
+//#define DEMO0
+#define DEMO1
+
 /*
  * *****************************
  * Stage: Array Generation
@@ -33,8 +36,13 @@
 #define SPACE_TIME_MAPPING
 
 // sync or async
-#define SYNC_ARRAY
-//#define ASYNC_ARRAY
+#ifdef DEMO1
+  #define SYNC_ARRAY
+//  #define SYNC_ARRAY_WAVEFRONT
+#endif
+#ifdef DEMO0
+  #define ASYNC_ARRAY
+#endif
 
 // upper bound of permissible systolic array dimension
 #define SA_DIM_UB 2
@@ -50,32 +58,37 @@
  * Stage: PE Optimization
  * *****************************
  */ 
-//// perform latency hiding optimization 
-//#define LATENCY_HIDING
-//
-//// print out the transformed code after latency hiding
-//#define PRINT_LATENCY_HIDING_TRANS_PROGRAM
-//
-//// dump out latency hiding candidates
-//#define PRINT_LATENCY_HIDING_MISC
+#ifdef DEMO0
+  // perform latency hiding optimization 
+  #define LATENCY_HIDING
+  
+  // print out the transformed code after latency hiding
+  #define PRINT_LATENCY_HIDING_TRANS_PROGRAM
+  
+  // dump out latency hiding candidates
+  #define PRINT_LATENCY_HIDING_MISC
+  
+  // perfrom SIMD vectorization
+  #define SIMD_VECTORIZATION
+  
+  // print out the transformed code after SIMD vectorization
+  #define PRINT_SIMD_VECTORIZATION_TRANS_PROGRAM
+  
+  // dump out SIMD vectorization candidates
+  #define PRINT_SIMD_VECTORIZATION_MISC
 
-//// perfrom SIMD vectorization
-//#define SIMD_VECTORIZATION
-//
-//// print out the transformed code after SIMD vectorization
-//#define PRINT_SIMD_VECTORIZATION_TRANS_PROGRAM
-//
-//// dump out SIMD vectorization candidates
-//#define PRINT_SIMD_VECTORIZATION_MISC
+  // perfom array partitioning optimization
+  #define ARRAY_PARTITIONING
+  
+  // print out the transformed code after array partitioning
+  #define PRINT_ARRAY_PARTITIONING_TRANS_PROGRAM
+  
+  // dump out array partitioning candidates
+  #define PRINT_ARRAY_PARTITIONING_MISC 
+#endif
 
-//// perfom array partitioning optimization
-//#define ARRAY_PARTITIONING
-//
-//// print out the transformed code after array partitioning
-//#define PRINT_ARRAY_PARTITIONING_TRANS_PROGRAM
-//
-//// dump out array partitioning candidates
-//#define PRINT_ARRAY_PARTITIONING_MISC
+// print out detailed information of each dependence after the PE optimization
+#define PRINT_DEPS_POST_PE_OPTIMIZATION
 
 /*
  * ************************************
@@ -93,10 +106,12 @@
 // print out the final transformed CPU code
 #define CPU_CODEGEN
 // generate T2S code
-#define T2S_CODEGEN
+#ifdef DEMO1
+  #define T2S_CODEGEN
+#endif
 // generate Intel OpenCL code
 //#define INTEL_CODEGEN
-//// generate Xilinx HLS code
+// generate Xilinx HLS code
 //#define XILINX_CODEGEN
 
 #endif

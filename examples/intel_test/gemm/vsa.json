@@ -1,0 +1,34 @@
+{
+  "EVAR_NUM": 0,
+  "EDVAR_NUM": 0,
+  "IVAR_NUM": 0,
+  "IDVAR_NUM": 0,
+  "EVAR_NAMES": [
+  ],
+  "EDVAR_NAMES": [
+  ],
+  "EVAR_REFS": [
+  ],
+  "EDVAR_REFS": [
+  ],
+  "IVAR_NAMES": [
+  ],
+  "IDVAR_NAMES": [
+  ],
+  "IVAR_REFS": [
+  ],
+  "IDVAR_REFS": [
+  ],
+  "T2S_ITER_NUM": -1,
+  "T2S_ITERS": [
+  ],
+  "ARRAY_NUM": -1,
+  "ARRAYS": [
+  ],
+  "URE_NUM": 0,
+  "URES": [
+  ],
+  "DOMAIN_EXP_NUM": 0,
+  "DOMAIN_EXPS": [
+  ],
+}

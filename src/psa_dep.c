@@ -60,17 +60,24 @@ bool systolic_array_legal_checker(PlutoProg *prog) {
   if (nbands != 1) {
     err_type = 1;
   }
+  if (!err_type) {
+    int nbands_tmp = 0;
+    Band **tmp_bands = pluto_get_innermost_permutable_bands(prog, &nbands_tmp);
+    if (nbands_tmp > 1) {
+      err_type = 2;
+    } else if (nbands_tmp == 1) {
+      if (tmp_bands[0]->loop->depth != bands[0]->loop->depth)  {
+        err_type = 2;
+      }
+    }
+  }
+
 //  if (!err_type) {
-//    int nbands_tmp = 0;
-//    Band **tmp_bands = pluto_get_innermost_permutable_bands(prog, &nbands_tmp);
-//    if (nbands_tmp > 1) {
+//    if (bands[0]->width != prog->num_hyperplanes) {
 //      err_type = 2;
-//    } else if (nbands_tmp == 1) {
-//      if (tmp_bands[0]->loop->depth != bands[0]->loop->depth)  {
-//        err_type = 2;
-//      }
 //    }
 //  }
+
   if (!err_type) {
     /* uniform dependency */
     bool is_uniform = systolic_array_dep_checker_isl(prog);

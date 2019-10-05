@@ -224,7 +224,7 @@ char *create_new_acc_str(Stmt *stmt, PlutoAccess *acc, PlutoProg *prog, VSA *vsa
   // compute the new access function
   int *divs;
   PlutoMatrix *new_acc = pluto_get_new_access_func(stmt, acc->mat, &divs);
-  pluto_matrix_print(stdout, new_acc);
+//  pluto_matrix_print(stdout, new_acc);
 
   int npar = prog->npar;
   char **params = prog->params;
