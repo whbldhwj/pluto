@@ -174,19 +174,19 @@ void psa_t2s_codegen(FILE *fp, const VSA *vsa) {
   fprintf(fp, "   .domain(");  
   for (int i = 0; i < vsa->t2s_iter_num; i++) {
     if (i == 0) {
-      fprintf(fp, "%s, %s, %s, %s,\n", 
+      fprintf(fp, "%s, %d, %d, %d,\n", 
           vsa->t2s_meta_iters[i]->iter_name,
           vsa->t2s_meta_iters[i]->lb,
           vsa->t2s_meta_iters[i]->ub,
           vsa->t2s_meta_iters[i]->stride);
     } else if (i < vsa->t2s_iter_num - 1) {
-      fprintf(fp, "           %s, %s, %s, %s,\n", 
+      fprintf(fp, "           %s, %d, %d, %d,\n", 
           vsa->t2s_meta_iters[i]->iter_name,
           vsa->t2s_meta_iters[i]->lb,
           vsa->t2s_meta_iters[i]->ub,
           vsa->t2s_meta_iters[i]->stride);
     } else {
-      fprintf(fp, "           %s, %s, %s, %s,\n", 
+      fprintf(fp, "           %s, %d, %d, %d,\n", 
           vsa->t2s_meta_iters[i]->iter_name,
           vsa->t2s_meta_iters[i]->lb,
           vsa->t2s_meta_iters[i]->ub,
@@ -198,13 +198,13 @@ void psa_t2s_codegen(FILE *fp, const VSA *vsa) {
   for (int i = 0; i < vsa->t2s_iter_num; i++) {
     if (vsa->t2s_meta_iters[i]->type == 'T') {
       if (titer_cnt < vsa->time_band_width - 1) {
-        fprintf(fp, "           tloop%d, %s, %s, %s,\n", 
+        fprintf(fp, "           tloop%d, %d, %d, %d,\n", 
             titer_cnt + 1,
             vsa->t2s_meta_iters[i]->lb,
             vsa->t2s_meta_iters[i]->ub,
             vsa->t2s_meta_iters[i]->stride);
       } else {
-        fprintf(fp, "           tloop%d, %s, %s, %s", 
+        fprintf(fp, "           tloop%d, %d, %d, %d", 
             titer_cnt + 1,
             vsa->t2s_meta_iters[i]->lb,
             vsa->t2s_meta_iters[i]->ub,
@@ -226,9 +226,9 @@ void psa_t2s_codegen(FILE *fp, const VSA *vsa) {
   fprintf(fp, "Image<int> FPGA_output(");
   for (int i = 0; i < vsa->t2s_iter_num; i++) {
     if (i == 0) {
-      fprintf(fp, "%s + 1", vsa->t2s_meta_iters[i]->ub);
+      fprintf(fp, "%d + 1", vsa->t2s_meta_iters[i]->ub);
     } else {
-      fprintf(fp, ", %s + 1", vsa->t2s_meta_iters[i]->ub);
+      fprintf(fp, ", %d + 1", vsa->t2s_meta_iters[i]->ub);
     }
   }
   fprintf(fp, ");\n");

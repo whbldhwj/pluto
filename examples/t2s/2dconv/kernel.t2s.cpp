@@ -9,9 +9,9 @@ using namespace std;
 
 int main(void) {
 // Input declarations
+ImageParam W(type_of<int>(), 2, "W");
 ImageParam Z(type_of<int>(), 2, "Z");
 ImageParam X(type_of<int>(), 2, "X");
-ImageParam W(type_of<int>(), 2, "W");
 
 // Input initialization
 
@@ -20,24 +20,23 @@ Var t1, t2, t3, t4;
 
 // Function declarations
 #define FUNC_S type_of<int>(), {t1, t2, t3, t4}, Place::Host
-Func X_CC1_E(FUNC_S), W_CC2_E(FUNC_S), Z_CC0_I(FUNC_S), APP(FUNC_S);
+Func W_CC0_E(FUNC_S), X_CC2_E(FUNC_S), Z_CC1_I(FUNC_S), APP(FUNC_S);
 
 // UREs
-X_CC1_E(t1, t2, t3, t4) = 0;
-X_CC1_E(t1, t2, t3, t4) = select((-t2 + t3 - 8 == 0 && t2 - 2 >= 0) || (t2 - 1 == 0 && t3 - 2 >= 0), X(t3, t1 - t2 - t3 + t4), select((t2 - t3 + 7 >= 0 && -t2 + t3 - 1 >= 0 && t2 - 2 >= 0), X_CC1_E(t1, t2 - 1, t3, t4 - 1), X_CC1_E(t1, t2, t3, t4)));
-W_CC2_E(t1, t2, t3, t4) = 0;
-W_CC2_E(t1, t2, t3, t4) = select((-t2 + t3 - 1 == 0), W(t2, -t2 - t3 + t4), select((-t2 + t3 - 2 >= 0), W_CC2_E(t1, t2, t3 - 1, t4 - 1), W_CC2_E(t1, t2, t3, t4)));
-Z_CC0_I(t1, t2, t3, t4) = 0;
-Z_CC0_I(t1, t2, t3, t4) = select((-t3 + t4 - 2 == 0 && t2 - 1 == 0 && -t3 + 8 >= 0), 0, Z_CC0_I(t1, t2, t3, t4));
-Z_CC0_I(t1, t2, t3, t4) = select((-t3 + t4 - 2 == 0 && t2 - 1 == 0 && t3 - 2 >= 0), (Z_CC0_I(t1, t2, t3 - 1, t4 - 1) + (X_CC1_E(t1, t2, t3, t4) * W_CC2_E(t1, t2, t3, t4))), Z_CC0_I(t1, t2, t3, t4));
-Z_CC0_I(t1, t2, t3, t4) = select((-t2 + t3 - 1 >= 0 && -t2 - t3 + t4 - 2 >= 0), (Z_CC0_I(t1, t2, t3, t4 - 1) + (X_CC1_E(t1, t2, t3, t4) * W_CC2_E(t1, t2, t3, t4))), Z_CC0_I(t1, t2, t3, t4));
-Z_CC0_I(t1, t2, t3, t4) = select((-t2 - t3 + t4 - 1 == 0 && t2 - 2 >= 0 && -t2 + t3 - 1 >= 0), (Z_CC0_I(t1, t2 - 1, t3 - 1, t4) + (X_CC1_E(t1, t2, t3, t4) * W_CC2_E(t1, t2, t3, t4))), Z_CC0_I(t1, t2, t3, t4));
+W_CC0_E(t1, t2, t3, t4) = 0;
+W_CC0_E(t1, t2, t3, t4) = select((-t2 + t3 + 1 == 0), W(t3, -t2 - t3 + t4), W_CC0_E(t1, t2 - 1, t3, t4 - 1));
+X_CC2_E(t1, t2, t3, t4) = 0;
+X_CC2_E(t1, t2, t3, t4) = select((t3 - 1 == 0 && -t2 + 8 >= 0) || (-t2 + t3 + 8 == 0), X(t2, t1 - t2 - t3 + t4), X_CC2_E(t1, t2, t3 - 1, t4 - 1));
+Z_CC1_I(t1, t2, t3, t4) = 0;
+Z_CC1_I(t1, t2, t3, t4) = select((-t2 - t3 + t4 - 1 == 0 && t3 - 1 == 0), Z_CC1_I(t1, t2, t3, t4) + (X_CC2_E(t1, t2, t3, t4) * W_CC0_E(t1, t2, t3, t4)), Z_CC1_I(t1, t2, t3, t4));
+Z_CC1_I(t1, t2, t3, t4) = select((-t2 - t3 + t4 - 2 >= 0), (Z_CC1_I(t1, t2, t3, t4 - 1) + (X_CC2_E(t1, t2, t3, t4) * W_CC0_E(t1, t2, t3, t4))), Z_CC1_I(t1, t2, t3, t4));
+Z_CC1_I(t1, t2, t3, t4) = select((-t2 - t3 + t4 - 1 == 0 && t3 - 2 >= 0), (Z_CC1_I(t1, t2 - 1, t3 - 1, t4) + (X_CC2_E(t1, t2, t3, t4) * W_CC0_E(t1, t2, t3, t4))), Z_CC1_I(t1, t2, t3, t4));
 APP(t1, t2, t3, t4) = 0;
-APP(t1, t2, t3, t4) = select((-t3 + t4 - 6 == 0 && t2 - 3 == 0 && t3 - 4 >= 0), Z_CC0_I(t1, t2, t3, t4), APP(t1, t2, t3, t4));
+APP(t1, t2, t3, t4) = select((-t2 + t4 - 6 == 0 && t3 - 3 == 0), Z_CC1_I(t1, t2, t3, t4), APP(t1, t2, t3, t4));
 
 // Build the initial loop nest
 Var tloop1, tloop2;
-APP.merge_defs({X_CC1_E.update(0), W_CC2_E.update(0), Z_CC0_I.update(0), Z_CC0_I.update(1), Z_CC0_I.update(2), Z_CC0_I.update(3), APP.update(0)}, {X_CC1_E, W_CC2_E, Z_CC0_I})
+APP.merge_defs({W_CC0_E.update(0), X_CC2_E.update(0), Z_CC1_I.update(0), Z_CC1_I.update(1), APP.update(0)}, {W_CC0_E, X_CC2_E, Z_CC1_I})
    .reorder_inward(t1, t2, t3, t4)
    .space_time_transform({t1, t2, t3, t4},
                          {tloop1, tloop2},
@@ -51,16 +50,16 @@ APP.merge_defs({X_CC1_E.update(0), W_CC2_E.update(0), Z_CC0_I.update(0), Z_CC0_I
                           0, 0, 1, 0,
                           0, 0, 0, 1})
    .domain(t1, 1, 8, 1,
-           t2, 1, 3, 1,
-           t3, 1, 11, 1,
-           t4, 3, 17, 1,
+           t2, 2, 11, 1,
+           t3, 1, 3, 1,
+           t4, 4, 17, 1,
            tloop1, 1, 8, 1,
-           tloop2, 1, 3, 1);
+           tloop2, 2, 11, 1);
 
 // PE Optimization
 
 // CPU Realization
-Image<int> FPGA_output(8 + 1, 3 + 1, 11 + 1, 17 + 1);
+Image<int> FPGA_output(8 + 1, 11 + 1, 3 + 1, 17 + 1);
 APP.realize(FPGA_output);
 cout << "END" << endl;
 
@@ -68,10 +67,10 @@ cout << "END" << endl;
 
 /*
 // Build I/O network
-Func Z_CC0_I_drainer, Z_CC0_I_collector, Z_CC0_I_unloader, Z_CC0_I_deserializer(Place::Host), X_CC1_E_serializer(Place::Host), X_CC1_E_loader, X_CC1_E_feeder, W_CC2_E_serializer(Place::Host), W_CC2_E_loader, W_CC2_E_feeder;
-APP.isolate_producer_chain(Z_CC0_I, Z_CC0_I_drainer, Z_CC0_I_collector, Z_CC0_I_unloader Z_CC0_I_deserializer(Place::Host))
-   .isolate_consumer_chain(X_CC1_E, X_CC1_E_feeder, X_CC1_E_loader, X_CC1_E_serializer(Place::Host))
-   .isolate_consumer_chain(W_CC2_E, W_CC2_E_feeder, W_CC2_E_loader, W_CC2_E_serializer(Place::Host));
+Func W_CC0_E_serializer(Place::Host), W_CC0_E_loader, W_CC0_E_feeder, Z_CC1_I_drainer, Z_CC1_I_collector, Z_CC1_I_unloader, Z_CC1_I_deserializer(Place::Host), X_CC2_E_serializer(Place::Host), X_CC2_E_loader, X_CC2_E_feeder;
+APP.isolate_consumer_chain(W_CC0_E, W_CC0_E_feeder, W_CC0_E_loader, W_CC0_E_serializer(Place::Host))
+   .isolate_producer_chain(Z_CC1_I, Z_CC1_I_drainer, Z_CC1_I_collector, Z_CC1_I_unloader Z_CC1_I_deserializer(Place::Host))
+   .isolate_consumer_chain(X_CC2_E, X_CC2_E_feeder, X_CC2_E_loader, X_CC2_E_serializer(Place::Host));
 
 // I/O Optimization
 

@@ -12,6 +12,9 @@
 
 #define URE_MERGE
 
+#define max(a,b) (a > b)? (a):(b)
+#define min(a,b) (a < b)? (a):(b)
+
 int t2s_compare_stmt_order(Stmt *stmt1, Stmt *stmt2, int band_width);
 //void create_RAR_UREs(Stmt *stmt, PlutoAccess *acc, PlutoProg *prog, VSA *vsa);
 PlutoConstraints *get_RAR_domain(Stmt *stmt, PlutoAccess *acc, PlutoProg *prog, VSA *vsa); 

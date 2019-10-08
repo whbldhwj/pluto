@@ -9,33 +9,33 @@
 
 int main(){
   // declarations
-  static data_t A[I][K][L];
-  static data_t B[K][J];
-  static data_t C[L][J];
-  static data_t D[I][J];
-  static data_t D_dsa[I][J];
+  static data_t A[I + 1][K + 1][L + 1];
+  static data_t B[K + 1][J + 1];
+  static data_t C[L + 1][J + 1];
+  static data_t D[I + 1][J + 1];
+  static data_t D_dsa[I + 1][J + 1];
 
   // data initialization
-  for (int i = 0; i < I; i++)
-    for (int k = 0; k < K; k++) 
-      for (int l = 0; l < L; l++) {
+  for (int i = 0; i < I + 1; i++)
+    for (int k = 0; k < K + 1; k++) 
+      for (int l = 0; l < L + 1; l++) {
         A[i][k][l] = (float)rand() / RAND_MAX;
       }
-  for (int k = 0; k < K; k++)
-    for (int j = 0; j < J; j++) {
+  for (int k = 0; k < K + 1; k++)
+    for (int j = 0; j < J + 1; j++) {
       B[k][j] = (float)rand() / RAND_MAX;
     }
-  for (int l = 0; l < L; l++)
-    for (int j = 0; j < J; j++) {
+  for (int l = 0; l < L + 1; l++)
+    for (int j = 0; j < J + 1; j++) {
       C[l][j] = (float)rand() / RAND_MAX;
     }
 
   // computation
-  for (int i = 0; i < I; i++)
-    for (int j = 0; j < J; j++) {
+  for (int i = 1; i <= I; i++)
+    for (int j = 1; j <= J; j++) {
       D[i][j] = 0;
-      for (int k = 0; k < K; k++)
-        for (int l = 0; l < L; l++) {
+      for (int k = 1; k <= K; k++)
+        for (int l = 1; l <= L; l++) {
           D[i][j] += A[i][k][l] * B[k][j] * C[l][j];
         }
     }
@@ -45,8 +45,8 @@ int main(){
   // comparison
   int err = 0;
   float thres = 0.001;
-  for (int i = 0; i < I; i++) 
-    for (int j = 0; j < J; j++) {
+  for (int i = 1; i <= I; i++) 
+    for (int j = 1; j <= J; j++) {
       if (fabs(D_dsa[i][j] - D[i][j]) > thres) {
         err++;
       }

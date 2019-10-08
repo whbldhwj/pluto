@@ -31,6 +31,7 @@ int main(){
   for (int r = 1; r < R + 1; r++)
     for (int s = 1; s < S + 1; s++) {
       Z[r][s] = 0;
+      Z_dsa[r][s] = 0;
     }
 
   // computation

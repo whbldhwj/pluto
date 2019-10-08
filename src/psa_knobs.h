@@ -88,7 +88,7 @@
 #endif
 
 // print out detailed information of each dependence after the PE optimization
-#define PRINT_DEPS_POST_PE_OPTIMIZATION
+//#define PRINT_DEPS_POST_PE_OPTIMIZATION
 
 /*
  * ************************************

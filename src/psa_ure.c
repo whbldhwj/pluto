@@ -2130,7 +2130,7 @@ void stmt_to_UREs(Stmt *stmt, PlutoProg *prog, VSA *vsa) {
 
 /*
  * This function parses iteration information
- * The fields to be fulfilled:
+ * The fields to be fulfiled:
  * - iter_name
  * - lb
  * - ub
@@ -2140,80 +2140,105 @@ void stmt_to_UREs(Stmt *stmt, PlutoProg *prog, VSA *vsa) {
 void vsa_t2s_meta_iter_extract(PlutoProg *prog, VSA *vsa) {
   // initialize the meta iterators
   Iter **t2s_meta_iters = (Iter **)malloc(sizeof(Iter *) * vsa->t2s_iter_num);
-//  for (int i = 0; i < vsa->t2s_iter_num; i++) {
-//    t2s_meta_iters[i] = (Iter *)malloc(sizeof(Iter));
-//  }
 
   // parse the AST tree to update the iters
   for (int i = 0; i < vsa->t2s_iter_num; i++) {
-    Iter **tmp_iters = (Iter **)malloc(sizeof(Iter *) * 1);
-    tmp_iters[0] = (Iter *)malloc(sizeof(Iter));
-
-//    // Build the anchor statement
-//    // The anchor statement is with maximum dimension, and the iteration
-//    // domain is the union of all the statements
-//    Stmt *anchor_stmt = get_new_anchor_stmt(prog->stmts, prog->nstmts);
-//
-//    // Generate a temporary program
-//    PlutoProg *print_prog = pluto_prog_alloc();
-//    for (int i = 0; i < prog->npar; i++) {
-//      pluto_prog_add_param(print_prog, prog->params[i], print_prog->npar);
-//    }
-//    for (int i = 0; i < anchor_stmt->dim; i++) {
-//      pluto_prog_add_hyperplane(print_prog, 0, H_UNKNOWN, PSA_H_UNKNOWN);
-//    }
-//    print_prog->stmts = (Stmt **)malloc(sizeof(Stmt *));
-//    print_prog->nstmts = 1;
-//    print_prog->stmts[0] = anchor_stmt;
+    t2s_meta_iters[i] = (Iter *)malloc(sizeof(Iter) * 1);
+    // initialize
+    t2s_meta_iters[i]->lb = -1;
+    t2s_meta_iters[i]->ub = -1;
+    t2s_meta_iters[i]->stride = 1;
+  
     PlutoProg *print_prog = pluto_prog_dup(prog);
 
     // permute the iterators to outermost
     for (int j = i; j >= 1; j--) {
       pluto_interchange(print_prog, j, j - 1);
     }
- 
-//    // debug
-//    char code_name[10];
-//    sprintf(code_name, "debug%d", i);
-//    pluto_print_program(print_prog, "kernel.c", code_name);
-
-    // generate temporary CLooG file
-    char *cloog_file_name = ".t2s.tmp.cloog";
-    FILE *cloog_fp;
-    cloog_fp = fopen(cloog_file_name, "w+");
-    if (!cloog_fp) {
-      fprintf(stderr, "[PSA] Can't open .cloog file: '%s'\n", cloog_file_name);
-      free(cloog_file_name);
-      return 0;
+    
+    PlutoConstraints *domain = NULL;
+    for (int s = 0; s < print_prog->nstmts; s++) {
+      Stmt *stmt = print_prog->stmts[s];
+      PlutoConstraints *new_stmt_domain = pluto_get_new_domain(stmt);
+      // Project out all other hyperplanes except the first one
+      pluto_constraints_project_out_isl_single(new_stmt_domain, 1, stmt->trans->nrows - 1);
+      if (s == 0) 
+        domain = pluto_constraints_dup(new_stmt_domain);
+      else
+        pluto_constraints_unionize(domain, new_stmt_domain);
+      pluto_constraints_free(new_stmt_domain);
     }
-    pluto_gen_cloog_file(cloog_fp, print_prog);
-    rewind(cloog_fp);
-    
-    // build the clast AST tree
-    struct clast_stmt *root;
-    CloogOptions *cloogOptions;
-    CloogState *state;
-  
-    state = cloog_state_malloc();
-    cloogOptions = cloog_options_malloc(state);
-  
-    root = psa_create_cloog_ast_tree(print_prog, print_prog->num_hyperplanes, 1, cloog_fp, &cloogOptions);
-    fclose(cloog_fp);
-    
-    int iter_cnt = 0;
-    clast_parse_t2s_meta_iters(tmp_iters, 1, &iter_cnt, root, cloogOptions);
 
-    cloog_clast_free(root);
-    cloog_options_free(cloogOptions);
-    cloog_state_free(state);
+//    pluto_constraints_pretty_print(stdout, domain);
+    PlutoConstraints *single_domain = pluto_constraints_dup(domain);
+    PlutoConstraints *domain_keep = domain;
 
-    t2s_meta_iters[i] = tmp_iters[0];
+    while(single_domain != NULL) {
+//      pluto_constraints_pretty_print(stdout, single_domain);
+      // compute the rectangular hull
+      isl_fixed_box *box = pluto_constraints_box_hull_isl(single_domain, 0, single_domain->ncols - print_prog->npar - 1, print_prog->npar);
+      isl_ctx *ctx = isl_fixed_box_get_ctx(box);
+
+      if (isl_fixed_box_is_valid(box)) {
+        isl_multi_val *box_sizes = isl_fixed_box_get_size(box);
+//      int dim = isl_multi_val_dim(box_sizes, isl_dim_set);
+//      printf("%d\n", dim);
+        isl_val *val = isl_multi_val_get_val(box_sizes, 0);
+        int extent = isl_val_get_num_si(val);
+        isl_val_free(val);
+        isl_multi_val_free(box_sizes);
+        
+        isl_multi_aff *box_offsets = isl_fixed_box_get_offset(box);
+        // get isl_map from the multi_aff
+        isl_basic_map *box_offsets_map = isl_basic_map_from_multi_aff(box_offsets);
+        // get the fixed value
+        isl_val *offset_val = isl_basic_map_plain_get_val_if_fixed(box_offsets_map, isl_dim_out, 0);
+        int lb = isl_val_get_num_si(offset_val);
+        isl_val_free(offset_val);
+        isl_basic_map_free(box_offsets_map);
+
+        int ub = lb + extent - 1;
+        // update the iterator
+        if (t2s_meta_iters[i]->lb == -1) 
+          t2s_meta_iters[i]->lb = lb;
+        else
+          t2s_meta_iters[i]->lb = min(t2s_meta_iters[i]->lb, lb);
+
+        t2s_meta_iters[i]->ub = max(ub, t2s_meta_iters[i]->ub);
+      
+//        t2s_meta_iters[i]->stride = (int)isl_val_get_num_si(val);
+//        printf("%d\n", t2s_meta_iters[i]->stride);
+//        isl_val_free(val);
+//        isl_multi_val_free(box_sizes);
+//
+//        isl_multi_aff *box_offsets = isl_fixed_box_get_offset(box);
+//        // get isl_map from the multi_aff
+//        isl_basic_map *box_offsets_map = isl_basic_map_from_multi_aff(box_offsets);
+//        // get the fixed value
+//        isl_val *offset_val = isl_basic_map_plain_get_val_if_fixed(box_offsets_map, isl_dim_out, 0);
+//        printf("%d\n", isl_val_get_num_si(offset_val));
+//
+//        isl_printer *printer = isl_printer_to_file(ctx, stdout);
+//        isl_printer_print_multi_aff(printer, box_offsets);
+//        printf("\n");
+      } 
+
+      isl_fixed_box_free(box);
+      isl_ctx_free(ctx);
+      
+      domain = domain->next;
+      pluto_constraints_free(single_domain);
+      if (domain != NULL)
+        single_domain = pluto_constraints_dup(domain);
+      else
+        single_domain = NULL;
+    }
+
     char iter_name[20];
     sprintf(iter_name, "t%d", i + 1);
-    free(t2s_meta_iters[i]->iter_name);
-    t2s_meta_iters[i]->iter_name = strdup(iter_name);
-    free(tmp_iters);
+    t2s_meta_iters[i]->iter_name = strdup(iter_name);    
 
+    pluto_constraints_free(domain_keep);
     pluto_prog_free(print_prog);
   }
 
@@ -2234,8 +2259,139 @@ void vsa_t2s_meta_iter_extract(PlutoProg *prog, VSA *vsa) {
 #endif    
   }
 
-  vsa->t2s_meta_iters = t2s_meta_iters;
+  vsa->t2s_meta_iters = t2s_meta_iters; 
 }
+
+/*
+ * This function parses iteration information
+ * The fields to be fulfilled:
+ * - iter_name
+ * - lb
+ * - ub
+ * - stride
+ * - type: P: array partitioning, T: time, S: space
+ */
+//void vsa_t2s_meta_iter_extract(PlutoProg *prog, VSA *vsa) {
+//  // initialize the meta iterators
+//  Iter **t2s_meta_iters = (Iter **)malloc(sizeof(Iter *) * vsa->t2s_iter_num);
+////  for (int i = 0; i < vsa->t2s_iter_num; i++) {
+////    t2s_meta_iters[i] = (Iter *)malloc(sizeof(Iter));
+////  }
+//
+//  // parse the AST tree to update the iters
+//  for (int i = 0; i < vsa->t2s_iter_num; i++) {
+//    Iter **tmp_iters = (Iter **)malloc(sizeof(Iter *) * 1);
+//    tmp_iters[0] = (Iter *)malloc(sizeof(Iter));
+//
+////    // Build the anchor statement
+////    // The anchor statement is with maximum dimension, and the iteration
+////    // domain is the union of all the statements
+////    Stmt *anchor_stmt = get_new_anchor_stmt(prog->stmts, prog->nstmts);
+////
+////    // Generate a temporary program
+////    PlutoProg *print_prog = pluto_prog_alloc();
+////    for (int i = 0; i < prog->npar; i++) {
+////      pluto_prog_add_param(print_prog, prog->params[i], print_prog->npar);
+////    }
+////    for (int i = 0; i < anchor_stmt->dim; i++) {
+////      pluto_prog_add_hyperplane(print_prog, 0, H_UNKNOWN, PSA_H_UNKNOWN);
+////    }
+////    print_prog->stmts = (Stmt **)malloc(sizeof(Stmt *));
+////    print_prog->nstmts = 1;
+////    print_prog->stmts[0] = anchor_stmt;
+//    PlutoProg *print_prog = pluto_prog_dup(prog);
+//
+//    // permute the iterators to outermost
+//    for (int j = i; j >= 1; j--) {
+//      pluto_interchange(print_prog, j, j - 1);
+//    }
+// 
+////    // debug
+////    char code_name[10];
+////    sprintf(code_name, "debug%d", i);
+////    pluto_print_program(print_prog, "kernel.c", code_name);
+//
+//    // generate temporary CLooG file
+//    //char *cloog_file_name = ".t2s.tmp.cloog";
+//    char cloog_file_name[50];
+//    sprintf(cloog_file_name, "t2s.tmp%d.cloog", i);
+//    FILE *cloog_fp;
+//    cloog_fp = fopen(cloog_file_name, "w+");
+//    if (!cloog_fp) {
+//      fprintf(stderr, "[PSA] Can't open .cloog file: '%s'\n", cloog_file_name);
+//      free(cloog_file_name);
+//      return 0;
+//    }
+//    pluto_gen_cloog_file(cloog_fp, print_prog);
+//    rewind(cloog_fp);
+//    
+//    // debug
+////    fclose(cloog_fp);
+////    cloog_fp = fopen(cloog_file_name, "r");
+////    FILE *out_fp;
+////    char out_file_name[50];
+////    sprintf(out_file_name, "t2s.tmp%d.c", i);
+////    out_fp = fopen(out_file_name, "w");
+////    pluto_gen_cloog_code(print_prog, print_prog->num_hyperplanes, 1, cloog_fp, out_fp);
+////    fclose(out_fp);
+//    // debug
+//
+//    // debug
+////    FILE *out_fp;
+////    char out_file_name[50];
+////    sprintf(out_file_name, "t2s.tmp%d.c", i);
+////    out_fp = fopen(out_file_name, "w");
+////    pluto_gen_cloog_code(print_prog, print_prog->num_hyperplanes, 1, cloog_fp, out_fp);
+////    fclose(out_fp);   
+//    // debug
+//
+////    // build the clast AST tree
+////    struct clast_stmt *root;
+////    CloogOptions *cloogOptions;
+////    CloogState *state;
+////  
+////    state = cloog_state_malloc();
+////    cloogOptions = cloog_options_malloc(state);
+////  
+////    root = psa_create_cloog_ast_tree(print_prog, print_prog->num_hyperplanes, 1, cloog_fp, &cloogOptions);
+////    fclose(cloog_fp);
+////    
+////    int iter_cnt = 0;
+////    clast_parse_t2s_meta_iters(tmp_iters, 1, &iter_cnt, root, cloogOptions);
+////
+////    cloog_clast_free(root);
+////    cloog_options_free(cloogOptions);
+////    cloog_state_free(state);
+////
+////    t2s_meta_iters[i] = tmp_iters[0];
+////    char iter_name[20];
+////    sprintf(iter_name, "t%d", i + 1);
+////    free(t2s_meta_iters[i]->iter_name);
+////    t2s_meta_iters[i]->iter_name = strdup(iter_name);
+////    free(tmp_iters);
+//
+//    pluto_prog_free(print_prog);
+//  }
+//
+//  for (int i = 0; i < vsa->t2s_iter_num; i++) {
+//    if (i < vsa->array_part_band_width)
+//      t2s_meta_iters[i]->type = 'A';
+//#ifdef ASYNC_ARRAY
+//    else if (i < vsa->array_part_band_width + vsa->space_band_width)
+//      t2s_meta_iters[i]->type = 'S';
+//    else
+//      t2s_meta_iters[i]->type = 'T';
+//#endif
+//#ifdef SYNC_ARRAY
+//    else if (i < vsa->array_part_band_width + vsa->time_band_width)
+//      t2s_meta_iters[i]->type = 'T';
+//    else
+//      t2s_meta_iters[i]->type = 'S';
+//#endif    
+//  }
+//
+//  vsa->t2s_meta_iters = t2s_meta_iters;
+//}
 
 /*
  * This function parses iteration information from the 

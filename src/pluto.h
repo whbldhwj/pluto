@@ -795,8 +795,8 @@ struct iter {
   char *iter_name;
 
   /* Iterator bound */
-  char *lb;
-  char *ub;
+  int lb;
+  int ub;
 
   /* Tilable */
   bool tilable;
@@ -805,7 +805,7 @@ struct iter {
   int tile_factor;
 
   /* Stride */
-  char *stride;
+  int stride;
 
   /* Type */
   char type;

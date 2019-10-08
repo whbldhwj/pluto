@@ -1535,9 +1535,9 @@ void vsa_free(VSA *vsa) {
   /* Iters */
   for (int i = 0; i < vsa->t2s_iter_num; i++) {
     free(vsa->t2s_meta_iters[i]->iter_name);
-    free(vsa->t2s_meta_iters[i]->lb);
-    free(vsa->t2s_meta_iters[i]->ub);
-    free(vsa->t2s_meta_iters[i]->stride);
+//    free(vsa->t2s_meta_iters[i]->lb);
+//    free(vsa->t2s_meta_iters[i]->ub);
+//    free(vsa->t2s_meta_iters[i]->stride);
     free(vsa->t2s_meta_iters[i]);
   }
   free(vsa->t2s_meta_iters);
