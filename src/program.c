@@ -2024,8 +2024,7 @@ static int basic_map_extract_dep(__isl_take isl_basic_map *bmap, void *user) {
       stmts[dep->src]->dim + stmts[dep->dest]->dim, stmts[dep->dest]->dim,
       stmts[dep->dest]->domain->ncols - stmts[dep->dest]->dim - 1);
 
-  if (options->isldepaccesswise &&
-      (stmts[dep->src]->reads != NULL && stmts[dep->dest]->reads != NULL)) {
+  if (options->isldepaccesswise) {
     /* Extract access function information */
     int src_acc_num, dest_acc_num;
     char src_type, dest_type;
@@ -2245,7 +2244,7 @@ static void compute_deps(osl_scop_p scop, PlutoProg *prog,
   param_space = isl_space_params(isl_space_copy(dim));
   context = osl_relation_to_isl_set(scop->context, param_space);
 
-  if (!options->rar)
+  if (options->rar)
     dep_rar = isl_union_map_empty(isl_space_copy(dim));
   empty = isl_union_map_empty(isl_space_copy(dim));
   write = isl_union_map_empty(isl_space_copy(dim));
@@ -4691,15 +4690,59 @@ struct acc_info {
   isl_map *base_schedule;
 };
 
-static int set_tuple_name(__isl_take isl_map *map, void *usr) {
+/* Jie Added - Start */
+static int isl_basic_map_set_dep_tuple_name(__isl_take isl_basic_map *bmap, void *usr) {
   char *name;
 
   struct acc_info *info = (struct acc_info *)usr;
   name = malloc(strlen(info->prefix) + 4);
   sprintf(name, "%s%d", info->prefix, info->acc_num);
-  // printf("%s\n", name);
+//  printf("%s\n", name);
+  bmap = isl_basic_map_set_tuple_name(bmap, isl_dim_in, name);
+  info->acc_num++;
+
+  *info->new_maps =
+      isl_union_map_union(*info->new_maps, isl_union_map_from_basic_map(bmap));
+  isl_map *schedule_i = isl_map_copy(info->base_schedule);
+  schedule_i = isl_map_set_tuple_name(schedule_i, isl_dim_in, name);
+  *info->schedule =
+      isl_union_map_union(*info->schedule, isl_union_map_from_map(schedule_i));
+  free(name);
+
+  return 0;
+}
+
+static int isl_map_set_dep_tuple_name(__isl_take isl_map *map, void *usr) {
+  int r;
+
+  r = isl_map_foreach_basic_map(map, &isl_basic_map_set_dep_tuple_name, usr);
+
+  isl_map_free(map);
+
+  return r;
+}
+/* Jie Added - End */
+
+static int set_tuple_name(__isl_take isl_map *map, void *usr) {
+  char *name;
+//  // debug
+//  isl_ctx *ctx = isl_map_get_ctx(map);
+//  isl_printer *printer = isl_printer_to_file(ctx, stdout);
+//  isl_printer_print_map(printer, map);
+//  printf("\n");
+//  // debug
+
+  struct acc_info *info = (struct acc_info *)usr;
+  name = malloc(strlen(info->prefix) + 4);
+  sprintf(name, "%s%d", info->prefix, info->acc_num);
+  printf("%s\n", name);
   map = isl_map_set_tuple_name(map, isl_dim_in, name);
   info->acc_num++;
+
+//  // debug
+//  isl_printer_print_map(printer, map);
+//  printf("\n");
+//  // debug
 
   *info->new_maps =
       isl_union_map_union(*info->new_maps, isl_union_map_from_map(map));
@@ -4735,7 +4778,7 @@ static void compute_deps_pet(struct pet_scop *pscop,
   reads = isl_union_map_copy(empty);
   writes = isl_union_map_copy(empty);
   schedule = isl_union_map_copy(empty);
-  if (!options->rar)
+  if (options->rar)
     dep_rar = isl_union_map_copy(empty);
 
   isl_union_map *schedules = isl_schedule_get_map(pscop->schedule);
@@ -4755,20 +4798,45 @@ static void compute_deps_pet(struct pet_scop *pscop,
     isl_union_map *lwrites = pet_stmt_collect_accesses(
         pstmt, pet_expr_access_may_write, 0, isl_space_copy(space));
 
+//    // debug
+//    isl_ctx *ctx = isl_union_map_get_ctx(lreads);
+//    isl_printer *printer = isl_printer_to_file(ctx, stdout);
+//    isl_printer_print_union_map(printer, lreads);
+//    fprintf(stdout, "\n");
+//    int ele_tmp = (int)isl_union_map_n_map(lreads);
+//    fprintf(stdout, "#: %d\n", ele_tmp);
+//    // debug
+
     char name[20];
     sprintf(name, "S_%d_r", stmt->id);
     struct acc_info rinfo = { name, 0, &reads, &schedule, s_map };
-    isl_union_map_foreach_map(lreads, &set_tuple_name, &rinfo);
+//    isl_union_map_foreach_map(lreads, &set_tuple_name, &rinfo);
+    isl_union_map_foreach_map(lreads, &isl_map_set_dep_tuple_name, &rinfo);
     sprintf(name, "S_%d_w", stmt->id);
     struct acc_info winfo = { name, 0, &writes, &schedule, s_map };
-    isl_union_map_foreach_map(lwrites, &set_tuple_name, &winfo);
+//    isl_union_map_foreach_map(lwrites, &set_tuple_name, &winfo);
+    isl_union_map_foreach_map(lwrites, &isl_map_set_dep_tuple_name, &winfo);
 
     isl_map_free(s_map);
     isl_union_map_free(lreads);
     isl_union_map_free(lwrites);
+
+//    // debug
+//    isl_printer_print_union_map(printer, reads);
+//    fprintf(stdout, "\n");
+//    // debug
   }
   isl_union_map_free(schedules);
   isl_space_free(space);
+
+//  // debug
+//  isl_ctx *ctx = isl_union_map_get_ctx(schedules);
+//  isl_printer *printer = isl_printer_to_file(ctx, stdout);
+//  isl_printer_print_union_map(printer, reads);
+//  fprintf(stdout, "\n");
+//  isl_printer_print_union_map(printer, writes);
+//  fprintf(stdout, "\n");
+//  // debug
 
   if (options->lastwriter) {
     // compute RAW dependences which do not contain transitive dependences
@@ -4814,6 +4882,11 @@ static void compute_deps_pet(struct pet_scop *pscop,
     }
   }
 
+//  // debug
+//  isl_printer_print_union_map(printer, dep_war);
+//  fprintf(stdout, "\n");
+//  // debug
+
   if (options->isldepcoalesce) {
     dep_raw = isl_union_map_coalesce(dep_raw);
     dep_war = isl_union_map_coalesce(dep_war);
@@ -4838,6 +4911,11 @@ static void compute_deps_pet(struct pet_scop *pscop,
   prog->ndeps = 0;
   prog->ndeps += extract_deps(prog->deps, prog->ndeps, prog->stmts, dep_raw,
                               OSL_DEPENDENCE_RAW);
+//  // debug
+//  isl_printer_print_union_map(printer, dep_war);
+//  fprintf(stdout, "\n");
+//  // debug
+
   prog->ndeps += extract_deps(prog->deps, prog->ndeps, prog->stmts, dep_war,
                               OSL_DEPENDENCE_WAR);
   prog->ndeps += extract_deps(prog->deps, prog->ndeps, prog->stmts, dep_waw,

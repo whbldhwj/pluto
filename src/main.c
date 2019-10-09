@@ -612,6 +612,7 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
  * *******************************************
  */
 /* Jie Added - Start */  
+  psa_print_deps(prog);
   fprintf(stdout, "[PSA] Filter out redundant dependences.\n");
   /* Filter out RAR dependences on scalar variables */
   rar_scalar_filter(prog);
@@ -640,6 +641,7 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
   }
 
   /* Jie Added - Start */
+//  psa_print_deps(prog);
   /* Create the access dependence graph */
   Graph *adg = adg_create(prog);
   adg_merge_racc(adg, prog);

@@ -184,10 +184,10 @@ Ploop **pluto_get_loops_under(Stmt **stmts, unsigned nstmts, unsigned depth,
 
     loop_nstmts = 0;
     for (i = 0; i < nstmts; i++) {
-      if (!pluto_is_hyperplane_scalar(stmts[i], depth)) {
+//      if (!pluto_is_hyperplane_scalar(stmts[i], depth)) {
         memcpy(this_loop->stmts + loop_nstmts, stmts + i, sizeof(Stmt *));
         loop_nstmts++;
-      }
+//      }
     }
     this_loop->nstmts = loop_nstmts;
     this_loop->depth = depth;

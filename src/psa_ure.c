@@ -1608,6 +1608,20 @@ void stmt_to_UREs_new(Stmt *stmt, PlutoProg *prog, VSA *vsa) {
   } else if (num_split_accs == 1) {
     if (!is_acc_split[0]) {
       // update the vsa->acc_var_map
+      PlutoAccess *acc = split_accs[0];
+      Dep *dep = split_deps[0][0];
+      for (int iter_id = 0; iter_id < vsa->t2s_iter_num; iter_id++) {
+        int diff = dep->disvec[iter_id];
+        vsa->acc_var_map[acc->sym_id]->var_iters[iter_id]->iter_offset = -diff;
+      }
+      char var_ref[50];
+      char *str_tmp = get_iter_str(vsa->acc_var_map[acc->sym_id]->var_iters, vsa->t2s_iter_num);
+      sprintf(var_ref, "%s(%s)", vsa->acc_var_map[acc->sym_id]->var_name, str_tmp);
+      free(str_tmp);
+
+      free(vsa->acc_var_map[acc->sym_id]->var_ref);
+      vsa->acc_var_map[acc->sym_id]->var_ref = strdup(var_ref);
+
       // update the domain
       char *domain_str = create_stmt_domain_str(stmt, prog, vsa);
       stmt_to_URE_single(domain_str, stmt, prog, vsa);
